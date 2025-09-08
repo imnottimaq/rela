@@ -310,7 +310,25 @@ func addBoard(c *gin.Context) {
 }
 
 func deleteBoard(c *gin.Context) {
-
+	id, _ := c.Get("id")
+	boardId, _ := c.Get("boardId")
+	var board Board
+	if err := boardsDb.FindOne(context.TODO(), bson.D{{"_id", boardId}}).Decode(board); err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			c.AbortWithStatusJSON(404, gin.H{"error": "task does not exist"})
+			return
+		} else {
+			c.AbortWithStatusJSON(500, gin.H{"error": "failed to execute search"})
+			return
+		}
+	}
+	if board.OwnedBy == id {
+		if _, err := boardsDb.DeleteOne(context.TODO(), bson.D{{"_id", boardId}}); err != nil {
+			c.AbortWithStatusJSON(500, gin.H{"error": "failed to remove board"})
+		}
+		c.AbortWithStatus(200)
+		return
+	}
 }
 
 func editBoard(c *gin.Context) {
