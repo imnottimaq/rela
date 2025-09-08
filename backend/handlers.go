@@ -198,6 +198,25 @@ func loginUser(c *gin.Context) {
 	}
 }
 
+func deleteUser(c *gin.Context) {
+	userId, _ := c.Get("id")
+	var input LoginUser
+	var user User
+	json.NewDecoder(c.Request.Body).Decode(&input)
+	usersDb.FindOne(context.TODO(), bson.D{{Key: "_id", Value: userId}}).Decode(&user)
+	if user.Email == input.Email && base64.RawStdEncoding.EncodeToString(argon2.IDKey([]byte(input.Password+pepper), []byte(user.Salt), uint32(3), uint32(128*1024), uint8(2), uint32(32))) == user.HashedPassword && userId == user.Id {
+		usersDb.DeleteOne(context.TODO(), bson.D{{Key: "_id", Value: userId}})
+		c.AbortWithStatus(200)
+		return
+	} else if user.Email != input.Email || base64.RawStdEncoding.EncodeToString(argon2.IDKey([]byte(input.Password+pepper), []byte(user.Salt), uint32(3), uint32(128*1024), uint8(2), uint32(32))) != user.HashedPassword {
+		c.AbortWithStatus(400)
+		return
+	} else if userId != user.Id {
+		c.AbortWithStatus(403)
+		return
+	}
+}
+
 func generateAccessToken(token string) (accessToken string, err error) {
 	parsedToken, _ := jwt.ParseWithClaims(token, &LoginToken{}, func(token *jwt.Token) (any, error) {
 		if token.Method != jwt.SigningMethodHS256 {

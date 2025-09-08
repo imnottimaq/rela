@@ -30,6 +30,7 @@ func main() {
 		protected.PATCH("/tasks/:taskId", editExistingTask)
 		protected.DELETE("/tasks/:taskId", deleteExistingTask)
 		protected.POST("/boards", addBoard)
+		protected.DELETE("/users/delete", deleteUser)
 
 		r.POST("/api/v1/users/create", createUser)
 		r.POST("/api/v1/users/login", loginUser)
