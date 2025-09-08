@@ -23,12 +23,13 @@ var _ = godotenv.Load()
 var pepper = os.Getenv("PEPPER")
 var tasksDb = dbClient.Database("rela").Collection("tasks")
 var usersDb = dbClient.Database("rela").Collection("users")
+var boardsDb = dbClient.Database("rela").Collection("boards")
 
 var emailRegex = regexp.MustCompile(`^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$`)
 
 func getAllTasks(c *gin.Context) {
 	id, _ := c.Get("id")
-	cursor, _ := tasksDb.Find(context.TODO(), bson.D{{Key: "createdby", Value: id}})
+	cursor, _ := tasksDb.Find(context.TODO(), bson.D{{Key: "created_by", Value: id}})
 	defer cursor.Close(context.TODO())
 	var tasks []Task
 	_ = cursor.All(context.TODO(), &tasks)
@@ -38,14 +39,26 @@ func getAllTasks(c *gin.Context) {
 
 func createNewTask(c *gin.Context) {
 	id, _ := c.Get("id")
+
 	var newTask Task
+	var board Board
 	json.NewDecoder(c.Request.Body).Decode(&newTask)
 	if newTask.Name == "" {
 		c.AbortWithStatusJSON(400, gin.H{"error": "Field 'name' is not specified"})
 		return
+	} else if newTask.Board.IsZero() {
+		c.AbortWithStatusJSON(400, gin.H{"error": "Field 'board' is not specified"})
+		return
+	}
+	err := boardsDb.FindOne(context.TODO(), bson.D{{"_id", newTask.Board}}).Decode(board)
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		c.AbortWithStatusJSON(400, gin.H{"error": "Board does not exist"})
+		return
+	} else {
+		c.AbortWithStatusJSON(500, gin.H{"error": err})
 	}
 	newTask.CreatedAt = time.Now().UTC().Unix()
-	newTask.CreatedBy = id.(bson.ObjectID)
+	newTask.OwnedBy = id.(bson.ObjectID)
 	task, err := tasksDb.InsertOne(context.TODO(), newTask)
 	if err != nil {
 		c.AbortWithStatusJSON(500, gin.H{"error": "Failed to push task to database"})
@@ -70,7 +83,7 @@ func editExistingTask(c *gin.Context) {
 			return
 		}
 	}
-	if previousVersion.CreatedBy != id {
+	if previousVersion.OwnedBy != id {
 		c.AbortWithStatusJSON(400, gin.H{"error": "This task isn't owned by you"})
 		return
 	}
@@ -85,9 +98,6 @@ func editExistingTask(c *gin.Context) {
 	}
 	if valuesToEdit.Description != nil {
 		previousVersion.Description = valuesToEdit.Description
-	}
-	if valuesToEdit.Board != nil {
-		previousVersion.Board = valuesToEdit.Board
 	}
 	_, err = tasksDb.ReplaceOne(context.TODO(), bson.D{{Key: "_id", Value: taskId}}, previousVersion)
 	if err != nil {
@@ -112,7 +122,7 @@ func deleteExistingTask(c *gin.Context) {
 			return
 		}
 	}
-	if result.CreatedBy != id {
+	if result.OwnedBy != id {
 		c.AbortWithStatusJSON(400, gin.H{"error": "This task isn't owned by you"})
 		return
 	}
@@ -241,7 +251,7 @@ func generateAccessToken(token string) (accessToken string, err error) {
 	})
 	claims := parsedToken.Claims.(*LoginToken)
 	if claims.ExpiresAt < time.Now().UTC().Unix() {
-		return "", fmt.Errorf("Expired refresh token")
+		return "", fmt.Errorf("expired refresh token")
 	} else {
 		newToken := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 			"id":  claims.Id,
@@ -274,8 +284,8 @@ func addBoard(c *gin.Context) {
 		return
 	}
 	usersDb.FindOne(context.TODO(), bson.D{{Key: "_id", Value: id}}).Decode(&user)
-	user.Boards = append(user.Boards, input.Name)
-	usersDb.ReplaceOne(context.TODO(), bson.D{{Key: "_id", Value: id}}, user)
-	c.AbortWithStatusJSON(200, gin.H{"error": "no name given"})
+	input.OwnedBy = user.Id
+	boardsDb.InsertOne(context.TODO(), input)
+	c.AbortWithStatus(200)
 	return
 }
