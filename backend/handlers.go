@@ -88,7 +88,7 @@ func editExistingTask(c *gin.Context) {
 		c.AbortWithStatusJSON(400, gin.H{"error": "This task isn't owned by you"})
 		return
 	}
-	var valuesToEdit TaskEdit
+	var valuesToEdit EditTask
 	json.NewDecoder(c.Request.Body).Decode(&valuesToEdit)
 	if valuesToEdit.Name != nil {
 		previousVersion.Name = *valuesToEdit.Name
@@ -315,7 +315,7 @@ func deleteBoard(c *gin.Context) {
 	var board Board
 	if err := boardsDb.FindOne(context.TODO(), bson.D{{"_id", boardId}}).Decode(board); err != nil {
 		if errors.Is(err, mongo.ErrNoDocuments) {
-			c.AbortWithStatusJSON(404, gin.H{"error": "task does not exist"})
+			c.AbortWithStatusJSON(404, gin.H{"error": "board does not exist"})
 			return
 		} else {
 			c.AbortWithStatusJSON(500, gin.H{"error": "failed to execute search"})
@@ -328,9 +328,40 @@ func deleteBoard(c *gin.Context) {
 		}
 		c.AbortWithStatus(200)
 		return
+	} else {
+		c.AbortWithStatusJSON(400, gin.H{"error": "you dont own this board"})
 	}
 }
 
 func editBoard(c *gin.Context) {
-
+	id, _ := c.Get("id")
+	boardId, _ := c.Get("boardId")
+	var valuesToEdit Board
+	var i Board
+	json.NewDecoder(c.Request.Body).Decode(valuesToEdit)
+	if valuesToEdit.OwnedBy != id && !valuesToEdit.OwnedBy.IsZero() {
+		c.AbortWithStatusJSON(400, gin.H{"error": "you dont own this board"})
+		return
+	} else if valuesToEdit.OwnedBy.IsZero() {
+		if err := boardsDb.FindOne(context.TODO(), bson.D{{"_id", boardId}}).Decode(i); err != nil {
+			if boardId == "" {
+				c.AbortWithStatusJSON(400, gin.H{"error": "board id cannot be empty"})
+				return
+			} else if errors.Is(err, mongo.ErrNoDocuments) {
+				c.AbortWithStatusJSON(404, gin.H{"error": "board does not exist"})
+				return
+			} else {
+				c.AbortWithStatusJSON(500, gin.H{"error": "failed to execute search"})
+				return
+			}
+		}
+		if valuesToEdit.Name == "" {
+			c.AbortWithStatusJSON(400, gin.H{"error": "you cant change board name to nothing"})
+			return
+		}
+		i.Name = valuesToEdit.Name
+		if _, err := boardsDb.InsertOne(context.TODO(), i); err != nil {
+			c.AbortWithStatusJSON(500, gin.H{"error": "failed to insert board"})
+		}
+	}
 }

@@ -15,7 +15,7 @@ type Task struct {
 	Board       bson.ObjectID `json:"board" bson:"board"`
 }
 
-type TaskEdit struct {
+type EditTask struct {
 	Name        *string `json:"name" bson:"name"`
 	Description *string `json:"description" bson:"description"`
 	CompletedAt *int64  `json:"completed_at" bson:"completed_at"`
@@ -46,6 +46,7 @@ type LoginUser struct {
 	Password string `json:"password" bson:"password"`
 }
 type Board struct {
+	Id      bson.ObjectID `json:"_id" bson:"_id,omitempty"`
 	Name    string        `json:"name" bson:"name"`
 	OwnedBy bson.ObjectID `json:"owned_by" bson:"owned_by"`
 }
