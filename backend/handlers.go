@@ -21,6 +21,7 @@ import (
 
 var _ = godotenv.Load()
 var pepper = os.Getenv("PEPPER")
+
 var tasksDb = dbClient.Database("rela").Collection("tasks")
 var usersDb = dbClient.Database("rela").Collection("users")
 var boardsDb = dbClient.Database("rela").Collection("boards")
@@ -306,4 +307,12 @@ func addBoard(c *gin.Context) {
 	boardsDb.InsertOne(context.TODO(), input)
 	c.AbortWithStatus(200)
 	return
+}
+
+func deleteBoard(c *gin.Context) {
+
+}
+
+func editBoard(c *gin.Context) {
+
 }
