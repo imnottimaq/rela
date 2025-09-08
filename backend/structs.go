@@ -30,21 +30,22 @@ type User struct {
 }
 
 type CreateUser struct {
-	Name     string `json:"name"`
-	Email    string `json:"email"`
-	Password string `json:"password"`
+	Name     string `json:"name" bson:"name"`
+	Email    string `json:"email" bson:"email"`
+	Password string `json:"password" bson:"password"`
 }
 
 type LoginToken struct {
-	Id        bson.ObjectID `json:"id"`
-	ExpiresAt int64         `json:"exp"`
+	Id        bson.ObjectID `json:"id" bson:"id"`
+	ExpiresAt int64         `json:"exp" bson:"expires_at"`
+	Type      string        `json:"type" bson:"type"`
 	jwt.RegisteredClaims
 }
 type LoginUser struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
+	Email    string `json:"email" bson:"email"`
+	Password string `json:"password" bson:"password"`
 }
 type Board struct {
-	Name    string        `json:"name"`
-	OwnedBy bson.ObjectID `json:"owned_by"`
+	Name    string        `json:"name" bson:"name"`
+	OwnedBy bson.ObjectID `json:"owned_by" bson:"owned_by"`
 }

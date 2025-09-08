@@ -28,6 +28,8 @@ func authMiddleware() gin.HandlerFunc {
 		if claims.ExpiresAt < time.Now().UTC().Unix() {
 			c.AbortWithStatusJSON(403, "Authorization Required")
 			return
+		} else if claims.Type == "refresh" {
+			c.AbortWithStatusJSON(400, "Invalid Token")
 		} else {
 			c.Set("id", claims.Id)
 			c.Next()

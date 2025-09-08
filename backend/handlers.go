@@ -165,7 +165,7 @@ func createUser(c *gin.Context) {
 				return
 			} else {
 				c.SetCookie("refreshToken", signedRefreshToken, 604800, "/", "", true, true)
-				bearerToken, err := generateAccessToken(signedRefreshToken)
+				bearerToken, err := generateAccessToken(signedRefreshToken, "access")
 				if err != nil {
 					fmt.Println(err)
 					c.AbortWithStatusJSON(500, err)
@@ -208,7 +208,7 @@ func loginUser(c *gin.Context) {
 			return
 		} else {
 			c.SetCookie("refreshToken", signedRefreshToken, 604800, "/", "", true, true)
-			bearerToken, err := generateAccessToken(signedRefreshToken)
+			bearerToken, err := generateAccessToken(signedRefreshToken, "access")
 			if err != nil {
 				c.AbortWithStatusJSON(500, err)
 				return
@@ -242,7 +242,7 @@ func deleteUser(c *gin.Context) {
 	}
 }
 
-func generateAccessToken(token string) (accessToken string, err error) {
+func generateAccessToken(token string, tokenType string) (accessToken string, err error) {
 	parsedToken, _ := jwt.ParseWithClaims(token, &LoginToken{}, func(token *jwt.Token) (any, error) {
 		if token.Method != jwt.SigningMethodHS256 {
 			return nil, fmt.Errorf("Unknown signing method: ", token.Method)
@@ -254,8 +254,9 @@ func generateAccessToken(token string) (accessToken string, err error) {
 		return "", fmt.Errorf("expired refresh token")
 	} else {
 		newToken := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-			"id":  claims.Id,
-			"exp": time.Now().UTC().Unix() + 300,
+			"id":   claims.Id,
+			"exp":  time.Now().UTC().Unix() + 300,
+			"type": tokenType,
 		})
 		accessToken, _ = newToken.SignedString([]byte(pepper))
 		return accessToken, nil
@@ -264,7 +265,24 @@ func generateAccessToken(token string) (accessToken string, err error) {
 
 func refreshAccessToken(c *gin.Context) {
 	refreshToken, _ := c.Cookie("refreshToken")
-	bearerToken, err := generateAccessToken(refreshToken)
+	token, err := jwt.ParseWithClaims(refreshToken, &LoginToken{}, func(token *jwt.Token) (any, error) {
+		if token.Method != jwt.SigningMethodHS256 {
+			return nil, fmt.Errorf("Unknown signing method: ", token.Method)
+		}
+		return []byte(pepper), nil
+	})
+	if err != nil {
+		c.AbortWithStatusJSON(500, "Internal Server Error")
+		return
+	}
+	claims := token.Claims.(*LoginToken)
+	if claims.ExpiresAt < time.Now().UTC().Unix() {
+		c.AbortWithStatusJSON(403, "Authorization Required")
+		return
+	} else if claims.Type == "access" {
+		c.AbortWithStatusJSON(400, "Invalid Token")
+	}
+	bearerToken, err := generateAccessToken(refreshToken, "refresh")
 	if err != nil {
 		c.AbortWithStatusJSON(500, gin.H{"error": err})
 		return
