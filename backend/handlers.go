@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"regexp"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -22,6 +23,8 @@ var _ = godotenv.Load()
 var pepper = os.Getenv("PEPPER")
 var tasksDb = dbClient.Database("rela").Collection("tasks")
 var usersDb = dbClient.Database("rela").Collection("users")
+
+var emailRegex = regexp.MustCompile(`^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$`)
 
 func getAllTasks(c *gin.Context) {
 	id, _ := c.Get("id")
@@ -127,6 +130,10 @@ func createUser(c *gin.Context) {
 	var input CreateUser
 	var i bson.M
 	json.NewDecoder(c.Request.Body).Decode(&input)
+	if !emailRegex.MatchString(input.Email) {
+		c.AbortWithStatusJSON(400, gin.H{"error": "bad email"})
+		return
+	}
 	newUser := User{
 		Salt:           generatedSalt,
 		Name:           input.Name,
@@ -167,6 +174,10 @@ func loginUser(c *gin.Context) {
 	var input LoginUser
 	var i User
 	json.NewDecoder(c.Request.Body).Decode(&input)
+	if !emailRegex.MatchString(input.Email) {
+		c.AbortWithStatusJSON(400, gin.H{"error": "bad email"})
+		return
+	}
 	if err := usersDb.FindOne(context.TODO(), bson.D{{Key: "email", Value: input.Email}}).Decode(i); err != nil {
 		if errors.Is(err, mongo.ErrNoDocuments) {
 			c.AbortWithStatusJSON(400, gin.H{"error": "User doesnt exist"})
@@ -203,6 +214,10 @@ func deleteUser(c *gin.Context) {
 	var input LoginUser
 	var user User
 	json.NewDecoder(c.Request.Body).Decode(&input)
+	if !emailRegex.MatchString(input.Email) {
+		c.AbortWithStatusJSON(400, gin.H{"error": "bad email"})
+		return
+	}
 	usersDb.FindOne(context.TODO(), bson.D{{Key: "_id", Value: userId}}).Decode(&user)
 	if user.Email == input.Email && base64.RawStdEncoding.EncodeToString(argon2.IDKey([]byte(input.Password+pepper), []byte(user.Salt), uint32(3), uint32(128*1024), uint8(2), uint32(32))) == user.HashedPassword && userId == user.Id {
 		usersDb.DeleteOne(context.TODO(), bson.D{{Key: "_id", Value: userId}})
