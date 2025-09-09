@@ -1,7 +1,7 @@
 package main
 
 import (
-	_ "Rela/docs"
+	docs "Rela/docs"
 	"log"
 	_ "net/http/pprof"
 	"os"
@@ -25,6 +25,7 @@ func rateLimitHandler(c *gin.Context, info ratelimit.Info) {
 }
 
 func main() {
+	docs.SwaggerInfo.BasePath = "/api/v1"
 	r := gin.Default()
 	r.MaxMultipartMemory = 8 << 20
 	store := ratelimit.InMemoryStore(&ratelimit.InMemoryOptions{
@@ -56,7 +57,7 @@ func main() {
 		protected.DELETE("/users/delete", rateLimiter, deleteUser)
 		protected.POST("/users/upload_avatar", rateLimiter, uploadAvatar)
 
-		r.GET("/docs", ginSwagger.WrapHandler(swaggerfiles.Handler))
+		r.GET("/docs/*any", ginSwagger.WrapHandler(swaggerfiles.Handler))
 	}
 	if err := r.Run(port); err != nil {
 		log.Fatal("Failed to start server")

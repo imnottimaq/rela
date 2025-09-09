@@ -1,4 +1,3 @@
-basePath: /api/v1
 definitions:
   main.CreateBoard:
     properties:
@@ -63,12 +62,50 @@ definitions:
     type: object
 info:
   contact: {}
-  description: Simple WIP task tracker that can be self-hosted
-  title: Rela API Docs
-  version: "1.0"
 paths:
   /api/v1/boards:
     post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Create board request
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/main.CreateBoard'
+      - description: Bearer Token
+        in: header
+        name: X-Authorization
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+      summary: Create new board
+      tags:
+      - Boards
+  /api/v1/boards/{boardId}:
+    delete:
+      consumes:
+      - application/json
+      parameters:
+      - description: Bearer Token
+        in: header
+        name: X-Authorization
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+      summary: Delete board
+      tags:
+      - Boards
+    patch:
       consumes:
       - application/json
       parameters:
@@ -86,6 +123,8 @@ paths:
         "200":
           description: OK
       summary: Edit board
+      tags:
+      - Boards
   /api/v1/tasks:
     get:
       description: Return all tasks that current user owns
@@ -132,6 +171,8 @@ paths:
               $ref: '#/definitions/main.Task'
             type: array
       summary: Create new task
+      tags:
+      - Tasks
   /api/v1/tasks/{taskId}:
     delete:
       parameters:
@@ -146,6 +187,8 @@ paths:
         "200":
           description: OK
       summary: Edit existing task
+      tags:
+      - Tasks
     patch:
       consumes:
       - application/json
@@ -165,6 +208,8 @@ paths:
         "200":
           description: OK
       summary: Edit existing task
+      tags:
+      - Tasks
   /api/v1/users/create:
     post:
       consumes:
@@ -186,6 +231,8 @@ paths:
               $ref: '#/definitions/main.Token'
             type: array
       summary: Create new user
+      tags:
+      - Users
   /api/v1/users/delete:
     delete:
       consumes:
@@ -206,6 +253,8 @@ paths:
         "200":
           description: OK
       summary: Delete user
+      tags:
+      - Users
   /api/v1/users/login:
     post:
       consumes:
@@ -227,6 +276,8 @@ paths:
               $ref: '#/definitions/main.Token'
             type: array
       summary: Login user
+      tags:
+      - Users
   /api/v1/users/refresh:
     get:
       description: For this route, you must have refresh token, that is sent to your
@@ -241,4 +292,6 @@ paths:
               $ref: '#/definitions/main.Token'
             type: array
       summary: Refresh bearer token
+      tags:
+      - Users
 swagger: "2.0"

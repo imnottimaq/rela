@@ -23,6 +23,72 @@ const docTemplate = `{
                 "produces": [
                     "application/json"
                 ],
+                "tags": [
+                    "Boards"
+                ],
+                "summary": "Create new board",
+                "parameters": [
+                    {
+                        "description": "Create board request",
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/main.CreateBoard"
+                        }
+                    },
+                    {
+                        "type": "string",
+                        "description": "Bearer Token",
+                        "name": "X-Authorization",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    }
+                }
+            }
+        },
+        "/api/v1/boards/{boardId}": {
+            "delete": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Boards"
+                ],
+                "summary": "Delete board",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer Token",
+                        "name": "X-Authorization",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    }
+                }
+            },
+            "patch": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Boards"
+                ],
                 "summary": "Edit board",
                 "parameters": [
                     {
@@ -83,6 +149,9 @@ const docTemplate = `{
                 "produces": [
                     "application/json"
                 ],
+                "tags": [
+                    "Tasks"
+                ],
                 "summary": "Create new task",
                 "parameters": [
                     {
@@ -120,6 +189,9 @@ const docTemplate = `{
                 "produces": [
                     "application/json"
                 ],
+                "tags": [
+                    "Tasks"
+                ],
                 "summary": "Edit existing task",
                 "parameters": [
                     {
@@ -139,6 +211,9 @@ const docTemplate = `{
             "patch": {
                 "consumes": [
                     "application/json"
+                ],
+                "tags": [
+                    "Tasks"
                 ],
                 "summary": "Edit existing task",
                 "parameters": [
@@ -174,6 +249,9 @@ const docTemplate = `{
                 "produces": [
                     "application/json"
                 ],
+                "tags": [
+                    "Users"
+                ],
                 "summary": "Create new user",
                 "parameters": [
                     {
@@ -203,6 +281,9 @@ const docTemplate = `{
             "delete": {
                 "consumes": [
                     "application/json"
+                ],
+                "tags": [
+                    "Users"
                 ],
                 "summary": "Delete user",
                 "parameters": [
@@ -238,6 +319,9 @@ const docTemplate = `{
                 "produces": [
                     "application/json"
                 ],
+                "tags": [
+                    "Users"
+                ],
                 "summary": "Login user",
                 "parameters": [
                     {
@@ -268,6 +352,9 @@ const docTemplate = `{
                 "description": "For this route, you must have refresh token, that is sent to your browser when you log into user account as a http-only cookie",
                 "produces": [
                     "application/json"
+                ],
+                "tags": [
+                    "Users"
                 ],
                 "summary": "Refresh bearer token",
                 "responses": {
@@ -385,12 +472,12 @@ const docTemplate = `{
 
 // SwaggerInfo holds exported Swagger Info so clients can modify it
 var SwaggerInfo = &swag.Spec{
-	Version:          "1.0",
+	Version:          "",
 	Host:             "",
-	BasePath:         "/api/v1",
+	BasePath:         "",
 	Schemes:          []string{},
-	Title:            "Rela API Docs",
-	Description:      "Simple WIP task tracker that can be self-hosted",
+	Title:            "",
+	Description:      "",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",

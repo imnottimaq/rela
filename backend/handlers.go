@@ -434,7 +434,7 @@ func addBoard(c *gin.Context) {
 }
 
 // @Summary Delete board
-// @Router /api/v1/boards [post]
+// @Router /api/v1/boards/{boardId} [delete]
 // @Accept json
 // @Success 200
 // @Produce json
@@ -466,7 +466,7 @@ func deleteBoard(c *gin.Context) {
 }
 
 // @Summary Edit board
-// @Router /api/v1/boards [post]
+// @Router /api/v1/boards/{boardId} [patch]
 // @Accept json
 // @Success 200
 // @Produce json

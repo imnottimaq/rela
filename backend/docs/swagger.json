@@ -1,12 +1,8 @@
 {
     "swagger": "2.0",
     "info": {
-        "description": "Simple WIP task tracker that can be self-hosted",
-        "title": "Rela API Docs",
-        "contact": {},
-        "version": "1.0"
+        "contact": {}
     },
-    "basePath": "/api/v1",
     "paths": {
         "/api/v1/boards": {
             "post": {
@@ -15,6 +11,72 @@
                 ],
                 "produces": [
                     "application/json"
+                ],
+                "tags": [
+                    "Boards"
+                ],
+                "summary": "Create new board",
+                "parameters": [
+                    {
+                        "description": "Create board request",
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/main.CreateBoard"
+                        }
+                    },
+                    {
+                        "type": "string",
+                        "description": "Bearer Token",
+                        "name": "X-Authorization",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    }
+                }
+            }
+        },
+        "/api/v1/boards/{boardId}": {
+            "delete": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Boards"
+                ],
+                "summary": "Delete board",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer Token",
+                        "name": "X-Authorization",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    }
+                }
+            },
+            "patch": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Boards"
                 ],
                 "summary": "Edit board",
                 "parameters": [
@@ -76,6 +138,9 @@
                 "produces": [
                     "application/json"
                 ],
+                "tags": [
+                    "Tasks"
+                ],
                 "summary": "Create new task",
                 "parameters": [
                     {
@@ -113,6 +178,9 @@
                 "produces": [
                     "application/json"
                 ],
+                "tags": [
+                    "Tasks"
+                ],
                 "summary": "Edit existing task",
                 "parameters": [
                     {
@@ -132,6 +200,9 @@
             "patch": {
                 "consumes": [
                     "application/json"
+                ],
+                "tags": [
+                    "Tasks"
                 ],
                 "summary": "Edit existing task",
                 "parameters": [
@@ -167,6 +238,9 @@
                 "produces": [
                     "application/json"
                 ],
+                "tags": [
+                    "Users"
+                ],
                 "summary": "Create new user",
                 "parameters": [
                     {
@@ -196,6 +270,9 @@
             "delete": {
                 "consumes": [
                     "application/json"
+                ],
+                "tags": [
+                    "Users"
                 ],
                 "summary": "Delete user",
                 "parameters": [
@@ -231,6 +308,9 @@
                 "produces": [
                     "application/json"
                 ],
+                "tags": [
+                    "Users"
+                ],
                 "summary": "Login user",
                 "parameters": [
                     {
@@ -261,6 +341,9 @@
                 "description": "For this route, you must have refresh token, that is sent to your browser when you log into user account as a http-only cookie",
                 "produces": [
                     "application/json"
+                ],
+                "tags": [
+                    "Users"
                 ],
                 "summary": "Refresh bearer token",
                 "responses": {
