@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"regexp"
 	"time"
 
@@ -29,6 +30,18 @@ var boardsDb = dbClient.Database("rela").Collection("boards")
 var emailRegex = regexp.MustCompile(`^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$`)
 var passwordRegex = regexp.MustCompile(`^(?=.*?[A-Z])(?=.*?[a-z])(?=.*?[0-9])(?=.*?[#?!@$%^&*-]).{8,}$`)
 
+// @Title			Rela API Docs
+// @Description	Simple WIP task tracker that can be self-hosted
+// @Version		1.0
+// @BasePath		/api/v1
+
+// @Summary Get all tasks
+// @Description Return all tasks that current user owns
+// @Router /api/v1/tasks [get]
+// @Success 200 {array} Task
+// @Produce json
+// @Tags Tasks
+// @Param X-Authorization header string true "Bearer Token"
 func getAllTasks(c *gin.Context) {
 	id, _ := c.Get("id")
 	cursor, _ := tasksDb.Find(context.TODO(), bson.D{{Key: "created_by", Value: id}})
@@ -39,44 +52,64 @@ func getAllTasks(c *gin.Context) {
 	return
 }
 
+// @Summary Create new task
+// @Router /api/v1/tasks [post]
+// @Accept json
+// @Success 200 {array} Task
+// @Produce json
+// @Tags Tasks
+// @Param data body CreateTask true "Create task request"
+// @Param X-Authorization header string true "Bearer Token"
 func createNewTask(c *gin.Context) {
 	id, _ := c.Get("id")
-
-	var newTask Task
+	var input CreateTask
 	var board Board
-	json.NewDecoder(c.Request.Body).Decode(&newTask)
-	if newTask.Name == "" {
+	json.NewDecoder(c.Request.Body).Decode(&input)
+	if input.Name == "" {
 		c.AbortWithStatusJSON(400, gin.H{"error": "Field 'name' is not specified"})
 		return
-	} else if newTask.Board.IsZero() {
+	} else if input.Board.IsZero() {
 		c.AbortWithStatusJSON(400, gin.H{"error": "Field 'board' is not specified"})
 		return
 	}
-	err := boardsDb.FindOne(context.TODO(), bson.D{{"_id", newTask.Board}}).Decode(board)
+	err := boardsDb.FindOne(context.TODO(), bson.D{{"_id", input.Board}}).Decode(board)
 	if errors.Is(err, mongo.ErrNoDocuments) {
 		c.AbortWithStatusJSON(400, gin.H{"error": "Board does not exist"})
 		return
 	} else {
 		c.AbortWithStatusJSON(500, gin.H{"error": err})
 	}
-	newTask.CreatedAt = time.Now().UTC().Unix()
-	newTask.OwnedBy = id.(bson.ObjectID)
+	newTask := Task{
+		Name:        input.Name,
+		Description: input.Description,
+		CreatedAt:   time.Now().UTC().Unix(),
+		OwnedBy:     id.(bson.ObjectID),
+		Board:       input.Board,
+	}
 	task, err := tasksDb.InsertOne(context.TODO(), newTask)
 	if err != nil {
 		c.AbortWithStatusJSON(500, gin.H{"error": "Failed to push task to database"})
 		return
 	}
 	newTask.Id = task.InsertedID.(bson.ObjectID)
-	c.AbortWithStatus(200)
+	c.AbortWithStatusJSON(200, newTask)
 	return
 }
 
+// @Summary Edit existing task
+// @Router /api/v1/tasks/{taskId} [patch]
+// @Accept json
+// @Success 200
+// @Tags Tasks
+// @Param taskId path bson.ObjectID true "Task ID"
+// @Param data body EditTask true "Edit task request"
+// @Param X-Authorization header string true "Bearer Token"
 func editExistingTask(c *gin.Context) {
 	id, _ := c.Get("id")
 	var previousVersion Task
 	taskId, _ := bson.ObjectIDFromHex(c.Param("taskId"))
-	if taskId.IsZero(){
-		c.AbortWithStatusJSON(400,gin.H{"error":"you must specify task id"})
+	if taskId.IsZero() {
+		c.AbortWithStatusJSON(400, gin.H{"error": "you must specify task id"})
 		return
 	}
 	err := tasksDb.FindOne(context.TODO(), bson.D{{Key: "_id", Value: taskId}}).Decode(&previousVersion)
@@ -114,11 +147,18 @@ func editExistingTask(c *gin.Context) {
 	return
 }
 
+// @Summary Edit existing task
+// @Router /api/v1/tasks/{taskId} [delete]
+// @Success 200
+// @Produce json
+// @Tags Tasks
+// @Param taskId path bson.ObjectID true "Task ID"
+// @Param X-Authorization header string true "Bearer Token"
 func deleteExistingTask(c *gin.Context) {
 	id, _ := c.Get("id")
 	taskId, _ := bson.ObjectIDFromHex(c.Param("taskId"))
-	if taskId.IsZero(){
-        c.AbortWithStatusJSON(400,gin.H{"error":"you must specify task id"})
+	if taskId.IsZero() {
+		c.AbortWithStatusJSON(400, gin.H{"error": "you must specify task id"})
 
 	}
 	var result Task
@@ -143,6 +183,13 @@ func deleteExistingTask(c *gin.Context) {
 	}
 }
 
+// @Summary Create new user
+// @Router /api/v1/users/create [post]
+// @Accept json
+// @Success 200 {array} Token
+// @Produce json
+// @Tags Users
+// @Param data body CreateUser true "Create user request"
 func createUser(c *gin.Context) {
 	randomBytes := make([]byte, 32)
 	rand.Read(randomBytes)
@@ -150,20 +197,20 @@ func createUser(c *gin.Context) {
 	var input CreateUser
 	var i bson.M
 	json.NewDecoder(c.Request.Body).Decode(&input)
-	if input.Email == ""{
-        c.AbortWithStatusJSON(400,gin.H{"error":"email is required"})
+	if input.Email == "" {
+		c.AbortWithStatusJSON(400, gin.H{"error": "email is required"})
 		return
 	} else if !emailRegex.MatchString(input.Email) {
 		c.AbortWithStatusJSON(400, gin.H{"error": "bad email"})
 		return
-	} else if input.Name == ""{
-        c.AbortWithStatusJSON(400,gin.H{"error":"name is required"})
+	} else if input.Name == "" {
+		c.AbortWithStatusJSON(400, gin.H{"error": "name is required"})
 		return
-	} else if input.Password == ""{
-        c.AbortWithStatusJSON(400,gin.H{"error":"password is required"})
+	} else if input.Password == "" {
+		c.AbortWithStatusJSON(400, gin.H{"error": "password is required"})
 		return
-	} else if !passwordRegex.MatchString(input.Password){
-        c.AbortWithStatusJSON(400,gin.H{"":"your password must contain 1 uppercase letter, 1 lowercase letter, 1 special character and be atleast 8 characters long"})
+	} else if !passwordRegex.MatchString(input.Password) {
+		c.AbortWithStatusJSON(400, gin.H{"": "your password must contain 1 uppercase letter, 1 lowercase letter, 1 special character and be atleast 8 characters long"})
 		return
 	}
 	newUser := User{
@@ -202,21 +249,28 @@ func createUser(c *gin.Context) {
 	return
 }
 
+// @Summary Login user
+// @Router /api/v1/users/login [post]
+// @Accept json
+// @Success 200 {array} Token
+// @Produce json
+// @Tags Users
+// @Param data body LoginUser true "Login user request"
 func loginUser(c *gin.Context) {
 	var input LoginUser
 	var i User
 	json.NewDecoder(c.Request.Body).Decode(&input)
-	if input.Email == ""{
-        c.AbortWithStatusJSON(400,gin.H{"error":"email is required"})
+	if input.Email == "" {
+		c.AbortWithStatusJSON(400, gin.H{"error": "email is required"})
 		return
 	} else if !emailRegex.MatchString(input.Email) {
 		c.AbortWithStatusJSON(400, gin.H{"error": "bad email"})
 		return
-	} else if input.Password == ""{
-		c.AbortWithStatusJSON(400,gin.H{"error":"password is required"})
+	} else if input.Password == "" {
+		c.AbortWithStatusJSON(400, gin.H{"error": "password is required"})
 		return
-	} else if !passwordRegex.MatchString(input.Password){
-        c.AbortWithStatusJSON(400,gin.H{"error":"password does not meet requirements"})
+	} else if !passwordRegex.MatchString(input.Password) {
+		c.AbortWithStatusJSON(400, gin.H{"error": "password does not meet requirements"})
 		return
 	}
 	if err := usersDb.FindOne(context.TODO(), bson.D{{Key: "email", Value: input.Email}}).Decode(i); err != nil {
@@ -250,23 +304,30 @@ func loginUser(c *gin.Context) {
 	}
 }
 
+// @Summary Delete user
+// @Router /api/v1/users/delete [delete]
+// @Accept json
+// @Success 200
+// @Tags Users
+// @Param data body LoginUser true "Delete user request"
+// @Param X-Authorization header string true "Bearer Token"
 func deleteUser(c *gin.Context) {
 	userId, _ := c.Get("id")
 	var input LoginUser
 	var user User
 	json.NewDecoder(c.Request.Body).Decode(&input)
-	if input.Email ==""{
-		c.AbortWithStatusJSON(400, gin.H{"error":"email is required"})
+	if input.Email == "" {
+		c.AbortWithStatusJSON(400, gin.H{"error": "email is required"})
 		return
 	} else if !emailRegex.MatchString(input.Email) {
 		c.AbortWithStatusJSON(400, gin.H{"error": "bad email"})
 		return
-	} else if input.Password == ""{
-		c.AbortWithStatusJSON(400,gin.H{"error":"password is required"})
-        return
-	} else if !passwordRegex.MatchString(input.Password){
-		c.AbortWithStatusJSON(400,gin.H{"error":"password does not meet requirements"})
-        return
+	} else if input.Password == "" {
+		c.AbortWithStatusJSON(400, gin.H{"error": "password is required"})
+		return
+	} else if !passwordRegex.MatchString(input.Password) {
+		c.AbortWithStatusJSON(400, gin.H{"error": "password does not meet requirements"})
+		return
 	}
 	usersDb.FindOne(context.TODO(), bson.D{{Key: "_id", Value: userId}}).Decode(&user)
 	if user.Email == input.Email && base64.RawStdEncoding.EncodeToString(argon2.IDKey([]byte(input.Password+pepper), []byte(user.Salt), uint32(3), uint32(128*1024), uint8(2), uint32(32))) == user.HashedPassword && userId == user.Id {
@@ -280,6 +341,14 @@ func deleteUser(c *gin.Context) {
 		c.AbortWithStatus(403)
 		return
 	}
+}
+
+func uploadAvatar(c *gin.Context) {
+	userId, _ := c.Get("id")
+	avatar, _ := c.FormFile("avatar_" + fmt.Sprintf("%v", userId))
+	filename := filepath.Base("img/" + avatar.Filename)
+	c.SaveUploadedFile(avatar, filename)
+	c.AbortWithStatus(200)
 }
 
 func generateAccessToken(token string, tokenType string) (accessToken string, err error) {
@@ -303,6 +372,12 @@ func generateAccessToken(token string, tokenType string) (accessToken string, er
 	}
 }
 
+// @Summary Refresh bearer token
+// @Description For this route, you must have refresh token, that is sent to your browser when you log into user account as a http-only cookie
+// @Router /api/v1/users/refresh [get]
+// @Success 200 {array} Token
+// @Produce json
+// @Tags Users
 func refreshAccessToken(c *gin.Context) {
 	refreshToken, _ := c.Cookie("refreshToken")
 	token, err := jwt.ParseWithClaims(refreshToken, &LoginToken{}, func(token *jwt.Token) (any, error) {
@@ -332,6 +407,14 @@ func refreshAccessToken(c *gin.Context) {
 
 }
 
+// @Summary Create new board
+// @Router /api/v1/boards [post]
+// @Accept json
+// @Success 200
+// @Produce json
+// @Tags Boards
+// @Param data body CreateBoard true "Create board request"
+// @Param X-Authorization header string true "Bearer Token"
 func addBoard(c *gin.Context) {
 	id, _ := c.Get("id")
 	var input Board
@@ -348,6 +431,14 @@ func addBoard(c *gin.Context) {
 	return
 }
 
+// @Summary Delete board
+// @Router /api/v1/boards [post]
+// @Accept json
+// @Success 200
+// @Produce json
+// @Tags Boards
+// @Param boardId path bson.ObjectID true "Board ID"
+// @Param X-Authorization header string true "Bearer Token"
 func deleteBoard(c *gin.Context) {
 	id, _ := c.Get("id")
 	boardId, _ := c.Get("boardId")
@@ -372,6 +463,15 @@ func deleteBoard(c *gin.Context) {
 	}
 }
 
+// @Summary Edit board
+// @Router /api/v1/boards [post]
+// @Accept json
+// @Success 200
+// @Produce json
+// @Tags Boards
+// @Param boardId path bson.ObjectID true "Board ID"
+// @Param body path CreateBoard true "Edit board request"
+// @Param X-Authorization header string true "Bearer Token"
 func editBoard(c *gin.Context) {
 	id, _ := c.Get("id")
 	boardId, _ := c.Get("boardId")

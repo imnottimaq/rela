@@ -7,5 +7,371 @@
         "version": "1.0"
     },
     "basePath": "/api/v1",
-    "paths": {}
+    "paths": {
+        "/api/v1/boards": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "summary": "Edit board",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "name": "name",
+                        "in": "path"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Bearer Token",
+                        "name": "X-Authorization",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    }
+                }
+            }
+        },
+        "/api/v1/tasks": {
+            "get": {
+                "description": "Return all tasks that current user owns",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Tasks"
+                ],
+                "summary": "Get all tasks",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer Token",
+                        "name": "X-Authorization",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/main.Task"
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "summary": "Create new task",
+                "parameters": [
+                    {
+                        "description": "Create task request",
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/main.CreateTask"
+                        }
+                    },
+                    {
+                        "type": "string",
+                        "description": "Bearer Token",
+                        "name": "X-Authorization",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/main.Task"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/tasks/{taskId}": {
+            "delete": {
+                "produces": [
+                    "application/json"
+                ],
+                "summary": "Edit existing task",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer Token",
+                        "name": "X-Authorization",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    }
+                }
+            },
+            "patch": {
+                "consumes": [
+                    "application/json"
+                ],
+                "summary": "Edit existing task",
+                "parameters": [
+                    {
+                        "description": "Edit task request",
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/main.EditTask"
+                        }
+                    },
+                    {
+                        "type": "string",
+                        "description": "Bearer Token",
+                        "name": "X-Authorization",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    }
+                }
+            }
+        },
+        "/api/v1/users/create": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "summary": "Create new user",
+                "parameters": [
+                    {
+                        "description": "Create user request",
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/main.CreateUser"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/main.Token"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/users/delete": {
+            "delete": {
+                "consumes": [
+                    "application/json"
+                ],
+                "summary": "Delete user",
+                "parameters": [
+                    {
+                        "description": "Delete user request",
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/main.LoginUser"
+                        }
+                    },
+                    {
+                        "type": "string",
+                        "description": "Bearer Token",
+                        "name": "X-Authorization",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    }
+                }
+            }
+        },
+        "/api/v1/users/login": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "summary": "Login user",
+                "parameters": [
+                    {
+                        "description": "Login user request",
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/main.LoginUser"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/main.Token"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/users/refresh": {
+            "get": {
+                "description": "For this route, you must have refresh token, that is sent to your browser when you log into user account as a http-only cookie",
+                "produces": [
+                    "application/json"
+                ],
+                "summary": "Refresh bearer token",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/main.Token"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "main.CreateBoard": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "main.CreateTask": {
+            "type": "object",
+            "properties": {
+                "board": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "main.CreateUser": {
+            "type": "object",
+            "properties": {
+                "email": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "password": {
+                    "type": "string"
+                }
+            }
+        },
+        "main.EditTask": {
+            "type": "object",
+            "properties": {
+                "board": {
+                    "type": "string"
+                },
+                "completed_at": {
+                    "type": "integer"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "main.LoginUser": {
+            "type": "object",
+            "properties": {
+                "email": {
+                    "type": "string"
+                },
+                "password": {
+                    "type": "string"
+                }
+            }
+        },
+        "main.Task": {
+            "type": "object",
+            "properties": {
+                "_id": {
+                    "type": "string"
+                },
+                "board": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "integer"
+                },
+                "created_by": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "main.Token": {
+            "type": "object",
+            "properties": {
+                "token": {
+                    "type": "string"
+                }
+            }
+        }
+    }
 }

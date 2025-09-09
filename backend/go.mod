@@ -1,4 +1,4 @@
-module TaskTrackerRework
+module Rela
 
 go 1.24.2
 
