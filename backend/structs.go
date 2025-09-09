@@ -11,7 +11,12 @@ type Task struct {
 	Description *string       `json:"description" bson:"description"`
 	CreatedAt   int64         `json:"created_at" bson:"created_at"`
 	OwnedBy     bson.ObjectID `json:"created_by" bson:"created_by"`
-	CompletedAt *int64        `json:"completed_at" bson:"completed_at"`
+	Board       bson.ObjectID `json:"board" bson:"board"`
+}
+
+type CreateTask struct {
+	Name        string        `json:"name" bson:"name"`
+	Description *string       `json:"description" bson:"description"`
 	Board       bson.ObjectID `json:"board" bson:"board"`
 }
 
@@ -34,7 +39,9 @@ type CreateUser struct {
 	Email    string `json:"email" bson:"email"`
 	Password string `json:"password" bson:"password"`
 }
-
+type Token struct {
+	Token string `json:"token" bson:"token"`
+}
 type LoginToken struct {
 	Id        bson.ObjectID `json:"id" bson:"id"`
 	ExpiresAt int64         `json:"exp" bson:"expires_at"`
@@ -49,4 +56,7 @@ type Board struct {
 	Id      bson.ObjectID `json:"_id" bson:"_id,omitempty"`
 	Name    string        `json:"name" bson:"name"`
 	OwnedBy bson.ObjectID `json:"owned_by" bson:"owned_by"`
+}
+type CreateBoard struct {
+	Name string `json:"name" bson:"name"`
 }
