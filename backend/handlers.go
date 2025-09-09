@@ -27,6 +27,7 @@ var usersDb = dbClient.Database("rela").Collection("users")
 var boardsDb = dbClient.Database("rela").Collection("boards")
 
 var emailRegex = regexp.MustCompile(`^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$`)
+var passwordRegex = regexp.MustCompile(`^(?=.*?[A-Z])(?=.*?[a-z])(?=.*?[0-9])(?=.*?[#?!@$%^&*-]).{8,}$`)
 
 func getAllTasks(c *gin.Context) {
 	id, _ := c.Get("id")
@@ -74,10 +75,14 @@ func editExistingTask(c *gin.Context) {
 	id, _ := c.Get("id")
 	var previousVersion Task
 	taskId, _ := bson.ObjectIDFromHex(c.Param("taskId"))
+	if taskId.IsZero(){
+		c.AbortWithStatusJSON(400,gin.H{"error":"you must specify task id"})
+		return
+	}
 	err := tasksDb.FindOne(context.TODO(), bson.D{{Key: "_id", Value: taskId}}).Decode(&previousVersion)
 	if err != nil {
 		if errors.Is(err, mongo.ErrNoDocuments) {
-			c.AbortWithStatusJSON(400, gin.H{"error": "There is no task with specified id"})
+			c.AbortWithStatusJSON(404, gin.H{"error": "not found"})
 			return
 		} else {
 			c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
@@ -102,7 +107,7 @@ func editExistingTask(c *gin.Context) {
 	}
 	_, err = tasksDb.ReplaceOne(context.TODO(), bson.D{{Key: "_id", Value: taskId}}, previousVersion)
 	if err != nil {
-		c.AbortWithStatusJSON(400, gin.H{"error": "Failed to change task"})
+		c.AbortWithStatusJSON(500, gin.H{"error": "Failed to change task"})
 		return
 	}
 	c.AbortWithStatus(200)
@@ -111,7 +116,11 @@ func editExistingTask(c *gin.Context) {
 
 func deleteExistingTask(c *gin.Context) {
 	id, _ := c.Get("id")
-	taskId, _ := bson.ObjectIDFromHex(c.Param("id"))
+	taskId, _ := bson.ObjectIDFromHex(c.Param("taskId"))
+	if taskId.IsZero(){
+        c.AbortWithStatusJSON(400,gin.H{"error":"you must specify task id"})
+
+	}
 	var result Task
 	err := tasksDb.FindOne(context.TODO(), bson.D{{Key: "_id", Value: taskId}}).Decode(&result)
 	if err != nil {
@@ -141,8 +150,20 @@ func createUser(c *gin.Context) {
 	var input CreateUser
 	var i bson.M
 	json.NewDecoder(c.Request.Body).Decode(&input)
-	if !emailRegex.MatchString(input.Email) {
+	if input.Email == ""{
+        c.AbortWithStatusJSON(400,gin.H{"error":"email is required"})
+		return
+	} else if !emailRegex.MatchString(input.Email) {
 		c.AbortWithStatusJSON(400, gin.H{"error": "bad email"})
+		return
+	} else if input.Name == ""{
+        c.AbortWithStatusJSON(400,gin.H{"error":"name is required"})
+		return
+	} else if input.Password == ""{
+        c.AbortWithStatusJSON(400,gin.H{"error":"password is required"})
+		return
+	} else if !passwordRegex.MatchString(input.Password){
+        c.AbortWithStatusJSON(400,gin.H{"":"your password must contain 1 uppercase letter, 1 lowercase letter, 1 special character and be atleast 8 characters long"})
 		return
 	}
 	newUser := User{
@@ -185,13 +206,22 @@ func loginUser(c *gin.Context) {
 	var input LoginUser
 	var i User
 	json.NewDecoder(c.Request.Body).Decode(&input)
-	if !emailRegex.MatchString(input.Email) {
+	if input.Email == ""{
+        c.AbortWithStatusJSON(400,gin.H{"error":"email is required"})
+		return
+	} else if !emailRegex.MatchString(input.Email) {
 		c.AbortWithStatusJSON(400, gin.H{"error": "bad email"})
+		return
+	} else if input.Password == ""{
+		c.AbortWithStatusJSON(400,{"error":"password is required"})
+		return
+	} else if !passwordRegex.MatchString(input.Password){
+        c.AbortWithStatusJSON(400,gin.H{"error":"password does not meet requirements"})
 		return
 	}
 	if err := usersDb.FindOne(context.TODO(), bson.D{{Key: "email", Value: input.Email}}).Decode(i); err != nil {
 		if errors.Is(err, mongo.ErrNoDocuments) {
-			c.AbortWithStatusJSON(400, gin.H{"error": "User doesnt exist"})
+			c.AbortWithStatusJSON(404, gin.H{"error": "User doesnt exist"})
 			return
 		} else {
 			c.AbortWithStatusJSON(500, gin.H{"error": err})
@@ -225,9 +255,18 @@ func deleteUser(c *gin.Context) {
 	var input LoginUser
 	var user User
 	json.NewDecoder(c.Request.Body).Decode(&input)
-	if !emailRegex.MatchString(input.Email) {
+	if input.Email ==""{
+		c.AbortWithStatusJSON(400, gin.H{"error":"email is required"})
+		return
+	} else if !emailRegex.MatchString(input.Email) {
 		c.AbortWithStatusJSON(400, gin.H{"error": "bad email"})
 		return
+	} else if input.Password == ""{
+		c.AbortWithStatusJSON(400,gin.H{"error":"password is required"})
+        return
+	} else if !passwordRegex.MatchString(input.Password){
+		c.AbortWithStatusJSON(400,gin.H{"error":"password does not meet requirements"})
+        return
 	}
 	usersDb.FindOne(context.TODO(), bson.D{{Key: "_id", Value: userId}}).Decode(&user)
 	if user.Email == input.Email && base64.RawStdEncoding.EncodeToString(argon2.IDKey([]byte(input.Password+pepper), []byte(user.Salt), uint32(3), uint32(128*1024), uint8(2), uint32(32))) == user.HashedPassword && userId == user.Id {
