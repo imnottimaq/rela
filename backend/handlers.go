@@ -213,7 +213,7 @@ func loginUser(c *gin.Context) {
 		c.AbortWithStatusJSON(400, gin.H{"error": "bad email"})
 		return
 	} else if input.Password == ""{
-		c.AbortWithStatusJSON(400,{"error":"password is required"})
+		c.AbortWithStatusJSON(400,gin.H{"error":"password is required"})
 		return
 	} else if !passwordRegex.MatchString(input.Password){
         c.AbortWithStatusJSON(400,gin.H{"error":"password does not meet requirements"})
