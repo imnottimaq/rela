@@ -28,7 +28,6 @@ var usersDb = dbClient.Database("rela").Collection("users")
 var boardsDb = dbClient.Database("rela").Collection("boards")
 
 var emailRegex = regexp.MustCompile(`^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$`)
-var passwordRegex = regexp.MustCompile(`^(?=.*?[A-Z])(?=.*?[a-z])(?=.*?[0-9])(?=.*?[#?!@$%^&*-]).{8,}$`)
 
 // @Title			Rela API Docs
 // @Description	Simple WIP task tracker that can be self-hosted
@@ -209,7 +208,7 @@ func createUser(c *gin.Context) {
 	} else if input.Password == "" {
 		c.AbortWithStatusJSON(400, gin.H{"error": "password is required"})
 		return
-	} else if !passwordRegex.MatchString(input.Password) {
+	} else if !validatePassword(input.Password) {
 		c.AbortWithStatusJSON(400, gin.H{"": "your password must contain 1 uppercase letter, 1 lowercase letter, 1 special character and be atleast 8 characters long"})
 		return
 	}
@@ -269,7 +268,7 @@ func loginUser(c *gin.Context) {
 	} else if input.Password == "" {
 		c.AbortWithStatusJSON(400, gin.H{"error": "password is required"})
 		return
-	} else if !passwordRegex.MatchString(input.Password) {
+	} else if !validatePassword(input.Password) {
 		c.AbortWithStatusJSON(400, gin.H{"error": "password does not meet requirements"})
 		return
 	}
@@ -325,7 +324,7 @@ func deleteUser(c *gin.Context) {
 	} else if input.Password == "" {
 		c.AbortWithStatusJSON(400, gin.H{"error": "password is required"})
 		return
-	} else if !passwordRegex.MatchString(input.Password) {
+	} else if !validatePassword(input.Password) {
 		c.AbortWithStatusJSON(400, gin.H{"error": "password does not meet requirements"})
 		return
 	}
@@ -503,4 +502,17 @@ func editBoard(c *gin.Context) {
 			c.AbortWithStatusJSON(500, gin.H{"error": "failed to insert board"})
 		}
 	}
+}
+
+func validatePassword(password string) bool {
+	if len(password) < 8 {
+		return false
+	}
+
+	hasLower := regexp.MustCompile(`[a-z]`).MatchString(password)
+	hasUpper := regexp.MustCompile(`[A-Z]`).MatchString(password)
+	hasDigit := regexp.MustCompile(`\d`).MatchString(password)
+	hasSpecial := regexp.MustCompile(`[@$!%*?&]`).MatchString(password)
+
+	return hasLower && hasUpper && hasDigit && hasSpecial
 }

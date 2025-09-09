@@ -19,7 +19,7 @@ import (
 	"go.mongodb.org/mongo-driver/v2/mongo/readpref"
 )
 
-var _ = godotenv.Load()
+var _ = godotenv.Load(".env")
 var mongodbCredentials = os.Getenv("MONGO_CREDS")
 var port = os.Getenv("PORT")
 var dbClient, _ = mongo.Connect(options.Client().ApplyURI(mongodbCredentials).SetServerAPIOptions(options.ServerAPI(options.ServerAPIVersion1)))
