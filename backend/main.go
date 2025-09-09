@@ -2,27 +2,20 @@ package main
 
 import (
 	_ "Rela/docs"
-	"context"
 	"log"
 	_ "net/http/pprof"
 	"os"
 	"time"
-
-	"go.mongodb.org/mongo-driver/v2/mongo"
-	"go.mongodb.org/mongo-driver/v2/mongo/options"
 
 	ratelimit "github.com/JGLTechnologies/gin-rate-limit"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 	swaggerfiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
-	"go.mongodb.org/mongo-driver/v2/mongo/readpref"
 )
 
 var _ = godotenv.Load(".env")
-var mongodbCredentials = os.Getenv("MONGO_CREDS")
 var port = os.Getenv("PORT")
-var dbClient, _ = mongo.Connect(options.Client().ApplyURI(mongodbCredentials).SetServerAPIOptions(options.ServerAPI(options.ServerAPIVersion1)))
 
 func keyFunc(c *gin.Context) string {
 	return c.ClientIP()
@@ -32,9 +25,6 @@ func rateLimitHandler(c *gin.Context, info ratelimit.Info) {
 }
 
 func main() {
-	if err := dbClient.Ping(context.TODO(), readpref.Primary()); err != nil {
-		log.Fatal("Failed to ping MongoDB database")
-	}
 	r := gin.Default()
 	r.MaxMultipartMemory = 8 << 20
 	store := ratelimit.InMemoryStore(&ratelimit.InMemoryOptions{

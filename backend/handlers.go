@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -22,6 +23,8 @@ import (
 
 var _ = godotenv.Load()
 var pepper = os.Getenv("PEPPER")
+var mongodbCredentials = os.Getenv("MONGO_CREDS")
+var dbClient, _ = mongo.Connect(options.Client().ApplyURI(mongodbCredentials).SetServerAPIOptions(options.ServerAPI(options.ServerAPIVersion1)))
 
 var tasksDb = dbClient.Database("rela").Collection("tasks")
 var usersDb = dbClient.Database("rela").Collection("users")
