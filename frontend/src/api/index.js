@@ -52,79 +52,108 @@ const createApiWithDebug = () => {
 	return wrappedApi;
 };
 
-const api = createApiWithDebug();
+const createApi = () => {
+    const api = createSafeFetch({
+        baseURL: `${window.location.origin}/api/v1/`,
+        timeoutMs: 10000,
+        retries: {
+            retries: 2,
+            baseDelayMs: 300,
+        },
+    });
 
-const getAuthHeaders = (token) => ({
-	"X-Authorization": `Bearer ${token}`,
-	"Content-Type": "application/json",
-});
+    const wrappedApi = {};
+
+    ["get", "post", "put", "patch", "delete"].forEach((method) => {
+        wrappedApi[method] = async (url, options = {}) => {
+            const headers = {
+                "Content-Type": "application/json",
+                ...options.headers,
+            };
+
+            const requestOptions = {
+                ...options,
+                headers,
+            };
+
+            // just call the actual fetch without debug
+            return api[method](url, requestOptions);
+        };
+    });
+
+    return wrappedApi;
+};
+
+// const api = createApiWithDebug();
+const api = createApi();
 
 export const userAPI = {
 	login: (email, password) =>
-		api.post("users/login", {
-			body: JSON.stringify({ email, password }),
-		}),
+		api.post(
+			"users/login",
+			{ email, password },
+			{ headers: { "Content-Type": "application/json" } }
+		),
 
 	register: (name, email, password) =>
-		api.post("users/create", {
-			body: JSON.stringify({ name, email, password }),
-		}),
+		api.post(
+			"users/create",
+			{ name, email, password },
+			{ headers: { "Content-Type": "application/json" } }
+		),
 
 	delete: (email, password, token) =>
-		api.delete("users/delete", {
-			body: JSON.stringify({ email, password }),
-			headers: getAuthHeaders(token),
-		}),
+		api.delete(
+			"users/delete",
+			{ email, password },
+			{ headers: { Authorization: token } }
+		),
 
 	refresh: () => api.get("users/refresh"),
 };
 
 export const boardAPI = {
 	getAll: (token) =>
-		api.get("boards", {
-			headers: getAuthHeaders(token),
-		}),
+		api.get("boards", {}, { headers: { Authorization: token } }),
 
 	create: (name, token) =>
-		api.post("boards", {
-			body: JSON.stringify({ name }),
-			headers: getAuthHeaders(token),
-		}),
+		api.post("boards", { name }, { headers: { Authorization: token } }),
 
 	update: (boardId, name, token) =>
-		api.patch(`boards/${boardId}`, {
-			body: JSON.stringify({ name }),
-			headers: getAuthHeaders(token),
-		}),
+		api.patch(
+			`boards/${boardId}`,
+			{ name },
+			{ headers: { Authorization: token } }
+		),
 
 	delete: (boardId, token) =>
-		api.delete(`boards/${boardId}`, {
-			headers: getAuthHeaders(token),
-		}),
+		api.delete(
+			`boards/${boardId}`,
+			{},
+			{ headers: { Authorization: token } }
+		),
 };
 
 export const taskAPI = {
 	getAll: (token) =>
-		api.get("tasks", {
-			headers: getAuthHeaders(token),
-		}),
+		api.get("tasks", {}, { headers: { Authorization: token } }),
 
 	create: (taskData, token) =>
-		api.post("tasks", {
-			body: JSON.stringify(taskData),
-			headers: getAuthHeaders(token),
-		}),
+		api.post("tasks", { taskData }, { headers: { Authorization: token } }),
 
 	update: (taskId, taskData, token) =>
-		api.patch(`tasks/${taskId}`, {
-			body: JSON.stringify(taskData),
-			headers: getAuthHeaders(token),
-		}),
+		api.patch(
+			`tasks/${taskId}`,
+			{ taskData },
+			{ headers: { Authorization: token } }
+		),
 
 	delete: (taskId, token) =>
-		api.delete(`tasks/${taskId}`, {
-			headers: getAuthHeaders(token),
-		}),
+		api.delete(
+			`tasks/${taskId}`,
+			{},
+			{ headers: { Authorization: token } }
+		),
 };
 
 export default api;

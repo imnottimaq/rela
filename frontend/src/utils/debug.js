@@ -7,8 +7,8 @@ export const debugAPI = {
 				data: data ? JSON.parse(data) : undefined,
 				headers: {
 					...headers,
-					"X-Authorization": headers?.["X-Authorization"]
-						? "Bearer [REDACTED]"
+					"Authorization": headers?.["Authorization"]
+						? "[REDACTED]"
 						: undefined,
 				},
 			});
