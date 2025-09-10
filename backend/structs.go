@@ -27,6 +27,7 @@ type EditTask struct {
 	Board       *string `json:"board" bson:"board"`
 }
 type User struct {
+	Avatar         string        `json:"avatar" bson:"avatar"`
 	Id             bson.ObjectID `json:"_id" bson:"_id,omitempty"`
 	Name           string        `json:"name" bson:"name"`
 	Email          string        `json:"email" bson:"email"`

@@ -42,6 +42,7 @@ func main() {
 		//Tasks
 		r.Static("/app", "../frontend/dist/")
 		r.Static("/assets", "../frontend/dist/assets")
+		r.Static("/img", "./img")
 		protected.GET("/tasks", rateLimiter, getAllTasks)
 		protected.POST("/tasks", rateLimiter, createNewTask)
 		protected.PATCH("/tasks/:taskId", rateLimiter, editExistingTask)

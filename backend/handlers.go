@@ -15,6 +15,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/goccy/go-json"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	"github.com/joho/godotenv"
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
@@ -347,17 +348,27 @@ func deleteUser(c *gin.Context) {
 
 func uploadAvatar(c *gin.Context) {
 	userId, _ := c.Get("id")
-	avatar, err := c.FormFile("avatar_" + fmt.Sprintf("%v", userId))
+	user := User{}
+	avatar, err := c.FormFile("img")
 	if err != nil {
+		fmt.Printf(fmt.Sprintf("%v", err))
 		c.AbortWithStatusJSON(400, gin.H{"error": "no file given"})
 		return
 	} else if filepath.Ext(avatar.Filename) != ".png" && filepath.Ext(avatar.Filename) != ".jpg" && filepath.Ext(avatar.Filename) != ".jpeg" {
 		c.AbortWithStatusJSON(400, gin.H{"error": "wrong format"})
 		return
 	}
-	filename := filepath.Base("img/" + avatar.Filename)
-	c.SaveUploadedFile(avatar, filename)
-	c.AbortWithStatus(200)
+	usersDb.FindOne(context.TODO(), bson.D{{"_id", userId}}).Decode(&user)
+
+	filename := filepath.Join("img", "/"+fmt.Sprintf("%v", uuid.New()))
+	if err := c.SaveUploadedFile(avatar, filename); err != nil {
+		c.AbortWithStatusJSON(500, gin.H{"error": "error while saving image"})
+	} else {
+		user.Avatar = filename
+		usersDb.ReplaceOne(context.TODO(), bson.D{{"_id", userId}}, user)
+		c.AbortWithStatus(200)
+	}
+
 }
 
 func generateAccessToken(token string, tokenType string) (accessToken string, err error) {
@@ -406,7 +417,7 @@ func refreshAccessToken(c *gin.Context) {
 	} else if claims.Type == "access" {
 		c.AbortWithStatusJSON(400, "Invalid Token")
 	}
-	bearerToken, err := generateAccessToken(refreshToken, "refresh")
+	bearerToken, err := generateAccessToken(refreshToken, "access")
 	if err != nil {
 		c.AbortWithStatusJSON(500, gin.H{"error": err})
 		return
