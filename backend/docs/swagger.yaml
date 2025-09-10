@@ -294,4 +294,25 @@ paths:
       summary: Refresh bearer token
       tags:
       - Users
+  /api/v1/users/upload_avatar:
+    post:
+      consumes:
+      - multipart/form-data
+      parameters:
+      - description: Avatar
+        in: formData
+        name: image
+        required: true
+        type: string
+      - description: Bearer Token
+        in: header
+        name: X-Authorization
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+      summary: Upload avatar for user
+      tags:
+      - Users
 swagger: "2.0"

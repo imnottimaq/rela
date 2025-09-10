@@ -346,6 +346,13 @@ func deleteUser(c *gin.Context) {
 	}
 }
 
+// @Summary Upload avatar for user
+// @Router /api/v1/users/upload_avatar [post]
+// @Accept mpfd
+// @Success 200
+// @Tags Users
+// @Param image formData string true "Avatar"
+// @Param X-Authorization header string true "Bearer Token"
 func uploadAvatar(c *gin.Context) {
 	userId, _ := c.Get("id")
 	user := User{}

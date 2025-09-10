@@ -358,6 +358,38 @@
                     }
                 }
             }
+        },
+        "/api/v1/users/upload_avatar": {
+            "post": {
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "tags": [
+                    "Users"
+                ],
+                "summary": "Upload avatar for user",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Avatar",
+                        "name": "image",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Bearer Token",
+                        "name": "X-Authorization",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    }
+                }
+            }
         }
     },
     "definitions": {
