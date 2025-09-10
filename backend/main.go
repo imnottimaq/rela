@@ -40,6 +40,8 @@ func main() {
 	protected.Use(authMiddleware())
 	{
 		//Tasks
+		r.Static("/app", "../frontend/dist/")
+		r.Static("/assets", "../frontend/dist/assets")
 		protected.GET("/tasks", rateLimiter, getAllTasks)
 		protected.POST("/tasks", rateLimiter, createNewTask)
 		protected.PATCH("/tasks/:taskId", rateLimiter, editExistingTask)
@@ -54,6 +56,7 @@ func main() {
 		r.POST("/api/v1/users/create", rateLimiter, createUser)
 		r.POST("/api/v1/users/login", rateLimiter, loginUser)
 		r.GET("/api/v1/users/refresh", rateLimiter, refreshAccessToken)
+
 		protected.DELETE("/users/delete", rateLimiter, deleteUser)
 		protected.POST("/users/upload_avatar", rateLimiter, uploadAvatar)
 

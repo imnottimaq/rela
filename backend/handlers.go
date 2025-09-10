@@ -271,10 +271,10 @@ func loginUser(c *gin.Context) {
 	} else if input.Password == "" {
 		c.AbortWithStatusJSON(400, gin.H{"error": "password is required"})
 		return
-	} else if !validatePassword(input.Password) {
-		c.AbortWithStatusJSON(400, gin.H{"error": "password does not meet requirements"})
-		return
-	}
+	} // else if !validatePassword(input.Password) {
+	//c.AbortWithStatusJSON(400, gin.H{"error": "password does not meet requirements"})
+	//return
+	//}
 	if err := usersDb.FindOne(context.TODO(), bson.D{{Key: "email", Value: input.Email}}).Decode(&i); err != nil {
 		if errors.Is(err, mongo.ErrNoDocuments) {
 			c.AbortWithStatusJSON(404, gin.H{"error": "User doesnt exist"})
@@ -300,7 +300,7 @@ func loginUser(c *gin.Context) {
 				c.AbortWithStatusJSON(500, err)
 				return
 			}
-			c.AbortWithStatusJSON(200, gin.H{"token": bearerToken})
+			c.JSON(200, gin.H{"token": string(bearerToken)})
 			return
 		}
 	}
@@ -349,10 +349,10 @@ func uploadAvatar(c *gin.Context) {
 	userId, _ := c.Get("id")
 	avatar, err := c.FormFile("avatar_" + fmt.Sprintf("%v", userId))
 	if err != nil {
-		c.AbortWithStatusJSON(400, gin.H{"error":"no file given"})
+		c.AbortWithStatusJSON(400, gin.H{"error": "no file given"})
 		return
-	} else if filepath.Ext(avatar.Filename) != ".png" && filepath.Ext(avatar.Filename)!= ".jpg" && filepath.Ext(avatar.Filename) != ".jpeg"{
-		c.AbortWithStatusJSON(400, gin.H{"error":"wrong format"})
+	} else if filepath.Ext(avatar.Filename) != ".png" && filepath.Ext(avatar.Filename) != ".jpg" && filepath.Ext(avatar.Filename) != ".jpeg" {
+		c.AbortWithStatusJSON(400, gin.H{"error": "wrong format"})
 		return
 	}
 	filename := filepath.Base("img/" + avatar.Filename)
