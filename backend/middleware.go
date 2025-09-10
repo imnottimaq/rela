@@ -10,7 +10,7 @@ import (
 
 func authMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		header := c.GetHeader("Authorization")
+		header := c.GetHeader("X-Authorization")
 		if header == "" {
 			c.AbortWithStatusJSON(403, gin.H{"error": "no access token"})
 			return

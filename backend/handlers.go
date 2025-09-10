@@ -46,7 +46,7 @@ var emailRegex = regexp.MustCompile(`^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$`)
 // @Param X-Authorization header string true "Bearer Token"
 func getAllTasks(c *gin.Context) {
 	id, _ := c.Get("id")
-	cursor, _ := tasksDb.Find(context.TODO(), bson.D{{Key: "created_by", Value: id}})
+	cursor, _ := tasksDb.Find(context.TODO(), bson.D{{"created_by", id}})
 	defer cursor.Close(context.TODO())
 	var tasks []Task
 	_ = cursor.All(context.TODO(), &tasks)
@@ -74,7 +74,7 @@ func createNewTask(c *gin.Context) {
 		c.AbortWithStatusJSON(400, gin.H{"error": "Field 'board' is not specified"})
 		return
 	}
-	err := boardsDb.FindOne(context.TODO(), bson.D{{"_id", input.Board}}).Decode(board)
+	err := boardsDb.FindOne(context.TODO(), bson.D{{"_id", input.Board}}).Decode(&board)
 	if errors.Is(err, mongo.ErrNoDocuments) {
 		c.AbortWithStatusJSON(400, gin.H{"error": "Board does not exist"})
 		return
@@ -109,12 +109,14 @@ func createNewTask(c *gin.Context) {
 func editExistingTask(c *gin.Context) {
 	id, _ := c.Get("id")
 	var previousVersion Task
+	var valuesToEdit EditTask
 	taskId, _ := bson.ObjectIDFromHex(c.Param("taskId"))
+	json.NewDecoder(c.Request.Body).Decode(&valuesToEdit)
 	if taskId.IsZero() {
 		c.AbortWithStatusJSON(400, gin.H{"error": "you must specify task id"})
 		return
 	}
-	err := tasksDb.FindOne(context.TODO(), bson.D{{Key: "_id", Value: taskId}}).Decode(&previousVersion)
+	err := tasksDb.FindOne(context.TODO(), bson.D{{"_id", taskId}}).Decode(&previousVersion)
 	if err != nil {
 		if errors.Is(err, mongo.ErrNoDocuments) {
 			c.AbortWithStatusJSON(404, gin.H{"error": "not found"})
@@ -128,8 +130,6 @@ func editExistingTask(c *gin.Context) {
 		c.AbortWithStatusJSON(400, gin.H{"error": "This task isn't owned by you"})
 		return
 	}
-	var valuesToEdit EditTask
-	json.NewDecoder(c.Request.Body).Decode(&valuesToEdit)
 	if valuesToEdit.Name != nil {
 		previousVersion.Name = *valuesToEdit.Name
 		if previousVersion.Name == "" {
@@ -140,7 +140,7 @@ func editExistingTask(c *gin.Context) {
 	if valuesToEdit.Description != nil {
 		previousVersion.Description = valuesToEdit.Description
 	}
-	_, err = tasksDb.ReplaceOne(context.TODO(), bson.D{{Key: "_id", Value: taskId}}, previousVersion)
+	_, err = tasksDb.ReplaceOne(context.TODO(), bson.D{{Key: "_id", Value: taskId}}, &previousVersion)
 	if err != nil {
 		c.AbortWithStatusJSON(500, gin.H{"error": "Failed to change task"})
 		return
@@ -221,7 +221,7 @@ func createUser(c *gin.Context) {
 		HashedPassword: base64.RawStdEncoding.EncodeToString(argon2.IDKey([]byte(input.Password+pepper), []byte(generatedSalt), uint32(3), uint32(128*1024), uint8(2), uint32(32))),
 		Email:          input.Email,
 	}
-	err := usersDb.FindOne(context.TODO(), bson.D{{Key: "email", Value: input.Email}}).Decode(i)
+	err := usersDb.FindOne(context.TODO(), bson.D{{Key: "email", Value: input.Email}}).Decode(&i)
 	if err != nil {
 		if errors.Is(err, mongo.ErrNoDocuments) {
 			user, _ := usersDb.InsertOne(context.TODO(), &newUser)
@@ -275,7 +275,7 @@ func loginUser(c *gin.Context) {
 		c.AbortWithStatusJSON(400, gin.H{"error": "password does not meet requirements"})
 		return
 	}
-	if err := usersDb.FindOne(context.TODO(), bson.D{{Key: "email", Value: input.Email}}).Decode(i); err != nil {
+	if err := usersDb.FindOne(context.TODO(), bson.D{{Key: "email", Value: input.Email}}).Decode(&i); err != nil {
 		if errors.Is(err, mongo.ErrNoDocuments) {
 			c.AbortWithStatusJSON(404, gin.H{"error": "User doesnt exist"})
 			return
@@ -347,7 +347,14 @@ func deleteUser(c *gin.Context) {
 
 func uploadAvatar(c *gin.Context) {
 	userId, _ := c.Get("id")
-	avatar, _ := c.FormFile("avatar_" + fmt.Sprintf("%v", userId))
+	avatar, err := c.FormFile("avatar_" + fmt.Sprintf("%v", userId))
+	if err != nil {
+		c.AbortWithStatusJSON(400, gin.H{"error":"no file given"})
+		return
+	} else if filepath.Ext(avatar.Filename) != ".png" && filepath.Ext(avatar.Filename)!= ".jpg" && filepath.Ext(avatar.Filename) != ".jpeg"{
+		c.AbortWithStatusJSON(400, gin.H{"error":"wrong format"})
+		return
+	}
 	filename := filepath.Base("img/" + avatar.Filename)
 	c.SaveUploadedFile(avatar, filename)
 	c.AbortWithStatus(200)
