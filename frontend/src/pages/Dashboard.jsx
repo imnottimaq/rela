@@ -1,5 +1,5 @@
-// Dashboard.jsx
 import MainContent from "../components/MainContent";
+import Logo from "../assets/logo.svg";
 
 function Dashboard({ token, handleLogout }) {
 	return (
@@ -8,9 +8,16 @@ function Dashboard({ token, handleLogout }) {
 			<nav className="bg-white shadow-md">
 				<div className="flex justify-between items-center px-6 py-4">
 					{/* Logo / Title */}
-					<h1 className="text-2xl font-bold text-gray-800">
-						Task Tracker
-					</h1>
+					<div className="flex items-center space-x-2">
+						<img
+							src={Logo}
+							alt="Rela logo"
+							className="h-8 w-8 object-contain"
+						/>
+						<h1 className="text-2xl font-bold text-gray-800">
+							Rela
+						</h1>
+					</div>
 
 					{/* User section */}
 					<div className="flex items-center space-x-4">

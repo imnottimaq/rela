@@ -18,7 +18,6 @@ const Login = ({ setToken, switchToRegister }) => {
 		if (!result.ok) {
 			setError(getAPIErrorMessage(result, "login"));
 			setIsLoading(false);
-			return;
 		}
 		if (!result.data?.token) {
 			setError("Something went wrong. Please try again.");

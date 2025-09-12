@@ -56,20 +56,41 @@ const createApi = (mode = "") => {
 	return wrappedApi;
 };
 
-const api = createApi();
+// const api = createApi();
 // const api = createApi("debug");
 
+const api = createSafeFetch({
+	baseURL: `${window.location.origin}/api/v1/`,
+	timeoutMs: 10000,
+	retries: {
+		retries: 2,
+		baseDelayMs: 300,
+	},
+});
+
 export const userAPI = {
-	login: (email, password) => api.post("users/login", { email, password }),
+	login: (email, password) =>
+		api.post("users/login", {
+			email,
+			password,
+			headers: { "Content-Type": "application/json" },
+		}),
 
 	register: (name, email, password) =>
-		api.post("users/create", { name, email, password }),
+		api.post("users/create", {
+			name,
+			email,
+			password,
+			headers: { "Content-Type": "application/json" },
+		}),
 
 	delete: (email, password, token) =>
 		api.delete("users/delete", {
 			email,
 			password,
-			headers: { Authorization: token },
+			headers: {
+				Authorization: token,
+			},
 		}),
 
 	refresh: () => api.get("users/refresh"),
@@ -78,7 +99,6 @@ export const userAPI = {
 		const formData = new FormData();
 		formData.append("img", file);
 
-		// TODO: Fix Authorization header issues
 		return api.post("users/upload_avatar", {
 			formData,
 			headers: {
@@ -90,12 +110,21 @@ export const userAPI = {
 
 export const boardAPI = {
 	create: (name, token) =>
-		api.post("boards", { name, headers: { Authorization: token } }),
+		api.post("boards", {
+			name,
+			headers: {
+				Authorization: token,
+				"Content-Type": "application/json",
+			},
+		}),
 
 	update: (boardId, name, token) =>
 		api.patch(`boards/${boardId}`, {
 			name,
-			headers: { Authorization: token },
+			headers: {
+				Authorization: token,
+				"Content-Type": "application/json",
+			},
 		}),
 
 	delete: (boardId, token) =>
@@ -106,12 +135,21 @@ export const taskAPI = {
 	getAll: (token) => api.get("tasks", { headers: { Authorization: token } }),
 
 	create: (taskData, token) =>
-		api.post("tasks", { taskData, headers: { Authorization: token } }),
+		api.post("tasks", {
+			taskData,
+			headers: {
+				Authorization: token,
+				"Content-Type": "application/json",
+			},
+		}),
 
 	update: (taskId, taskData, token) =>
 		api.patch(`tasks/${taskId}`, {
 			taskData,
-			headers: { Authorization: token },
+			headers: {
+				Authorization: token,
+				"Content-Type": "application/json",
+			},
 		}),
 
 	delete: (taskId, token) =>
