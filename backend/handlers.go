@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
+	"log"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -48,10 +49,12 @@ var emailRegex = regexp.MustCompile(`^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$`)
 func getAllTasks(c *gin.Context) {
 	id, _ := c.Get("id")
 	cursor, _ := tasksDb.Find(context.TODO(), bson.D{{"created_by", id}})
-	defer cursor.Close(context.TODO())
 	var tasks []Task
 	_ = cursor.All(context.TODO(), &tasks)
 	c.IndentedJSON(200, tasks)
+	if err := cursor.Close(context.TODO()); err != nil {
+		log.Print("Failed to close cursor")
+	}
 	return
 }
 
@@ -67,20 +70,23 @@ func createNewTask(c *gin.Context) {
 	id, _ := c.Get("id")
 	var input CreateTask
 	var board Board
-	json.NewDecoder(c.Request.Body).Decode(&input)
-	if input.Name == "" {
+	err := json.NewDecoder(c.Request.Body).Decode(&input)
+	if err != nil {
+		c.AbortWithStatusJSON(500, gin.H{"error": "Something went wrong when parsing request"})
+		return
+	} else if input.Name == "" {
 		c.AbortWithStatusJSON(400, gin.H{"error": "Field 'name' is not specified"})
 		return
 	} else if input.Board.IsZero() {
 		c.AbortWithStatusJSON(400, gin.H{"error": "Field 'board' is not specified"})
 		return
 	}
-	err := boardsDb.FindOne(context.TODO(), bson.D{{"_id", input.Board}}).Decode(&board)
+	err = boardsDb.FindOne(context.TODO(), bson.D{{"_id", input.Board}}).Decode(&board)
 	if errors.Is(err, mongo.ErrNoDocuments) {
 		c.AbortWithStatusJSON(400, gin.H{"error": "Board does not exist"})
 		return
 	} else {
-		c.AbortWithStatusJSON(500, gin.H{"error": err})
+		c.AbortWithStatusJSON(500, gin.H{"error": "Internal server error"})
 	}
 	newTask := Task{
 		Name:        input.Name,
@@ -112,15 +118,18 @@ func editExistingTask(c *gin.Context) {
 	var previousVersion Task
 	var valuesToEdit EditTask
 	taskId, _ := bson.ObjectIDFromHex(c.Param("taskId"))
-	json.NewDecoder(c.Request.Body).Decode(&valuesToEdit)
-	if taskId.IsZero() {
-		c.AbortWithStatusJSON(400, gin.H{"error": "you must specify task id"})
+	err := json.NewDecoder(c.Request.Body).Decode(&valuesToEdit)
+	if err != nil {
+		c.AbortWithStatusJSON(400, gin.H{"error": "Something went wrong when parsing request"})
+		return
+	} else if taskId.IsZero() {
+		c.AbortWithStatusJSON(400, gin.H{"error": "You must specify task id"})
 		return
 	}
-	err := tasksDb.FindOne(context.TODO(), bson.D{{"_id", taskId}}).Decode(&previousVersion)
+	err = tasksDb.FindOne(context.TODO(), bson.D{{"_id", taskId}}).Decode(&previousVersion)
 	if err != nil {
 		if errors.Is(err, mongo.ErrNoDocuments) {
-			c.AbortWithStatusJSON(404, gin.H{"error": "not found"})
+			c.AbortWithStatusJSON(404, gin.H{"error": "Task does not exist"})
 			return
 		} else {
 			c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
@@ -195,25 +204,32 @@ func deleteExistingTask(c *gin.Context) {
 // @Param data body CreateUser true "Create user request"
 func createUser(c *gin.Context) {
 	randomBytes := make([]byte, 32)
-	rand.Read(randomBytes)
+	_, err := rand.Read(randomBytes)
+	if err != nil {
+		c.AbortWithStatusJSON(500, gin.H{"error": "Internal server error"})
+		return
+	}
 	generatedSalt := base64.URLEncoding.EncodeToString(randomBytes)
 	var input CreateUser
 	var i bson.M
-	json.NewDecoder(c.Request.Body).Decode(&input)
-	if input.Email == "" {
-		c.AbortWithStatusJSON(400, gin.H{"error": "email is required"})
+	err = json.NewDecoder(c.Request.Body).Decode(&input)
+	if err != nil {
+		c.AbortWithStatusJSON(500, gin.H{"error": "Something went wrong when parsing request"})
+		return
+	} else if input.Email == "" {
+		c.AbortWithStatusJSON(400, gin.H{"error": "Email is required"})
 		return
 	} else if !emailRegex.MatchString(input.Email) {
-		c.AbortWithStatusJSON(400, gin.H{"error": "bad email"})
+		c.AbortWithStatusJSON(400, gin.H{"error": "Bad email"})
 		return
 	} else if input.Name == "" {
-		c.AbortWithStatusJSON(400, gin.H{"error": "name is required"})
+		c.AbortWithStatusJSON(400, gin.H{"error": "Name is required"})
 		return
 	} else if input.Password == "" {
-		c.AbortWithStatusJSON(400, gin.H{"error": "password is required"})
+		c.AbortWithStatusJSON(400, gin.H{"error": "Password is required"})
 		return
 	} else if !validatePassword(input.Password) {
-		c.AbortWithStatusJSON(400, gin.H{"": "your password must contain 1 uppercase letter, 1 lowercase letter, 1 special character and be atleast 8 characters long"})
+		c.AbortWithStatusJSON(400, gin.H{"": "Your password must contain 1 uppercase letter, 1 lowercase letter, 1 special character and be at least 8 characters long"})
 		return
 	}
 	newUser := User{
@@ -222,10 +238,14 @@ func createUser(c *gin.Context) {
 		HashedPassword: base64.RawStdEncoding.EncodeToString(argon2.IDKey([]byte(input.Password+pepper), []byte(generatedSalt), uint32(3), uint32(128*1024), uint8(2), uint32(32))),
 		Email:          input.Email,
 	}
-	err := usersDb.FindOne(context.TODO(), bson.D{{Key: "email", Value: input.Email}}).Decode(&i)
+	err = usersDb.FindOne(context.TODO(), bson.D{{Key: "email", Value: input.Email}}).Decode(&i)
 	if err != nil {
 		if errors.Is(err, mongo.ErrNoDocuments) {
-			user, _ := usersDb.InsertOne(context.TODO(), &newUser)
+			user, err := usersDb.InsertOne(context.TODO(), &newUser)
+			if err != nil {
+				c.AbortWithStatusJSON(500, gin.H{"error": "Internal server error"})
+				return
+			}
 			refreshToken := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 				"id":  user.InsertedID.(bson.ObjectID),
 				"exp": time.Now().UTC().Unix() + 604800, // Current expire time is 7 days, this is subject to change
@@ -233,14 +253,14 @@ func createUser(c *gin.Context) {
 			signedRefreshToken, err := refreshToken.SignedString([]byte(pepper))
 			if err != nil {
 				fmt.Println(err)
-				c.AbortWithStatusJSON(500, gin.H{"error": err})
+				c.AbortWithStatusJSON(500, gin.H{"error": "Internal server error"})
 				return
 			} else {
 				c.SetCookie("refreshToken", signedRefreshToken, 604800, "/", "", true, true)
 				bearerToken, err := generateAccessToken(signedRefreshToken, "access")
 				if err != nil {
 					fmt.Println(err)
-					c.AbortWithStatusJSON(500, err)
+					c.AbortWithStatusJSON(500, gin.H{"error": "Internal server error"})
 					return
 				}
 				c.AbortWithStatusJSON(200, gin.H{"token": bearerToken})
@@ -248,7 +268,7 @@ func createUser(c *gin.Context) {
 			}
 		}
 	}
-	c.AbortWithStatusJSON(400, gin.H{"error": err})
+	c.AbortWithStatusJSON(400, gin.H{"error": "Bad request"})
 	return
 }
 
@@ -262,26 +282,27 @@ func createUser(c *gin.Context) {
 func loginUser(c *gin.Context) {
 	var input LoginUser
 	var i User
-	json.NewDecoder(c.Request.Body).Decode(&input)
+	err := json.NewDecoder(c.Request.Body).Decode(&input)
+	if err != nil {
+		c.AbortWithStatusJSON(500, gin.H{"error": "Something went wrong when parsing request"})
+		return
+	}
 	if input.Email == "" {
-		c.AbortWithStatusJSON(400, gin.H{"error": "email is required"})
+		c.AbortWithStatusJSON(400, gin.H{"error": "Email is required"})
 		return
 	} else if !emailRegex.MatchString(input.Email) {
-		c.AbortWithStatusJSON(400, gin.H{"error": "bad email"})
+		c.AbortWithStatusJSON(400, gin.H{"error": "Bad email"})
 		return
 	} else if input.Password == "" {
-		c.AbortWithStatusJSON(400, gin.H{"error": "password is required"})
+		c.AbortWithStatusJSON(400, gin.H{"error": "Password is required"})
 		return
-	} // else if !validatePassword(input.Password) {
-	//c.AbortWithStatusJSON(400, gin.H{"error": "password does not meet requirements"})
-	//return
-	//}
-	if err := usersDb.FindOne(context.TODO(), bson.D{{Key: "email", Value: input.Email}}).Decode(&i); err != nil {
+	}
+	if err = usersDb.FindOne(context.TODO(), bson.D{{Key: "email", Value: input.Email}}).Decode(&i); err != nil {
 		if errors.Is(err, mongo.ErrNoDocuments) {
 			c.AbortWithStatusJSON(404, gin.H{"error": "User doesnt exist"})
 			return
 		} else {
-			c.AbortWithStatusJSON(500, gin.H{"error": err})
+			c.AbortWithStatusJSON(500, gin.H{"error": "Internal server error"})
 			return
 		}
 	}
@@ -292,16 +313,16 @@ func loginUser(c *gin.Context) {
 		})
 		signedRefreshToken, err := refreshToken.SignedString([]byte(pepper))
 		if err != nil {
-			c.AbortWithStatusJSON(500, gin.H{"error": err})
+			c.AbortWithStatusJSON(500, gin.H{"error": "Internal server error"})
 			return
 		} else {
 			c.SetCookie("refreshToken", signedRefreshToken, 604800, "/", "", true, true)
 			bearerToken, err := generateAccessToken(signedRefreshToken, "access")
 			if err != nil {
-				c.AbortWithStatusJSON(500, err)
+				c.AbortWithStatusJSON(500, gin.H{"error": "Internal server error"})
 				return
 			}
-			c.JSON(200, gin.H{"token": string(bearerToken)})
+			c.JSON(200, gin.H{"token": bearerToken})
 			return
 		}
 	}
@@ -318,23 +339,35 @@ func deleteUser(c *gin.Context) {
 	userId, _ := c.Get("id")
 	var input LoginUser
 	var user User
-	json.NewDecoder(c.Request.Body).Decode(&input)
-	if input.Email == "" {
-		c.AbortWithStatusJSON(400, gin.H{"error": "email is required"})
-		return
-	} else if !emailRegex.MatchString(input.Email) {
-		c.AbortWithStatusJSON(400, gin.H{"error": "bad email"})
-		return
-	} else if input.Password == "" {
-		c.AbortWithStatusJSON(400, gin.H{"error": "password is required"})
-		return
-	} else if !validatePassword(input.Password) {
-		c.AbortWithStatusJSON(400, gin.H{"error": "password does not meet requirements"})
+	err := json.NewDecoder(c.Request.Body).Decode(&input)
+	if err != nil {
+		c.AbortWithStatusJSON(500, gin.H{"error": "Something went wrong when parsing request"})
 		return
 	}
-	usersDb.FindOne(context.TODO(), bson.D{{Key: "_id", Value: userId}}).Decode(&user)
+	if input.Email == "" {
+		c.AbortWithStatusJSON(400, gin.H{"error": "Email is required"})
+		return
+	} else if !emailRegex.MatchString(input.Email) {
+		c.AbortWithStatusJSON(400, gin.H{"error": "Bad email"})
+		return
+	} else if input.Password == "" {
+		c.AbortWithStatusJSON(400, gin.H{"error": "Password is required"})
+		return
+	} else if !validatePassword(input.Password) {
+		c.AbortWithStatusJSON(400, gin.H{"error": "Password does not meet requirements"})
+		return
+	}
+	err = usersDb.FindOne(context.TODO(), bson.D{{Key: "_id", Value: userId}}).Decode(&user)
+	if err != nil {
+		c.AbortWithStatusJSON(500, gin.H{"error": "Failed to delete user"})
+		return
+	}
 	if user.Email == input.Email && base64.RawStdEncoding.EncodeToString(argon2.IDKey([]byte(input.Password+pepper), []byte(user.Salt), uint32(3), uint32(128*1024), uint8(2), uint32(32))) == user.HashedPassword && userId == user.Id {
-		usersDb.DeleteOne(context.TODO(), bson.D{{Key: "_id", Value: userId}})
+		_, err = usersDb.DeleteOne(context.TODO(), bson.D{{Key: "_id", Value: userId}})
+		if err != nil {
+			c.AbortWithStatusJSON(500, gin.H{"error": "Failed to delete user"})
+			return
+		}
 		c.AbortWithStatus(200)
 		return
 	} else if user.Email != input.Email || base64.RawStdEncoding.EncodeToString(argon2.IDKey([]byte(input.Password+pepper), []byte(user.Salt), uint32(3), uint32(128*1024), uint8(2), uint32(32))) != user.HashedPassword {
@@ -354,25 +387,47 @@ func deleteUser(c *gin.Context) {
 // @Param image formData string true "Avatar"
 // @Param X-Authorization header string true "Bearer Token"
 func uploadAvatar(c *gin.Context) {
+	if _, err := os.Stat("./img/"); err != nil {
+		if os.IsNotExist(err) {
+			err = os.Mkdir("./img/", 0777)
+			if err != nil {
+				log.Fatal("Failed to create img/")
+			}
+		} else {
+			log.Fatal("Something went wrong when checking if img/ exists")
+		}
+	}
 	userId, _ := c.Get("id")
 	user := User{}
 	avatar, err := c.FormFile("img")
 	if err != nil {
 		fmt.Printf(fmt.Sprintf("%v", err))
-		c.AbortWithStatusJSON(400, gin.H{"error": "no file given"})
+		c.AbortWithStatusJSON(400, gin.H{"error": "No file given"})
 		return
 	} else if filepath.Ext(avatar.Filename) != ".png" && filepath.Ext(avatar.Filename) != ".jpg" && filepath.Ext(avatar.Filename) != ".jpeg" {
-		c.AbortWithStatusJSON(400, gin.H{"error": "wrong format"})
+		c.AbortWithStatusJSON(400, gin.H{"error": "Wrong file format"})
 		return
 	}
-	usersDb.FindOne(context.TODO(), bson.D{{"_id", userId}}).Decode(&user)
-
+	err = usersDb.FindOne(context.TODO(), bson.D{{"_id", userId}}).Decode(&user)
+	if err != nil {
+		c.AbortWithStatusJSON(500, gin.H{"error": "Failed to find user"})
+		return
+	}
 	filename := filepath.Join("img", "/"+fmt.Sprintf("%v", uuid.New()))
 	if err := c.SaveUploadedFile(avatar, filename); err != nil {
-		c.AbortWithStatusJSON(500, gin.H{"error": "error while saving image"})
+		c.AbortWithStatusJSON(500, gin.H{"error": "Error while saving image"})
+		return
 	} else {
 		user.Avatar = filename
-		usersDb.ReplaceOne(context.TODO(), bson.D{{"_id", userId}}, user)
+		_, err = usersDb.ReplaceOne(context.TODO(), bson.D{{"_id", userId}}, user)
+		if err != nil {
+			c.AbortWithStatusJSON(500, gin.H{"error": "Failed to pin image to user"})
+			err = os.Remove("./img/" + filename)
+			if err != nil {
+				log.Fatal("Failed to remove avatar")
+			}
+		}
+
 		c.AbortWithStatus(200)
 	}
 
@@ -381,7 +436,7 @@ func uploadAvatar(c *gin.Context) {
 func generateAccessToken(token string, tokenType string) (accessToken string, err error) {
 	parsedToken, _ := jwt.ParseWithClaims(token, &LoginToken{}, func(token *jwt.Token) (any, error) {
 		if token.Method != jwt.SigningMethodHS256 {
-			return nil, fmt.Errorf("Unknown signing method: ", token.Method)
+			return nil, fmt.Errorf("unknown signing method: %s", token.Method)
 		}
 		return []byte(pepper), nil
 	})
@@ -400,7 +455,7 @@ func generateAccessToken(token string, tokenType string) (accessToken string, er
 }
 
 // @Summary Refresh bearer token
-// @Description For this route, you must have refresh token, that is sent to your browser when you log into user account as a http-only cookie
+// @Description For this route, you must have refresh token, that is sent to your browser when you log into user account as an http-only cookie
 // @Router /api/v1/users/refresh [get]
 // @Success 200 {array} Token
 // @Produce json
@@ -409,7 +464,7 @@ func refreshAccessToken(c *gin.Context) {
 	refreshToken, _ := c.Cookie("refreshToken")
 	token, err := jwt.ParseWithClaims(refreshToken, &LoginToken{}, func(token *jwt.Token) (any, error) {
 		if token.Method != jwt.SigningMethodHS256 {
-			return nil, fmt.Errorf("Unknown signing method: ", token.Method)
+			return nil, fmt.Errorf("unknown signing method: %s", token.Method)
 		}
 		return []byte(pepper), nil
 	})
@@ -426,12 +481,10 @@ func refreshAccessToken(c *gin.Context) {
 	}
 	bearerToken, err := generateAccessToken(refreshToken, "access")
 	if err != nil {
-		c.AbortWithStatusJSON(500, gin.H{"error": err})
+		c.AbortWithStatusJSON(500, gin.H{"error": "Something went wrong when generating access token"})
 		return
 	}
 	c.AbortWithStatusJSON(200, gin.H{"token": bearerToken})
-	return
-
 }
 
 // @Summary Create new board
@@ -446,16 +499,25 @@ func addBoard(c *gin.Context) {
 	id, _ := c.Get("id")
 	var input Board
 	var user User
-	json.NewDecoder(c.Request.Body).Decode(&input)
-	if input.Name == "" {
-		c.AbortWithStatusJSON(400, gin.H{"error": "no name given"})
+	err := json.NewDecoder(c.Request.Body).Decode(&input)
+	if err != nil {
+		c.AbortWithStatusJSON(500, gin.H{"error": "Something went wrong when parsing request"})
 		return
 	}
-	usersDb.FindOne(context.TODO(), bson.D{{Key: "_id", Value: id}}).Decode(&user)
+	if input.Name == "" {
+		c.AbortWithStatusJSON(400, gin.H{"error": "No name given"})
+		return
+	}
+	err = usersDb.FindOne(context.TODO(), bson.D{{Key: "_id", Value: id}}).Decode(&user)
+	if err != nil {
+		c.AbortWithStatusJSON(500, gin.H{"error": "Failed to find user"})
+	}
 	input.OwnedBy = user.Id
-	boardsDb.InsertOne(context.TODO(), input)
+	if _, err = boardsDb.InsertOne(context.TODO(), input); err != nil {
+		c.AbortWithStatusJSON(500, gin.H{"error": "Failed to create board"})
+		return
+	}
 	c.AbortWithStatus(200)
-	return
 }
 
 // @Summary Delete board
@@ -472,21 +534,21 @@ func deleteBoard(c *gin.Context) {
 	var board Board
 	if err := boardsDb.FindOne(context.TODO(), bson.D{{"_id", boardId}}).Decode(board); err != nil {
 		if errors.Is(err, mongo.ErrNoDocuments) {
-			c.AbortWithStatusJSON(404, gin.H{"error": "board does not exist"})
+			c.AbortWithStatusJSON(404, gin.H{"error": "Board does not exist"})
 			return
 		} else {
-			c.AbortWithStatusJSON(500, gin.H{"error": "failed to execute search"})
+			c.AbortWithStatusJSON(500, gin.H{"error": "Failed to execute search"})
 			return
 		}
 	}
 	if board.OwnedBy == id {
 		if _, err := boardsDb.DeleteOne(context.TODO(), bson.D{{"_id", boardId}}); err != nil {
-			c.AbortWithStatusJSON(500, gin.H{"error": "failed to remove board"})
+			c.AbortWithStatusJSON(500, gin.H{"error": "Failed to remove board"})
 		}
 		c.AbortWithStatus(200)
 		return
 	} else {
-		c.AbortWithStatusJSON(400, gin.H{"error": "you dont own this board"})
+		c.AbortWithStatusJSON(400, gin.H{"error": "You dont own this board"})
 	}
 }
 
@@ -504,30 +566,33 @@ func editBoard(c *gin.Context) {
 	boardId, _ := c.Get("boardId")
 	var valuesToEdit Board
 	var i Board
-	json.NewDecoder(c.Request.Body).Decode(valuesToEdit)
-	if valuesToEdit.OwnedBy != id && !valuesToEdit.OwnedBy.IsZero() {
-		c.AbortWithStatusJSON(400, gin.H{"error": "you dont own this board"})
+	err := json.NewDecoder(c.Request.Body).Decode(&valuesToEdit)
+	if err != nil {
+		c.AbortWithStatusJSON(500, gin.H{"error": "Something went wrong when parsing request"})
+		return
+	} else if valuesToEdit.OwnedBy != id && !valuesToEdit.OwnedBy.IsZero() {
+		c.AbortWithStatusJSON(400, gin.H{"error": "You dont own this board"})
 		return
 	} else if valuesToEdit.OwnedBy.IsZero() {
 		if err := boardsDb.FindOne(context.TODO(), bson.D{{"_id", boardId}}).Decode(i); err != nil {
 			if boardId == "" {
-				c.AbortWithStatusJSON(400, gin.H{"error": "board id cannot be empty"})
+				c.AbortWithStatusJSON(400, gin.H{"error": "Board id cannot be empty"})
 				return
 			} else if errors.Is(err, mongo.ErrNoDocuments) {
-				c.AbortWithStatusJSON(404, gin.H{"error": "board does not exist"})
+				c.AbortWithStatusJSON(404, gin.H{"error": "Board does not exist"})
 				return
 			} else {
-				c.AbortWithStatusJSON(500, gin.H{"error": "failed to execute search"})
+				c.AbortWithStatusJSON(500, gin.H{"error": "Failed to execute search"})
 				return
 			}
 		}
 		if valuesToEdit.Name == "" {
-			c.AbortWithStatusJSON(400, gin.H{"error": "you cant change board name to nothing"})
+			c.AbortWithStatusJSON(400, gin.H{"error": "You cant change board name to nothing"})
 			return
 		}
 		i.Name = valuesToEdit.Name
 		if _, err := boardsDb.InsertOne(context.TODO(), i); err != nil {
-			c.AbortWithStatusJSON(500, gin.H{"error": "failed to insert board"})
+			c.AbortWithStatusJSON(500, gin.H{"error": "Failed to insert board"})
 		}
 	}
 }
@@ -540,7 +605,7 @@ func validatePassword(password string) bool {
 	hasLower := regexp.MustCompile(`[a-z]`).MatchString(password)
 	hasUpper := regexp.MustCompile(`[A-Z]`).MatchString(password)
 	hasDigit := regexp.MustCompile(`\d`).MatchString(password)
-	hasSpecial := regexp.MustCompile(`[@$!%*?&]`).MatchString(password)
+	hasSpecial := regexp.MustCompile(`[!"#$%&'()*+,\-./:;<=>?@[\\\]^_{|}~]`).MatchString(password)
 
 	return hasLower && hasUpper && hasDigit && hasSpecial
 }

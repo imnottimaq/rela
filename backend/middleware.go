@@ -17,7 +17,7 @@ func authMiddleware() gin.HandlerFunc {
 		}
 		token, err := jwt.ParseWithClaims(header, &LoginToken{}, func(token *jwt.Token) (any, error) {
 			if token.Method != jwt.SigningMethodHS256 {
-				return nil, fmt.Errorf("Unknown signing method: ", token.Method)
+				return nil, fmt.Errorf("unknown signing method: %s", token.Method)
 			}
 			return []byte(pepper), nil
 		})

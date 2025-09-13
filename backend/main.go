@@ -1,7 +1,7 @@
 package main
 
 import (
-	docs "Rela/docs"
+	_ "Rela/docs"
 	"log"
 	_ "net/http/pprof"
 	"os"
@@ -25,7 +25,6 @@ func rateLimitHandler(c *gin.Context, info ratelimit.Info) {
 }
 
 func main() {
-	docs.SwaggerInfo.BasePath = "/api/v1"
 	r := gin.Default()
 	r.MaxMultipartMemory = 8 << 20
 	store := ratelimit.InMemoryStore(&ratelimit.InMemoryOptions{
@@ -62,6 +61,16 @@ func main() {
 		protected.POST("/users/upload_avatar", rateLimiter, uploadAvatar)
 
 		r.GET("/docs/*any", ginSwagger.WrapHandler(swaggerfiles.Handler))
+	}
+	if pepper == "" {
+		log.Print("WARNING Server-side secret is not present, this is big security flaw")
+	} else if mongodbCredentials == "" {
+		log.Fatal("FATAL MongoDB credentials is not present")
+	} else if port == "" {
+		log.Print("WARNING Port is not present, falling back to default")
+		if err := r.Run(":8080"); err != nil {
+			log.Fatal("Failed to start server")
+		}
 	}
 	if err := r.Run(port); err != nil {
 		log.Fatal("Failed to start server")
