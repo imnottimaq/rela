@@ -25,7 +25,6 @@ const Register = ({ setToken, switchToLogin }) => {
 		const handleError = (error) => {
 			setError(error);
 			setIsLoading(false);
-			return;
 		};
 
 		if (!validateName(name)) return handleError("Please enter your name.");
@@ -43,7 +42,7 @@ const Register = ({ setToken, switchToLogin }) => {
 			return setError("Invalid response from server. Please try again.");
 
 		setToken(result.data.token);
-        localStorage.setItem("token", result.data.token);
+		localStorage.setItem("token", result.data.token);
 
 		if (avatar) {
 			const uploadRes = await userAPI.uploadAvatar(
