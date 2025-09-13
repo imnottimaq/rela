@@ -14,7 +14,7 @@ import (
 	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
-var _ = godotenv.Load(".env")
+var _ = godotenv.Load("../.env")
 var port = os.Getenv("PORT")
 
 func keyFunc(c *gin.Context) string {

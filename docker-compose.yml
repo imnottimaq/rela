@@ -1,0 +1,35 @@
+services:
+  rela-backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: rela-backend:latest
+    container_name: rela-backend
+    ports:
+      - "4444${PORT}"
+    env_file:
+      - .env
+    depends_on:
+      - rela-frontend
+      - mongodb
+    restart: unless-stopped
+  rela-frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    image: rela-frontend:latest
+    container_name: rela-frontend
+  mongodb:
+    image: mongo:latest
+    container_name: mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb-data:/data/db
+      - ./backend/mongodb_init:/docker-entrypoint-initdb.d
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
+    restart: unless-stopped
+volumes:
+  mongodb-data:
