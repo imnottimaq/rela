@@ -15,7 +15,7 @@ function App() {
 
 	const handleLogout = () => {
 		setToken("");
-        localStorage.removeItem("token");
+		localStorage.removeItem("token");
 		setCurrentView("login");
 	};
 
