@@ -2,9 +2,14 @@ package main
 
 import (
 	_ "Rela/docs"
+	"fmt"
+	"github.com/golang-jwt/jwt/v5"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 	"log"
 	_ "net/http/pprof"
 	"os"
+	"regexp"
 	"time"
 
 	ratelimit "github.com/JGLTechnologies/gin-rate-limit"
@@ -16,6 +21,15 @@ import (
 
 var _ = godotenv.Load("../.env")
 var port = os.Getenv("PORT")
+var pepper = os.Getenv("PEPPER")
+var mongodbCredentials = os.Getenv("MONGO_CREDS")
+var dbClient, _ = mongo.Connect(options.Client().ApplyURI(mongodbCredentials).SetServerAPIOptions(options.ServerAPI(options.ServerAPIVersion1)))
+
+var tasksDb = dbClient.Database("rela").Collection("tasks")
+var usersDb = dbClient.Database("rela").Collection("users")
+var boardsDb = dbClient.Database("rela").Collection("boards")
+
+var emailRegex = regexp.MustCompile(`^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$`)
 
 func keyFunc(c *gin.Context) string {
 	return c.ClientIP()
@@ -36,7 +50,33 @@ func main() {
 		KeyFunc:      keyFunc,
 	})
 	protected := r.Group("/api/v1")
-	protected.Use(authMiddleware())
+	protected.Use(func(c *gin.Context) {
+		header := c.GetHeader("X-Authorization")
+		if header == "" {
+			c.AbortWithStatusJSON(403, gin.H{"error": "no access token"})
+			return
+		}
+		token, err := jwt.ParseWithClaims(header, &LoginToken{}, func(token *jwt.Token) (any, error) {
+			if token.Method != jwt.SigningMethodHS256 {
+				return nil, fmt.Errorf("unknown signing method: %s", token.Method)
+			}
+			return []byte(pepper), nil
+		})
+		if err != nil {
+			c.AbortWithStatusJSON(500, "Internal Server Error")
+			return
+		}
+		claims := token.Claims.(*LoginToken)
+		if claims.ExpiresAt < time.Now().UTC().Unix() {
+			c.AbortWithStatusJSON(403, "Authorization Required")
+			return
+		} else if claims.Type == "refresh" {
+			c.AbortWithStatusJSON(400, "Invalid Token")
+		} else {
+			c.Set("id", claims.Id)
+			c.Next()
+		}
+	})
 	{
 		//Tasks
 		r.Static("/app", "../frontend/dist/")

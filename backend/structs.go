@@ -61,3 +61,9 @@ type Board struct {
 type CreateBoard struct {
 	Name string `json:"name" bson:"name"`
 }
+
+type Workspace struct {
+	Id      bson.ObjectID   `bson:"_id" json:"_id"`
+	Name    string          `json:"name"`
+	Members []bson.ObjectID `bson:"members" json:"members"`
+}
