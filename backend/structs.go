@@ -40,12 +40,12 @@ type CreateUser struct {
 	Email    string `json:"email" bson:"email"`
 	Password string `json:"password" bson:"password"`
 }
-type Token struct {
+type TokenSwagger struct {
 	Token string `json:"token" bson:"token"`
 }
-type LoginToken struct {
+type Token struct {
 	Id        bson.ObjectID `json:"id" bson:"id"`
-	ExpiresAt int64         `json:"exp" bson:"expires_at"`
+	ExpiresAt int64         `json:"exp" bson:"exp"`
 	Type      string        `json:"type" bson:"type"`
 	jwt.RegisteredClaims
 }

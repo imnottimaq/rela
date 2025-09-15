@@ -28,6 +28,7 @@ var dbClient, _ = mongo.Connect(options.Client().ApplyURI(mongodbCredentials).Se
 var tasksDb = dbClient.Database("rela").Collection("tasks")
 var usersDb = dbClient.Database("rela").Collection("users")
 var boardsDb = dbClient.Database("rela").Collection("boards")
+var workspacesDb = dbClient.Database("rela").Collection("workspaces")
 
 var emailRegex = regexp.MustCompile(`^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$`)
 
@@ -50,13 +51,17 @@ func main() {
 		KeyFunc:      keyFunc,
 	})
 	protected := r.Group("/api/v1")
+	workspaces := protected.Group("/workspaces")
+	tasks := protected.Group("/tasks")
+	users := r.Group("/api/v1/users")
+	boards := protected.Group("/boards")
 	protected.Use(func(c *gin.Context) {
 		header := c.GetHeader("X-Authorization")
 		if header == "" {
 			c.AbortWithStatusJSON(403, gin.H{"error": "no access token"})
 			return
 		}
-		token, err := jwt.ParseWithClaims(header, &LoginToken{}, func(token *jwt.Token) (any, error) {
+		token, err := jwt.ParseWithClaims(header, &Token{}, func(token *jwt.Token) (any, error) {
 			if token.Method != jwt.SigningMethodHS256 {
 				return nil, fmt.Errorf("unknown signing method: %s", token.Method)
 			}
@@ -66,7 +71,7 @@ func main() {
 			c.AbortWithStatusJSON(500, "Internal Server Error")
 			return
 		}
-		claims := token.Claims.(*LoginToken)
+		claims := token.Claims.(*Token)
 		if claims.ExpiresAt < time.Now().UTC().Unix() {
 			c.AbortWithStatusJSON(403, "Authorization Required")
 			return
@@ -82,24 +87,28 @@ func main() {
 		r.Static("/app", "../frontend/dist/")
 		r.Static("/assets", "../frontend/dist/assets")
 		r.Static("/img", "./img")
-		protected.GET("/tasks", rateLimiter, getAllTasks)
-		protected.POST("/tasks", rateLimiter, createNewTask)
-		protected.PATCH("/tasks/:taskId", rateLimiter, editExistingTask)
-		protected.DELETE("/tasks/:taskId", rateLimiter, deleteExistingTask)
+		tasks.GET("/", rateLimiter, getAllTasks)
+		tasks.POST("/", rateLimiter, createNewTask)
+		tasks.PATCH("/:taskId", rateLimiter, editExistingTask)
+		tasks.DELETE("/:taskId", rateLimiter, deleteExistingTask)
 
 		//Boards
-		protected.POST("/boards", rateLimiter, addBoard)
-		protected.DELETE("/boards/:boardId", rateLimiter, deleteBoard)
-		protected.PATCH("/boards/:boardId", rateLimiter, editBoard)
+		boards.POST("/", rateLimiter, addBoard)
+		boards.DELETE("/:boardId", rateLimiter, deleteBoard)
+		boards.PATCH("/:boardId", rateLimiter, editBoard)
 
 		//Users
-		r.POST("/api/v1/users/create", rateLimiter, createUser)
-		r.POST("/api/v1/users/login", rateLimiter, loginUser)
-		r.GET("/api/v1/users/refresh", rateLimiter, refreshAccessToken)
+		users.POST("/create", rateLimiter, createUser)
+		users.POST("/login", rateLimiter, loginUser)
+		users.GET("/refresh", rateLimiter, refreshAccessToken)
 
 		protected.DELETE("/users/delete", rateLimiter, deleteUser)
 		protected.POST("/users/upload_avatar", rateLimiter, uploadAvatar)
 
+		//Workspaces
+		workspaces.POST("/", rateLimiter, createWorkspace)
+		workspaces.POST("/add/:joinToken", rateLimiter, addMember)
+		//Docs
 		r.GET("/docs/*any", ginSwagger.WrapHandler(swaggerfiles.Handler))
 	}
 	if pepper == "" {

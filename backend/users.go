@@ -265,7 +265,7 @@ func uploadAvatar(c *gin.Context) {
 // @Tags Users
 func refreshAccessToken(c *gin.Context) {
 	refreshToken, _ := c.Cookie("refreshToken")
-	token, err := jwt.ParseWithClaims(refreshToken, &LoginToken{}, func(token *jwt.Token) (any, error) {
+	token, err := jwt.ParseWithClaims(refreshToken, &Token{}, func(token *jwt.Token) (any, error) {
 		if token.Method != jwt.SigningMethodHS256 {
 			return nil, fmt.Errorf("unknown signing method: %s", token.Method)
 		}
@@ -275,7 +275,7 @@ func refreshAccessToken(c *gin.Context) {
 		c.AbortWithStatusJSON(500, "Internal Server Error")
 		return
 	}
-	claims := token.Claims.(*LoginToken)
+	claims := token.Claims.(*Token)
 	if claims.ExpiresAt < time.Now().UTC().Unix() {
 		c.AbortWithStatusJSON(403, "Authorization Required")
 		return
