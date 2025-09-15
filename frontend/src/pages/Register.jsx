@@ -9,8 +9,9 @@ import {
 import PasswordField from "../components/PasswordField";
 import EmailField from "../components/EmailField";
 import AvatarUpload from "../components/AvatarUpload";
+import { useNavigate } from "react-router-dom";
 
-export default function Register({ setToken, switchToLogin }) {
+export default function Register({ setToken }) {
 	const [error, setError] = useState("");
 	const [isLoading, setIsLoading] = useState(false);
 
@@ -19,6 +20,8 @@ export default function Register({ setToken, switchToLogin }) {
 	const [password, setPassword] = useState("");
 	const [avatar, setAvatar] = useState(null);
 	const [avatarPreview, setAvatarPreview] = useState(null);
+    
+	const navigate = useNavigate();
 
 	const handleSubmit = async (e) => {
 		e.preventDefault();
@@ -57,6 +60,7 @@ export default function Register({ setToken, switchToLogin }) {
 		}
 
 		setIsLoading(false);
+		navigate("/dashboard");
 	};
 
 	return (
@@ -122,7 +126,7 @@ export default function Register({ setToken, switchToLogin }) {
 						<button
 							type="button"
 							className="text-main-600 hover:underline disabled:opacity-50 mt-2 sm:mt-0"
-							onClick={switchToLogin}
+							onClick={() => navigate("/login")}
 							disabled={isLoading}
 						>
 							Already have an account?

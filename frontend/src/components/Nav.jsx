@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import Logo from "../assets/logo.svg";
 import { RiLogoutBoxRLine } from "react-icons/ri";
 
@@ -5,13 +6,13 @@ export default function Nav({ handleLogout }) {
 	return (
 		<nav className="bg-white shadow-md">
 			<div className="flex justify-between items-center px-6 py-4">
-				<a
-					href="/"
+				<Link
+					to="/"
 					className="flex items-center space-x-2 cursor-pointer"
 				>
 					<img src={Logo} alt="" className="h-8 w-8 object-contain" />
 					<h1 className="text-2xl font-bold text-gray-800">Rela</h1>
-				</a>
+				</Link>
 
 				<div className="flex items-center space-x-4">
 					<div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-500">

@@ -3,12 +3,15 @@ import { userAPI } from "../api";
 import { getAPIErrorMessage } from "../api/errors";
 import PasswordField from "../components/PasswordField";
 import EmailField from "../components/EmailField";
+import { useNavigate } from "react-router-dom";
 
-export default function Login({ setToken, switchToRegister }) {
+export default function Login({ setToken }) {
 	const [error, setError] = useState("");
 	const [isLoading, setIsLoading] = useState(false);
 	const [email, setEmail] = useState("");
 	const [password, setPassword] = useState("");
+
+    const navigate = useNavigate();
 
 	const handleSubmit = async (e) => {
 		e.preventDefault();
@@ -30,6 +33,7 @@ export default function Login({ setToken, switchToRegister }) {
 		setToken(result.data.token);
 		localStorage.setItem("token", result.data.token);
 		setIsLoading(false);
+		navigate("/dashboard");
 	};
 
 	return (
@@ -70,7 +74,7 @@ export default function Login({ setToken, switchToRegister }) {
 						<button
 							type="button"
 							className="text-main-600 hover:underline disabled:opacity-50 mt-2 sm:mt-0"
-							onClick={switchToRegister}
+							onClick={() => navigate("/register")}
 							disabled={isLoading}
 						>
 							Register now
