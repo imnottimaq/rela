@@ -93,6 +93,7 @@ func main() {
 		tasks.DELETE("/:taskId", rateLimiter, deleteExistingTask)
 
 		//Boards
+		boards.GET("/", rateLimiter, getAllBoards)
 		boards.POST("/", rateLimiter, addBoard)
 		boards.DELETE("/:boardId", rateLimiter, deleteBoard)
 		boards.PATCH("/:boardId", rateLimiter, editBoard)
@@ -104,6 +105,7 @@ func main() {
 
 		protected.DELETE("/users/delete", rateLimiter, deleteUser)
 		protected.POST("/users/upload_avatar", rateLimiter, uploadAvatar)
+		protected.GET("/users/get_info", rateLimiter, getUserDetails)
 
 		//Workspaces
 		workspaces.POST("/", rateLimiter, createWorkspace)

@@ -7,6 +7,7 @@ import (
 	"github.com/goccy/go-json"
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
+	"log"
 )
 
 // @Summary Create new board
@@ -117,4 +118,23 @@ func editBoard(c *gin.Context) {
 			c.AbortWithStatusJSON(500, gin.H{"error": "Failed to insert board"})
 		}
 	}
+}
+
+// @Summary Get all boards
+// @Router /api/v1/boards [get]
+// @Accept json
+// @Success 200 {array} Board
+// @Produce json
+// @Tags Boards
+// @Param X-Authorization header string true "Bearer Token"
+func getAllBoards(c *gin.Context) {
+	userId, _ := c.Get("id")
+	cursor, _ := boardsDb.Find(context.TODO(), bson.D{{"owned_by", userId}})
+	var boards []Board
+	_ = cursor.All(context.TODO(), &boards)
+	c.IndentedJSON(200, boards)
+	if err := cursor.Close(context.TODO()); err != nil {
+		log.Print("Failed to close cursor")
+	}
+	return
 }

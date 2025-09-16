@@ -21,13 +21,13 @@ func validatePassword(password string) bool {
 }
 
 func generateAccessToken(token string, tokenType string) (accessToken string, err error) {
-	parsedToken, _ := jwt.ParseWithClaims(token, &LoginToken{}, func(token *jwt.Token) (any, error) {
+	parsedToken, _ := jwt.ParseWithClaims(token, &Token{}, func(token *jwt.Token) (any, error) {
 		if token.Method != jwt.SigningMethodHS256 {
 			return nil, fmt.Errorf("unknown signing method: %s", token.Method)
 		}
 		return []byte(pepper), nil
 	})
-	claims := parsedToken.Claims.(*LoginToken)
+	claims := parsedToken.Claims.(*Token)
 	if claims.ExpiresAt < time.Now().UTC().Unix() {
 		return "", fmt.Errorf("expired refresh token")
 	} else {

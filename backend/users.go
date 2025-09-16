@@ -22,7 +22,7 @@ import (
 // @Summary Create new user
 // @Router /api/v1/users/create [post]
 // @Accept json
-// @Success 200 {array} Token
+// @Success 200 {array} TokenSwagger
 // @Produce json
 // @Tags Users
 // @Param data body CreateUser true "Create user request"
@@ -99,7 +99,7 @@ func createUser(c *gin.Context) {
 // @Summary Login user
 // @Router /api/v1/users/login [post]
 // @Accept json
-// @Success 200 {array} Token
+// @Success 200 {array} TokenSwagger
 // @Produce json
 // @Tags Users
 // @Param data body LoginUser true "Login user request"
@@ -260,9 +260,10 @@ func uploadAvatar(c *gin.Context) {
 // @Summary Refresh bearer token
 // @Description For this route, you must have refresh token, that is sent to your browser when you log into user account as an http-only cookie
 // @Router /api/v1/users/refresh [get]
-// @Success 200 {array} Token
+// @Success 200 {array} TokenSwagger
 // @Produce json
 // @Tags Users
+
 func refreshAccessToken(c *gin.Context) {
 	refreshToken, _ := c.Cookie("refreshToken")
 	token, err := jwt.ParseWithClaims(refreshToken, &Token{}, func(token *jwt.Token) (any, error) {
@@ -288,4 +289,18 @@ func refreshAccessToken(c *gin.Context) {
 		return
 	}
 	c.AbortWithStatusJSON(200, gin.H{"token": bearerToken})
+}
+
+// @Summary Get user info
+// @Description For this route, you must have bearer token
+// @Router /api/v1/users/get_info [get]
+// @Success 200 {array} User
+// @Produce json
+// @Tags Users
+// @Param X-Authorization header string true "Bearer Token"
+func getUserDetails(c *gin.Context) {
+	userId, _ := c.Get("id")
+	var user User
+	usersDb.FindOne(context.TODO(), bson.D{{"_id", userId}}).Decode(&user)
+	c.AbortWithStatusJSON(200, user)
 }
