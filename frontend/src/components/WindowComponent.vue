@@ -39,7 +39,13 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  storageKey: {
+    type: String,
+    default: "",
+  },
 });
+
+const emit = defineEmits(["update:visible"]);
 
 const fallbackPosition = { x: 80, y: 80 };
 const fallbackSize = { width: 600, height: 420 };
@@ -55,6 +61,15 @@ const size = reactive({
   width: resolveNumber(props.initialSize?.width, fallbackSize.width),
   height: resolveNumber(props.initialSize?.height, fallbackSize.height),
 });
+
+const lastInitialPosition = reactive({ ...position });
+const lastInitialSize = reactive({ ...size });
+
+const storageKey = computed(() =>
+  typeof props.storageKey === "string" ? props.storageKey.trim() : ""
+);
+
+const internalVisible = ref(props.visible);
 
 const menuItems = computed(() =>
   Array.isArray(props.menu) ? props.menu : []
@@ -138,6 +153,67 @@ const clampToViewport = () => {
 
   position.x = Math.min(Math.max(position.x, 0), maxX);
   position.y = Math.min(Math.max(position.y, 0), maxY);
+};
+
+const parseStoredState = () => {
+  if (typeof window === "undefined" || !storageKey.value) return null;
+
+  try {
+    const raw = window.localStorage.getItem(storageKey.value);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch (error) {
+    return null;
+  }
+};
+
+const persistState = () => {
+  if (typeof window === "undefined" || !storageKey.value) return;
+
+  const stateToPersist = {
+    position: { x: position.x, y: position.y },
+    size: { width: size.width, height: size.height },
+    visible: internalVisible.value,
+  };
+
+  try {
+    window.localStorage.setItem(
+      storageKey.value,
+      JSON.stringify(stateToPersist)
+    );
+  } catch (error) {
+    // Ignore storage errors (quota, access issues)
+  }
+};
+
+const applyStoredState = () => {
+  const storedState = parseStoredState();
+  if (!storedState) return;
+
+  const storedPosition = storedState.position ?? {};
+  const storedSize = storedState.size ?? {};
+
+  if (typeof storedPosition.x === "number") {
+    position.x = storedPosition.x;
+  }
+
+  if (typeof storedPosition.y === "number") {
+    position.y = storedPosition.y;
+  }
+
+  if (typeof storedSize.width === "number") {
+    size.width = clampDimension(storedSize.width, minWidth);
+  }
+
+  if (typeof storedSize.height === "number") {
+    size.height = clampDimension(storedSize.height, minHeight);
+  }
+
+  if (typeof storedState.visible === "boolean") {
+    internalVisible.value = storedState.visible;
+  }
+
+  clampToViewport();
 };
 
 const handleWindowResize = () => {
@@ -237,13 +313,30 @@ watch(
   () => props.initialPosition,
   (nextPosition) => {
     if (!nextPosition) return;
+
+    let shouldClamp = false;
+
     if (Object.prototype.hasOwnProperty.call(nextPosition, "x")) {
-      position.x = resolveNumber(nextPosition.x, position.x);
+      const nextX = resolveNumber(nextPosition.x, lastInitialPosition.x);
+      if (!Object.is(nextX, lastInitialPosition.x)) {
+        lastInitialPosition.x = nextX;
+        position.x = nextX;
+        shouldClamp = true;
+      }
     }
+
     if (Object.prototype.hasOwnProperty.call(nextPosition, "y")) {
-      position.y = resolveNumber(nextPosition.y, position.y);
+      const nextY = resolveNumber(nextPosition.y, lastInitialPosition.y);
+      if (!Object.is(nextY, lastInitialPosition.y)) {
+        lastInitialPosition.y = nextY;
+        position.y = nextY;
+        shouldClamp = true;
+      }
     }
-    clampToViewport();
+
+    if (shouldClamp) {
+      clampToViewport();
+    }
   },
   { deep: true }
 );
@@ -252,18 +345,63 @@ watch(
   () => props.initialSize,
   (nextSize) => {
     if (!nextSize) return;
+
+    let shouldClamp = false;
+
     if (Object.prototype.hasOwnProperty.call(nextSize, "width")) {
-      size.width = resolveNumber(nextSize.width, size.width);
+      const nextWidth = resolveNumber(nextSize.width, lastInitialSize.width);
+      if (!Object.is(nextWidth, lastInitialSize.width)) {
+        lastInitialSize.width = nextWidth;
+        size.width = nextWidth;
+        shouldClamp = true;
+      }
     }
+
     if (Object.prototype.hasOwnProperty.call(nextSize, "height")) {
-      size.height = resolveNumber(nextSize.height, size.height);
+      const nextHeight = resolveNumber(nextSize.height, lastInitialSize.height);
+      if (!Object.is(nextHeight, lastInitialSize.height)) {
+        lastInitialSize.height = nextHeight;
+        size.height = nextHeight;
+        shouldClamp = true;
+      }
     }
-    clampToViewport();
+
+    if (shouldClamp) {
+      clampToViewport();
+    }
   },
   { deep: true }
 );
 
+watch(
+  () => props.visible,
+  (nextVisible) => {
+    if (nextVisible !== internalVisible.value) {
+      internalVisible.value = nextVisible;
+    }
+  }
+);
+
+watch(
+  () => internalVisible.value,
+  (nextVisible, previousVisible) => {
+    if (nextVisible !== previousVisible) {
+      emit("update:visible", nextVisible);
+      persistState();
+    }
+  }
+);
+
+watch(
+  () => [position.x, position.y, size.width, size.height],
+  () => {
+    persistState();
+  }
+);
+
 onMounted(() => {
+  applyStoredState();
+
   if (typeof window !== "undefined") {
     clampToViewport();
     window.addEventListener("resize", handleWindowResize);
@@ -275,6 +413,7 @@ onBeforeUnmount(() => {
     window.removeEventListener("resize", handleWindowResize);
   }
   detachListeners();
+  persistState();
 });
 
 const menuItemClasses = (item) => {
@@ -401,7 +540,7 @@ const MenuList = defineComponent({
 </script>
 
 <template>
-  <div class="window glass active draggable-window" :style="windowStyle" v-if="visible">
+  <div class="window glass active draggable-window" :style="windowStyle" v-if="internalVisible">
     <div class="title-bar" @pointerdown.prevent.stop="startDrag">
       <div class="title-bar-text">{{ title }}</div>
 

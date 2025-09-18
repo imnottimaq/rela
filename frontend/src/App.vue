@@ -10,10 +10,20 @@
       :menu="windowMenu"
       :initial-position="{ x: 160, y: 120 }"
       :initial-size="{ width: 640, height: 460 }"
-      :visible="true"
+      v-model:visible="welcomeVisible"
+      storage-key="rela-window-welcome"
     >
       <p>Rela is WIP task tracker with ability to self-host it.<br />Use Account to login or register.</p>
       <img class="demo" src="./assets/confused_travolta.gif" alt="Confused Travolta" />
+    </WindowComponent>
+
+    <WindowComponent
+      title="Login"
+      :buttons="[{ label: 'Close', onClick: () => { loginVisible = false; } }]"
+      v-model:visible="loginVisible"
+      storage-key="rela-window-login"
+    >
+      <p>Login placeholder</p>
     </WindowComponent>
   </main>
 </template>
@@ -21,12 +31,16 @@
 <script setup>
 import WindowComponent from './components/WindowComponent.vue';
 import background from './assets/background.png';
+import { ref } from 'vue';
 
 const mainStyle = `background-image: url(${background})`;
 
 const test = () => {
   alert("Test function");
 };
+
+const welcomeVisible = ref(true);
+const loginVisible = ref(false);
 
 const windowMenu = [
 //   {
@@ -41,7 +55,7 @@ const windowMenu = [
   {
     label: "Account",
     items: [
-      { type: "button", label: "Login", onClick: test },
+      { type: "button", label: "Login", onClick: () => { loginVisible.value = true; }},
       { type: "button", label: "Register", onClick: test, divider: true },
       { type: "button", label: "Logout", onClick: test },
     ],
