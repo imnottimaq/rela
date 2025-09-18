@@ -9,6 +9,7 @@
     ]"
     >
       <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed eleifend velit lectus, in tempor tellus tincidunt sit amet. Sed eget viverra arcu. Nunc non velit tempus, consequat ligula ut, luctus quam. Phasellus consequat quam et ornare bibendum. Sed rutrum fermentum ipsum, a tincidunt libero blandit quis. Aliquam commodo nulla sapien, eget convallis nibh euismod at. Integer pulvinar tincidunt justo, vel porta nisi ullamcorper et. Vivamus dapibus tortor ut sapien maximus, in iaculis lectus viverra. Nullam faucibus lacinia arcu non vehicula. Nam nec accumsan erat. </p>
+        <img class="demo" src="./assets/confused_travolta.gif" alt="Confused Travolta" />
     </WindowComponent>
   </main>
 </template>
@@ -34,6 +35,15 @@ main {
   background-position: center;
   background-size: cover;
   background-repeat: no-repeat;
+}
+.demo {
+  max-width: 100%;
+  max-height: 70%;
+  width: auto;
+  height: auto;
+  display: block;
+  object-fit: contain;
+  margin: 0 auto;
 }
 
 </style>
