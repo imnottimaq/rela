@@ -57,9 +57,12 @@ func main() {
 	boards := protected.Group("/boards")
 
 	//Middleware
-	protected.Use(authMiddleware)
-	tasks.Use(taskMiddleware)
-	users.Use(userMiddleware)
+	protected.Use(authMiddleware())
+	boards.Use(authMiddleware())
+	tasks.Use(authMiddleware())
+	tasks.Use(taskMiddleware())
+	users.Use(authMiddleware())
+	users.Use(userMiddleware())
 	{
 		//Tasks
 		r.Static("/app", "../frontend/dist/")

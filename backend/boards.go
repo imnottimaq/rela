@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/goccy/go-json"
 	"go.mongodb.org/mongo-driver/v2/bson"
@@ -31,6 +32,7 @@ func addBoard(c *gin.Context) {
 		c.AbortWithStatusJSON(400, gin.H{"error": "No name given"})
 		return
 	}
+	print(fmt.Sprintf("%v", id))
 	input.OwnedBy = id.(bson.ObjectID)
 	if workspaceId != "" {
 		i, _ := bson.ObjectIDFromHex(workspaceId)

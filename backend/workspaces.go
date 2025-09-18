@@ -37,6 +37,16 @@ func createWorkspace(c *gin.Context) {
 	c.AbortWithStatus(200)
 }
 
+func editWorkspace(c *gin.Context) {
+
+}
+func getAllWorkspaces(c *gin.Context) {
+
+}
+func deleteWorkspace(c *gin.Context) {
+
+}
+
 func addMember(c *gin.Context) {
 	userId, _ := c.Get("id")
 	joinToken := c.Param("joinToken")
@@ -160,5 +170,40 @@ func assignTask(c *gin.Context) {
 }
 
 func getAllMembers(c *gin.Context) {
-
+	id, _ := c.Get("id")
+	workspaceId := c.Param("workspaceId")
+	var input struct {
+		TaskId bson.ObjectID `bson:"taskId" json:"taskId"`
+		UserId bson.ObjectID `bson:"userId" json:"userId"`
+	}
+	json.NewDecoder(c.Request.Body).Decode(&input)
+	workspace := Workspace{}
+	if err := workspacesDb.FindOne(context.TODO(), bson.D{{"_id", workspaceId}}).Decode(&workspace); err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			c.AbortWithStatusJSON(404, gin.H{"error": "Workspace does not exist"})
+			return
+		} else {
+			c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
+			return
+		}
+	}
+	if input.UserId == id || workspace.OwnedBy == id {
+		task := Task{}
+		if err := tasksDb.FindOne(context.TODO(), bson.D{{"_id", input.TaskId}}).Decode(&task); err != nil {
+			if errors.Is(err, mongo.ErrNoDocuments) {
+				c.AbortWithStatusJSON(404, gin.H{"error": "Task does not exist"})
+				return
+			} else {
+				c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
+				return
+			}
+		}
+		task.AssignedTo = id.(bson.ObjectID)
+		if _, err := tasksDb.ReplaceOne(context.TODO(), bson.D{{"_id", input.TaskId}}, task); err != nil {
+			c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
+			return
+		}
+		c.AbortWithStatus(200)
+		return
+	}
 }

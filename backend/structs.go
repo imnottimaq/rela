@@ -6,13 +6,14 @@ import (
 )
 
 type Task struct {
-	Id          bson.ObjectID  `json:"_id" bson:"_id,omitempty"`
-	Name        string         `json:"name" bson:"name"`
-	Description *string        `json:"description" bson:"description"`
-	CreatedAt   int64          `json:"created_at" bson:"created_at"`
-	CreatedBy   bson.ObjectID  `json:"created_by" bson:"created_by"`
-	Board       bson.ObjectID  `json:"board" bson:"board"`
-	AssignedTo  *bson.ObjectID `json:"assigned_to" bson:"assigned_to"`
+	Id          bson.ObjectID `json:"_id" bson:"_id,omitempty"`
+	Name        string        `json:"name" bson:"name"`
+	Description *string       `json:"description" bson:"description"`
+	CreatedAt   int64         `json:"created_at" bson:"created_at"`
+	CreatedBy   bson.ObjectID `json:"created_by" bson:"created_by"`
+	Board       bson.ObjectID `json:"board" bson:"board"`
+	AssignedTo  bson.ObjectID `json:"assigned_to" bson:"assigned_to"`
+	Deadline    *int64        `json:"deadline" bson:"deadline"`
 }
 
 type CreateTask struct {
@@ -26,6 +27,7 @@ type EditTask struct {
 	Description *string `json:"description" bson:"description"`
 	CompletedAt *int64  `json:"completed_at" bson:"completed_at"`
 	Board       *string `json:"board" bson:"board"`
+	Deadline    *int64  `json:"deadline" bson:"deadline"`
 }
 type User struct {
 	Avatar         string        `json:"avatar" bson:"avatar"`
@@ -64,7 +66,7 @@ type CreateBoard struct {
 }
 
 type Workspace struct {
-	Id      bson.ObjectID   `bson:"_id" json:"_id"`
+	Id      bson.ObjectID   `bson:"_id,omitempty" json:"_id"`
 	Name    string          `json:"name"`
 	OwnedBy bson.ObjectID   `bson:"owned_by" json:"owned_by"`
 	Members []bson.ObjectID `bson:"members" json:"members"`
