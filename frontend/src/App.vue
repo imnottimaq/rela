@@ -30,7 +30,6 @@ main {
   min-height: 100vh;
   display: grid;
   place-items: center;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   text-align: center;
   background-position: center;
   background-size: cover;

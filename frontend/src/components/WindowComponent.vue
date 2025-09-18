@@ -233,32 +233,32 @@ onBeforeUnmount(() => {
 }
 
 .resize-ne {
-  top: -6px;
-  right: -6px;
+  top: -4px;
+  right: -4px;
   width: 12px;
   height: 12px;
   cursor: nesw-resize;
 }
 
 .resize-se {
-  bottom: -6px;
-  right: -6px;
+  bottom: -4px;
+  right: -4px;
   width: 12px;
   height: 12px;
   cursor: nwse-resize;
 }
 
 .resize-sw {
-  bottom: -6px;
-  left: -6px;
+  bottom: -4px;
+  left: -4px;
   width: 12px;
   height: 12px;
   cursor: nesw-resize;
 }
 
 .resize-nw {
-  top: -6px;
-  left: -6px;
+  top: -4px;
+  left: -4px;
   width: 12px;
   height: 12px;
   cursor: nwse-resize;
