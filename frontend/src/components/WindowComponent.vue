@@ -35,6 +35,10 @@ const props = defineProps({
     type: Object,
     default: () => ({ width: 600, height: 420 }),
   },
+  visible: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 const fallbackPosition = { x: 80, y: 80 };
@@ -397,11 +401,11 @@ const MenuList = defineComponent({
 </script>
 
 <template>
-  <div class="window glass active draggable-window" :style="windowStyle">
+  <div class="window glass active draggable-window" :style="windowStyle" v-if="visible">
     <div class="title-bar" @pointerdown.prevent.stop="startDrag">
       <div class="title-bar-text">{{ title }}</div>
 
-      <div class="title-bar-controls">
+      <div class="title-bar-controls" v-if="buttons.length">
         <button
           v-for="(buttonElement, index) in buttons"
           :key="index"
@@ -557,11 +561,5 @@ const MenuList = defineComponent({
   width: 12px;
   height: 12px;
   cursor: nwse-resize;
-}
-
-.menu-separator {
-  height: 0;
-  margin: 4px 0;
-  border-top: 1px solid var(--w7-button-shadow);
 }
 </style>

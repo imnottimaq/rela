@@ -1,15 +1,16 @@
 <template>
-  <main :style="mainStyle">
-    <WindowComponent
-      title="Welcome to Rela"
-      :buttons="[
+          <!-- :buttons="[
         { label: 'Minimize', onClick: test },
         { label: 'Maximize', onClick: test },
         { label: 'Close', onClick: test }
-      ]"
+      ]" -->
+  <main :style="mainStyle">
+    <WindowComponent
+      title="Welcome to Rela"
       :menu="windowMenu"
       :initial-position="{ x: 160, y: 120 }"
       :initial-size="{ width: 640, height: 460 }"
+      :visible="true"
     >
       <p>Rela is WIP task tracker with ability to self-host it.<br />Use Account to login or register.</p>
       <img class="demo" src="./assets/confused_travolta.gif" alt="Confused Travolta" />
@@ -28,24 +29,15 @@ const test = () => {
 };
 
 const windowMenu = [
-  {
-    label: "Workspaces",
-    items: [
-      { type: "button", label: "New Workspace", onClick: test, divider: true },
-      { type: "button", label: "Workspace 1", onClick: test },
-      { type: "button", label: "Workspace 2", onClick: test },
-      { type: "button", label: "Workspace 3", onClick: test },
-    ],
-  },
-  {
-    label: "Boards",
-    items: [
-      { type: "button", label: "New Board", onClick: test, divider: true },
-      { type: "button", label: "Board 1", onClick: test },
-      { type: "button", label: "Board 2", onClick: test },
-      { type: "button", label: "Board 3", onClick: test },
-    ],
-  },
+//   {
+//     label: "Workspaces",
+//     items: [
+//       { type: "button", label: "New Workspace", onClick: test, divider: true },
+//       { type: "button", label: "Workspace 1", onClick: test },
+//       { type: "button", label: "Workspace 2", onClick: test },
+//       { type: "button", label: "Workspace 3", onClick: test },
+//     ],
+//   },
   {
     label: "Account",
     items: [
