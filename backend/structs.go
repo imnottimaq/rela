@@ -67,6 +67,7 @@ type CreateBoard struct {
 
 type Workspace struct {
 	Id      bson.ObjectID   `bson:"_id,omitempty" json:"_id"`
+	Avatar  string          `json:"avatar" bson:"avatar"`
 	Name    string          `json:"name"`
 	OwnedBy bson.ObjectID   `bson:"owned_by" json:"owned_by"`
 	Members []bson.ObjectID `bson:"members" json:"members"`
@@ -74,4 +75,10 @@ type Workspace struct {
 
 type KickUser struct {
 	Id bson.ObjectID `bson:"id" json:"id"`
+}
+
+type Member struct {
+	Id     bson.ObjectID `bson:"_id" json:"_id"`
+	Name   string        `json:"name" bson:"name"`
+	Avatar string        `json:"avatar" bson:"avatar"`
 }

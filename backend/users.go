@@ -40,6 +40,19 @@ func createUser(c *gin.Context) {
 	if err != nil {
 		c.AbortWithStatusJSON(500, gin.H{"error": "Something went wrong when parsing request"})
 		return
+	}
+	if input.Email == "" {
+		c.AbortWithStatusJSON(400, gin.H{"error": "Email is required"})
+		return
+	} else if !emailRegex.MatchString(input.Email) {
+		c.AbortWithStatusJSON(400, gin.H{"error": "Bad email"})
+		return
+	} else if input.Password == "" {
+		c.AbortWithStatusJSON(400, gin.H{"error": "Password is required"})
+		return
+	} else if !validatePassword(input.Password) {
+		c.AbortWithStatusJSON(400, gin.H{"error": "Password does not meet requirements"})
+		return
 	} else if input.Name == "" {
 		c.AbortWithStatusJSON(400, gin.H{"error": "Name is required"})
 		return

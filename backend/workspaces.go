@@ -17,7 +17,10 @@ func createWorkspace(c *gin.Context) {
 	userId, _ := c.Get("id")
 	var input Workspace
 	var i Workspace
-	json.NewDecoder(c.Request.Body).Decode(&input)
+	if err := json.NewDecoder(c.Request.Body).Decode(&input); err != nil {
+		c.AbortWithStatusJSON(500, gin.H{"error": "Failed to parse request"})
+		return
+	}
 	if input.Name == "" {
 		c.AbortWithStatusJSON(400, gin.H{"error": "Field 'name' is not specified"})
 		return
@@ -38,13 +41,69 @@ func createWorkspace(c *gin.Context) {
 }
 
 func editWorkspace(c *gin.Context) {
-
+	id, _ := c.Get("id")
+	workspaceId := c.Param("workspaceId")
+	previousVersion := Workspace{}
+	input := Workspace{}
+	if err := json.NewDecoder(c.Request.Body).Decode(&input); err != nil {
+		c.AbortWithStatusJSON(500, gin.H{"error": "Failed to parse request"})
+		return
+	} else if input.Name == "" {
+		c.AbortWithStatusJSON(400, gin.H{"error": "Name cant be null"})
+		return
+	}
+	if err := workspacesDb.FindOne(context.TODO(), bson.D{{"_id", bson.ObjectIDFromHex(workspaceId)}}).Decode(&previousVersion); err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			c.AbortWithStatusJSON(404, gin.H{"error": "Not Found"})
+			return
+		} else {
+			c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
+			return
+		}
+	}
+	if previousVersion.OwnedBy != id {
+		c.AbortWithStatusJSON(400, gin.H{"error": "You are not an owner of this workplace"})
+		return
+	}
+	previousVersion.Name = input.Name
+	previousVersion.Avatar = input.Avatar
+	if _, err := workspacesDb.ReplaceOne(context.TODO(), bson.D{{"_id", bson.ObjectIDFromHex(workspaceId)}}, previousVersion); err != nil {
+		c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
+		return
+	}
 }
 func getAllWorkspaces(c *gin.Context) {
-
+	id, _ := c.Get("id")
+	cursor, _ := workspacesDb.Find(context.TODO(), bson.D{{"members", id}})
+	defer cursor.Close(context.TODO())
+	workspaces := []Workspace{}
+	if err := cursor.All(context.TODO(), &workspaces); err != nil {
+		c.JSON(500, gin.H{"error": "failed to decode workspaces"})
+		return
+	}
+	c.IndentedJSON(200, workspaces)
 }
 func deleteWorkspace(c *gin.Context) {
-
+	id, _ := c.Get("id")
+	workspaceId := c.Param("workspaceId")
+	previousVersion := Workspace{}
+	if err := workspacesDb.FindOne(context.TODO(), bson.D{{"_id", bson.ObjectIDFromHex(workspaceId)}}).Decode(&previousVersion); err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			c.AbortWithStatusJSON(404, gin.H{"error": "Not Found"})
+			return
+		} else {
+			c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
+			return
+		}
+	}
+	if previousVersion.OwnedBy != id {
+		c.AbortWithStatusJSON(400, gin.H{"error": "You are not an owner of this workplace"})
+		return
+	}
+	if _, err := workspacesDb.DeleteOne(context.TODO(), bson.D{{"_id", bson.ObjectIDFromHex(workspaceId)}}); err != nil {
+		c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
+		return
+	}
 }
 
 func addMember(c *gin.Context) {
@@ -165,11 +224,50 @@ func promoteMember(c *gin.Context) {
 	}
 }
 
-func assignTask(c *gin.Context) {
+func getAllMembers(c *gin.Context) {
+	id, _ := c.Get("id")
+	userId := id.(bson.ObjectID)
 
+	workspaceIdStr := c.Param("workspaceId")
+	workspaceId, err := bson.ObjectIDFromHex(workspaceIdStr)
+	if err != nil {
+		c.JSON(400, gin.H{"error": "invalid workspaceId"})
+		return
+	}
+
+	workspace := Workspace{}
+	if err := workspacesDb.FindOne(context.TODO(), bson.M{"_id": workspaceId}).Decode(&workspace); err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			c.JSON(404, gin.H{"error": "workspace not found"})
+			return
+		}
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+
+	if slices.Index(workspace.Members, userId) == -1 {
+		c.JSON(403, gin.H{"error": "not a member of this workspace"})
+		return
+	}
+	cursor, err := usersDb.Find(context.TODO(), bson.M{
+		"_id": bson.M{"$in": workspace.Members},
+	})
+	if err != nil {
+		c.JSON(500, gin.H{"error": "failed to fetch users"})
+		return
+	}
+	defer cursor.Close(context.TODO())
+
+	members := []Member{}
+	if err := cursor.All(context.TODO(), &members); err != nil {
+		c.JSON(500, gin.H{"error": "failed to decode users"})
+		return
+	}
+
+	c.IndentedJSON(200, members)
 }
 
-func getAllMembers(c *gin.Context) {
+func assignTask(c *gin.Context) {
 	id, _ := c.Get("id")
 	workspaceId := c.Param("workspaceId")
 	var input struct {

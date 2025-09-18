@@ -61,8 +61,8 @@ func main() {
 	boards.Use(authMiddleware())
 	tasks.Use(authMiddleware())
 	tasks.Use(taskMiddleware())
-	users.Use(authMiddleware())
 	users.Use(userMiddleware())
+	workspaces.Use(authMiddleware())
 	{
 		//Tasks
 		r.Static("/app", "../frontend/dist/")
@@ -84,6 +84,7 @@ func main() {
 		users.POST("/login", rateLimiter, loginUser)
 		users.GET("/refresh", rateLimiter, refreshAccessToken)
 
+		protected.GET("/users/workspaces", rateLimiter, getAllWorkspaces)
 		protected.DELETE("/users/delete", rateLimiter, deleteUser)
 		protected.POST("/users/upload_avatar", rateLimiter, uploadAvatar)
 		protected.GET("/users/get_info", rateLimiter, getUserDetails)
@@ -92,6 +93,11 @@ func main() {
 		protected.POST("/workspaces/create", rateLimiter, createWorkspace)
 		workspaces.POST("/add/:joinToken", rateLimiter, addMember)
 		workspaces.GET("/new_invite", rateLimiter, createNewInvite)
+		workspaces.DELETE("/kick", rateLimiter, kickMember)
+		workspaces.PATCH("/promote/:userId", rateLimiter, promoteMember)
+		workspaces.GET("/members", rateLimiter, getAllMembers)
+		workspaces.PATCH("/", rateLimiter, editWorkspace)
+		workspaces.DELETE("/", rateLimiter, deleteWorkspace)
 
 		//Workspace tasks
 		workspaces.GET("/tasks/", rateLimiter, getAllTasks)
@@ -104,9 +110,10 @@ func main() {
 		workspaces.POST("/boards", rateLimiter, addBoard)
 		workspaces.DELETE("/boards/:boardId", rateLimiter, deleteBoard)
 		workspaces.PATCH("/boards/:boardId", rateLimiter, editBoard)
+		workspaces.POST("/assign", rateLimiter, assignTask)
 
 		//Docs
-		r.GET("/docs/*any", ginSwagger.WrapHandler(swaggerfiles.Handler))
+		r.GET("/api/v1/docs/*any", ginSwagger.WrapHandler(swaggerfiles.Handler))
 	}
 	if pepper == "" {
 		log.Print("WARNING Server-side secret is not present, this is big security flaw")
