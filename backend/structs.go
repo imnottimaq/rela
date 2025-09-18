@@ -6,12 +6,13 @@ import (
 )
 
 type Task struct {
-	Id          bson.ObjectID `json:"_id" bson:"_id,omitempty"`
-	Name        string        `json:"name" bson:"name"`
-	Description *string       `json:"description" bson:"description"`
-	CreatedAt   int64         `json:"created_at" bson:"created_at"`
-	OwnedBy     bson.ObjectID `json:"created_by" bson:"created_by"`
-	Board       bson.ObjectID `json:"board" bson:"board"`
+	Id          bson.ObjectID  `json:"_id" bson:"_id,omitempty"`
+	Name        string         `json:"name" bson:"name"`
+	Description *string        `json:"description" bson:"description"`
+	CreatedAt   int64          `json:"created_at" bson:"created_at"`
+	CreatedBy   bson.ObjectID  `json:"created_by" bson:"created_by"`
+	Board       bson.ObjectID  `json:"board" bson:"board"`
+	AssignedTo  *bson.ObjectID `json:"assigned_to" bson:"assigned_to"`
 }
 
 type CreateTask struct {
@@ -65,5 +66,10 @@ type CreateBoard struct {
 type Workspace struct {
 	Id      bson.ObjectID   `bson:"_id" json:"_id"`
 	Name    string          `json:"name"`
+	OwnedBy bson.ObjectID   `bson:"owned_by" json:"owned_by"`
 	Members []bson.ObjectID `bson:"members" json:"members"`
+}
+
+type KickUser struct {
+	Id bson.ObjectID `bson:"id" json:"id"`
 }

@@ -40,20 +40,8 @@ func createUser(c *gin.Context) {
 	if err != nil {
 		c.AbortWithStatusJSON(500, gin.H{"error": "Something went wrong when parsing request"})
 		return
-	} else if input.Email == "" {
-		c.AbortWithStatusJSON(400, gin.H{"error": "Email is required"})
-		return
-	} else if !emailRegex.MatchString(input.Email) {
-		c.AbortWithStatusJSON(400, gin.H{"error": "Bad email"})
-		return
 	} else if input.Name == "" {
 		c.AbortWithStatusJSON(400, gin.H{"error": "Name is required"})
-		return
-	} else if input.Password == "" {
-		c.AbortWithStatusJSON(400, gin.H{"error": "Password is required"})
-		return
-	} else if !validatePassword(input.Password) {
-		c.AbortWithStatusJSON(400, gin.H{"": "Your password must contain 1 uppercase letter, 1 lowercase letter, 1 special character and be at least 8 characters long"})
 		return
 	}
 	newUser := User{
@@ -104,24 +92,10 @@ func createUser(c *gin.Context) {
 // @Tags Users
 // @Param data body LoginUser true "Login user request"
 func loginUser(c *gin.Context) {
-	var input LoginUser
+	middlewareInput, _ := c.Get("input")
+	input := middlewareInput.(LoginUser)
 	var i User
-	err := json.NewDecoder(c.Request.Body).Decode(&input)
-	if err != nil {
-		c.AbortWithStatusJSON(500, gin.H{"error": "Something went wrong when parsing request"})
-		return
-	}
-	if input.Email == "" {
-		c.AbortWithStatusJSON(400, gin.H{"error": "Email is required"})
-		return
-	} else if !emailRegex.MatchString(input.Email) {
-		c.AbortWithStatusJSON(400, gin.H{"error": "Bad email"})
-		return
-	} else if input.Password == "" {
-		c.AbortWithStatusJSON(400, gin.H{"error": "Password is required"})
-		return
-	}
-	if err = usersDb.FindOne(context.TODO(), bson.D{{Key: "email", Value: input.Email}}).Decode(&i); err != nil {
+	if err := usersDb.FindOne(context.TODO(), bson.D{{Key: "email", Value: input.Email}}).Decode(&i); err != nil {
 		if errors.Is(err, mongo.ErrNoDocuments) {
 			c.AbortWithStatusJSON(404, gin.H{"error": "User doesnt exist"})
 			return
@@ -161,27 +135,10 @@ func loginUser(c *gin.Context) {
 // @Param X-Authorization header string true "Bearer Token"
 func deleteUser(c *gin.Context) {
 	userId, _ := c.Get("id")
-	var input LoginUser
+	middlewareInput, _ := c.Get("input")
+	input := middlewareInput.(LoginUser)
 	var user User
-	err := json.NewDecoder(c.Request.Body).Decode(&input)
-	if err != nil {
-		c.AbortWithStatusJSON(500, gin.H{"error": "Something went wrong when parsing request"})
-		return
-	}
-	if input.Email == "" {
-		c.AbortWithStatusJSON(400, gin.H{"error": "Email is required"})
-		return
-	} else if !emailRegex.MatchString(input.Email) {
-		c.AbortWithStatusJSON(400, gin.H{"error": "Bad email"})
-		return
-	} else if input.Password == "" {
-		c.AbortWithStatusJSON(400, gin.H{"error": "Password is required"})
-		return
-	} else if !validatePassword(input.Password) {
-		c.AbortWithStatusJSON(400, gin.H{"error": "Password does not meet requirements"})
-		return
-	}
-	err = usersDb.FindOne(context.TODO(), bson.D{{Key: "_id", Value: userId}}).Decode(&user)
+	err := usersDb.FindOne(context.TODO(), bson.D{{Key: "_id", Value: userId}}).Decode(&user)
 	if err != nil {
 		c.AbortWithStatusJSON(500, gin.H{"error": "Failed to delete user"})
 		return
@@ -192,6 +149,7 @@ func deleteUser(c *gin.Context) {
 			c.AbortWithStatusJSON(500, gin.H{"error": "Failed to delete user"})
 			return
 		}
+		c.SetCookie("refreshToken", "", -1, "/", "", true, true)
 		c.AbortWithStatus(200)
 		return
 	} else if user.Email != input.Email || base64.RawStdEncoding.EncodeToString(argon2.IDKey([]byte(input.Password+pepper), []byte(user.Salt), uint32(3), uint32(128*1024), uint8(2), uint32(32))) != user.HashedPassword {

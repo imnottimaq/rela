@@ -26,7 +26,7 @@ import (
 func getAllTasks(c *gin.Context) {
 	id, _ := c.Get("id")
 	var tasks []Task
-	if workspaceId, exists := c.Get("workspaceId"); exists == false {
+	if workspaceId := c.Param("workspaceId"); workspaceId == "" {
 		cursor, _ := tasksDb.Find(context.TODO(), bson.D{{"created_by", id}})
 
 		_ = cursor.All(context.TODO(), &tasks)
@@ -43,7 +43,6 @@ func getAllTasks(c *gin.Context) {
 			log.Print("Failed to close cursor")
 		}
 	}
-
 }
 
 // @Summary Create new task
@@ -80,8 +79,12 @@ func createNewTask(c *gin.Context) {
 		Name:        input.Name,
 		Description: input.Description,
 		CreatedAt:   time.Now().UTC().Unix(),
-		OwnedBy:     id.(bson.ObjectID),
+		CreatedBy:   id.(bson.ObjectID),
 		Board:       input.Board,
+	}
+	if workspaceId := c.Param("workspaceId"); workspaceId != "" {
+		transformedId, _ := bson.ObjectIDFromHex(workspaceId)
+		newTask.CreatedBy = transformedId
 	}
 	task, err := tasksDb.InsertOne(context.TODO(), newTask)
 	if err != nil {
@@ -102,30 +105,13 @@ func createNewTask(c *gin.Context) {
 // @Param data body EditTask true "Edit task request"
 // @Param X-Authorization header string true "Bearer Token"
 func editExistingTask(c *gin.Context) {
-	id, _ := c.Get("id")
-	var previousVersion Task
+	input, _ := c.Get("output")
+	previousVersion := input.(Task)
 	var valuesToEdit EditTask
-	taskId, _ := bson.ObjectIDFromHex(c.Param("taskId"))
+	taskId := c.Param("taskId")
 	err := json.NewDecoder(c.Request.Body).Decode(&valuesToEdit)
 	if err != nil {
 		c.AbortWithStatusJSON(400, gin.H{"error": "Something went wrong when parsing request"})
-		return
-	} else if taskId.IsZero() {
-		c.AbortWithStatusJSON(400, gin.H{"error": "You must specify task id"})
-		return
-	}
-	err = tasksDb.FindOne(context.TODO(), bson.D{{"_id", taskId}}).Decode(&previousVersion)
-	if err != nil {
-		if errors.Is(err, mongo.ErrNoDocuments) {
-			c.AbortWithStatusJSON(404, gin.H{"error": "Task does not exist"})
-			return
-		} else {
-			c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
-			return
-		}
-	}
-	if previousVersion.OwnedBy != id {
-		c.AbortWithStatusJSON(400, gin.H{"error": "This task isn't owned by you"})
 		return
 	}
 	if valuesToEdit.Name != nil {
@@ -155,28 +141,9 @@ func editExistingTask(c *gin.Context) {
 // @Param taskId path bson.ObjectID true "Task ID"
 // @Param X-Authorization header string true "Bearer Token"
 func deleteExistingTask(c *gin.Context) {
-	id, _ := c.Get("id")
-	taskId, _ := bson.ObjectIDFromHex(c.Param("taskId"))
-	if taskId.IsZero() {
-		c.AbortWithStatusJSON(400, gin.H{"error": "you must specify task id"})
-
-	}
-	var result Task
-	err := tasksDb.FindOne(context.TODO(), bson.D{{Key: "_id", Value: taskId}}).Decode(&result)
-	if err != nil {
-		if errors.Is(err, mongo.ErrNoDocuments) {
-			c.AbortWithStatusJSON(404, gin.H{"error": "There is no task with that id"})
-			return
-		} else {
-			c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
-			return
-		}
-	}
-	if result.OwnedBy != id {
-		c.AbortWithStatusJSON(400, gin.H{"error": "This task isn't owned by you"})
-		return
-	}
-	_, err = tasksDb.DeleteOne(context.TODO(), bson.D{{Key: "_id", Value: taskId}})
+	input, _ := c.Get("output")
+	result := input.(Task)
+	_, err := tasksDb.DeleteOne(context.TODO(), bson.D{{Key: "_id", Value: result.Id}})
 	if err != nil {
 		c.AbortWithStatusJSON(500, gin.H{"error": "Failed to delete task"})
 		return

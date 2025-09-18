@@ -2,8 +2,6 @@ package main
 
 import (
 	_ "Rela/docs"
-	"fmt"
-	"github.com/golang-jwt/jwt/v5"
 	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 	"log"
@@ -19,7 +17,7 @@ import (
 	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
-var _ = godotenv.Load("../.env")
+var _ = godotenv.Load(".env_local")
 var port = os.Getenv("PORT")
 var pepper = os.Getenv("PEPPER")
 var mongodbCredentials = os.Getenv("MONGO_CREDS")
@@ -50,38 +48,18 @@ func main() {
 		ErrorHandler: rateLimitHandler,
 		KeyFunc:      keyFunc,
 	})
+
+	// Groups
 	protected := r.Group("/api/v1")
-	workspaces := protected.Group("/workspaces")
+	workspaces := protected.Group("/workspaces/:workspaceId")
 	tasks := protected.Group("/tasks")
 	users := r.Group("/api/v1/users")
 	boards := protected.Group("/boards")
-	protected.Use(func(c *gin.Context) {
-		header := c.GetHeader("X-Authorization")
-		if header == "" {
-			c.AbortWithStatusJSON(403, gin.H{"error": "no access token"})
-			return
-		}
-		token, err := jwt.ParseWithClaims(header, &Token{}, func(token *jwt.Token) (any, error) {
-			if token.Method != jwt.SigningMethodHS256 {
-				return nil, fmt.Errorf("unknown signing method: %s", token.Method)
-			}
-			return []byte(pepper), nil
-		})
-		if err != nil {
-			c.AbortWithStatusJSON(500, "Internal Server Error")
-			return
-		}
-		claims := token.Claims.(*Token)
-		if claims.ExpiresAt < time.Now().UTC().Unix() {
-			c.AbortWithStatusJSON(403, "Authorization Required")
-			return
-		} else if claims.Type == "refresh" {
-			c.AbortWithStatusJSON(400, "Invalid Token")
-		} else {
-			c.Set("id", claims.Id)
-			c.Next()
-		}
-	})
+
+	//Middleware
+	protected.Use(authMiddleware)
+	tasks.Use(taskMiddleware)
+	users.Use(userMiddleware)
 	{
 		//Tasks
 		r.Static("/app", "../frontend/dist/")
@@ -107,9 +85,23 @@ func main() {
 		protected.POST("/users/upload_avatar", rateLimiter, uploadAvatar)
 		protected.GET("/users/get_info", rateLimiter, getUserDetails)
 
-		//Workspaces
-		workspaces.POST("/", rateLimiter, createWorkspace)
+		//Workspace management
+		protected.POST("/workspaces/create", rateLimiter, createWorkspace)
 		workspaces.POST("/add/:joinToken", rateLimiter, addMember)
+		workspaces.GET("/new_invite", rateLimiter, createNewInvite)
+
+		//Workspace tasks
+		workspaces.GET("/tasks/", rateLimiter, getAllTasks)
+		workspaces.POST("/tasks/", rateLimiter, createNewTask)
+		workspaces.PATCH("/tasks/:taskId", rateLimiter, editExistingTask)
+		workspaces.DELETE("/delete/:taskId", rateLimiter, deleteExistingTask)
+
+		//Workspace boards
+		workspaces.GET("/boards", rateLimiter, getAllBoards)
+		workspaces.POST("/boards", rateLimiter, addBoard)
+		workspaces.DELETE("/boards/:boardId", rateLimiter, deleteBoard)
+		workspaces.PATCH("/boards/:boardId", rateLimiter, editBoard)
+
 		//Docs
 		r.GET("/docs/*any", ginSwagger.WrapHandler(swaggerfiles.Handler))
 	}

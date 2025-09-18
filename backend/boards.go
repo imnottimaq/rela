@@ -20,8 +20,8 @@ import (
 // @Param X-Authorization header string true "Bearer Token"
 func addBoard(c *gin.Context) {
 	id, _ := c.Get("id")
+	workspaceId := c.Param("workspaceId")
 	var input Board
-	var user User
 	err := json.NewDecoder(c.Request.Body).Decode(&input)
 	if err != nil {
 		c.AbortWithStatusJSON(500, gin.H{"error": "Something went wrong when parsing request"})
@@ -31,11 +31,11 @@ func addBoard(c *gin.Context) {
 		c.AbortWithStatusJSON(400, gin.H{"error": "No name given"})
 		return
 	}
-	err = usersDb.FindOne(context.TODO(), bson.D{{Key: "_id", Value: id}}).Decode(&user)
-	if err != nil {
-		c.AbortWithStatusJSON(500, gin.H{"error": "Failed to find user"})
+	input.OwnedBy = id.(bson.ObjectID)
+	if workspaceId != "" {
+		i, _ := bson.ObjectIDFromHex(workspaceId)
+		input.OwnedBy = i
 	}
-	input.OwnedBy = user.Id
 	if _, err = boardsDb.InsertOne(context.TODO(), input); err != nil {
 		c.AbortWithStatusJSON(500, gin.H{"error": "Failed to create board"})
 		return
@@ -53,7 +53,9 @@ func addBoard(c *gin.Context) {
 // @Param X-Authorization header string true "Bearer Token"
 func deleteBoard(c *gin.Context) {
 	id, _ := c.Get("id")
-	boardId, _ := c.Get("boardId")
+	boardId := c.Param("boardId")
+	workspaceId := c.Param("workspaceId")
+	i, _ := bson.ObjectIDFromHex(workspaceId)
 	var board Board
 	if err := boardsDb.FindOne(context.TODO(), bson.D{{"_id", boardId}}).Decode(board); err != nil {
 		if errors.Is(err, mongo.ErrNoDocuments) {
@@ -64,7 +66,7 @@ func deleteBoard(c *gin.Context) {
 			return
 		}
 	}
-	if board.OwnedBy == id {
+	if board.OwnedBy == id || board.OwnedBy == i {
 		if _, err := boardsDb.DeleteOne(context.TODO(), bson.D{{"_id", boardId}}); err != nil {
 			c.AbortWithStatusJSON(500, gin.H{"error": "Failed to remove board"})
 		}
@@ -86,14 +88,16 @@ func deleteBoard(c *gin.Context) {
 // @Param X-Authorization header string true "Bearer Token"
 func editBoard(c *gin.Context) {
 	id, _ := c.Get("id")
-	boardId, _ := c.Get("boardId")
+	boardId := c.Param("boardId")
+	workspaceId := c.Param("workspaceId")
+	i, _ := bson.ObjectIDFromHex(workspaceId)
 	var valuesToEdit Board
-	var i Board
+	var a Board
 	err := json.NewDecoder(c.Request.Body).Decode(&valuesToEdit)
 	if err != nil {
 		c.AbortWithStatusJSON(500, gin.H{"error": "Something went wrong when parsing request"})
 		return
-	} else if valuesToEdit.OwnedBy != id && !valuesToEdit.OwnedBy.IsZero() {
+	} else if valuesToEdit.OwnedBy != id || valuesToEdit.OwnedBy != i {
 		c.AbortWithStatusJSON(400, gin.H{"error": "You dont own this board"})
 		return
 	} else if valuesToEdit.OwnedBy.IsZero() {
@@ -113,7 +117,7 @@ func editBoard(c *gin.Context) {
 			c.AbortWithStatusJSON(400, gin.H{"error": "You cant change board name to nothing"})
 			return
 		}
-		i.Name = valuesToEdit.Name
+		a.Name = valuesToEdit.Name
 		if _, err := boardsDb.InsertOne(context.TODO(), i); err != nil {
 			c.AbortWithStatusJSON(500, gin.H{"error": "Failed to insert board"})
 		}
@@ -128,8 +132,15 @@ func editBoard(c *gin.Context) {
 // @Tags Boards
 // @Param X-Authorization header string true "Bearer Token"
 func getAllBoards(c *gin.Context) {
+	var cursor *mongo.Cursor
 	userId, _ := c.Get("id")
-	cursor, _ := boardsDb.Find(context.TODO(), bson.D{{"owned_by", userId}})
+	workspaceId := c.Param("workspaceId")
+	if workspaceId != "" {
+		i, _ := bson.ObjectIDFromHex(workspaceId)
+		cursor, _ = boardsDb.Find(context.TODO(), bson.D{{"owned_by", i}})
+	} else {
+		cursor, _ = boardsDb.Find(context.TODO(), bson.D{{"owned_by", userId}})
+	}
 	var boards []Board
 	_ = cursor.All(context.TODO(), &boards)
 	c.IndentedJSON(200, boards)
