@@ -11,6 +11,54 @@ import {
   watch,
 } from "vue";
 
+const layerManagerKey = "__relaWindowLayerManager__";
+
+const getLayerManager = () => {
+  const target =
+    typeof window !== "undefined"
+      ? window
+      : typeof globalThis !== "undefined"
+      ? globalThis
+      : {};
+
+  if (!target[layerManagerKey]) {
+    target[layerManagerKey] = {
+      maxLayer: 0,
+      topWindowId: null,
+      counter: 0,
+    };
+  }
+
+  return target[layerManagerKey];
+};
+
+const layerManager = getLayerManager();
+
+const createInstanceId = () => {
+  layerManager.counter += 1;
+  return layerManager.counter;
+};
+
+const normalizeLayer = (value) => {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return null;
+  return Math.max(1, Math.round(numeric));
+};
+
+const syncGlobalLayer = (value) => {
+  const normalized = normalizeLayer(value);
+  if (normalized === null) return null;
+  if (normalized > layerManager.maxLayer) {
+    layerManager.maxLayer = normalized;
+  }
+  return normalized;
+};
+
+const allocateLayer = () => {
+  layerManager.maxLayer += 1;
+  return layerManager.maxLayer;
+};
+
 const resolveNumber = (value, fallback) =>
   typeof value === "number" && !Number.isNaN(value) ? value : fallback;
 
@@ -71,6 +119,9 @@ const storageKey = computed(() =>
 
 const internalVisible = ref(props.visible);
 
+const instanceId = createInstanceId();
+const layer = ref(allocateLayer());
+
 const menuItems = computed(() =>
   Array.isArray(props.menu) ? props.menu : []
 );
@@ -81,6 +132,7 @@ const windowStyle = computed(() => ({
   height: `${size.height}px`,
   maxWidth: "100vw",
   maxHeight: "100vh",
+  zIndex: layer.value,
 }));
 
 const isDragging = ref(false);
@@ -174,6 +226,7 @@ const persistState = () => {
     position: { x: position.x, y: position.y },
     size: { width: size.width, height: size.height },
     visible: internalVisible.value,
+    layer: layer.value,
   };
 
   try {
@@ -213,6 +266,13 @@ const applyStoredState = () => {
     internalVisible.value = storedState.visible;
   }
 
+  const storedLayer = syncGlobalLayer(storedState.layer);
+  if (storedLayer !== null) {
+    layer.value = storedLayer;
+  } else {
+    syncGlobalLayer(layer.value);
+  }
+
   clampToViewport();
 };
 
@@ -238,6 +298,23 @@ const detachListeners = () => {
   setBodySelection(null);
 };
 
+const bringToFront = () => {
+  if (
+    layerManager.topWindowId === instanceId &&
+    layer.value === layerManager.maxLayer
+  ) {
+    return;
+  }
+
+  layerManager.topWindowId = instanceId;
+  layer.value = allocateLayer();
+  persistState();
+};
+
+const handleWindowPointerDown = () => {
+  bringToFront();
+};
+
 const isPrimaryPointer = (event) => {
   if (event.pointerType === "mouse" && event.button !== 0) return false;
   return event.isPrimary !== false;
@@ -255,6 +332,7 @@ const startDrag = (event) => {
   isDragging.value = true;
   dragOffset.x = event.clientX - position.x;
   dragOffset.y = event.clientY - position.y;
+  bringToFront();
   attachListeners();
 };
 
@@ -268,6 +346,7 @@ const startResize = (direction, event) => {
   resizeStart.height = size.height;
   resizeStart.left = position.x;
   resizeStart.top = position.y;
+  bringToFront();
   attachListeners();
 };
 
@@ -393,6 +472,9 @@ watch(
   () => internalVisible.value,
   (nextVisible, previousVisible) => {
     if (nextVisible !== previousVisible) {
+      if (nextVisible && !previousVisible) {
+        bringToFront();
+      }
       emit("update:visible", nextVisible);
       persistState();
     }
@@ -400,7 +482,7 @@ watch(
 );
 
 watch(
-  () => [position.x, position.y, size.width, size.height],
+  () => [position.x, position.y, size.width, size.height, layer.value],
   () => {
     persistState();
   }
@@ -553,7 +635,12 @@ const MenuList = defineComponent({
 </script>
 
 <template>
-  <div class="window glass active draggable-window" :style="windowStyle" v-if="internalVisible">
+  <div
+    class="window glass active draggable-window"
+    :style="windowStyle"
+    v-if="internalVisible"
+    @pointerdown.capture="handleWindowPointerDown"
+  >
     <div class="title-bar" @pointerdown.prevent.stop="startDrag">
       <div class="title-bar-text">{{ title }}</div>
 

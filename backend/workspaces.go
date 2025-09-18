@@ -4,13 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
+	"time"
+
 	"github.com/gin-gonic/gin"
 	"github.com/goccy/go-json"
 	"github.com/golang-jwt/jwt/v5"
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
-	"slices"
-	"time"
 )
 
 // @Summary Create new workspace
@@ -65,7 +66,7 @@ func editWorkspace(c *gin.Context) {
 		c.AbortWithStatusJSON(400, gin.H{"error": "Name cant be null"})
 		return
 	}
-	if err := workspacesDb.FindOne(context.TODO(), bson.D{{"_id", bson.ObjectIDFromHex(workspaceId)}}).Decode(&previousVersion); err != nil {
+	if err := workspacesDb.FindOne(context.TODO(), bson.D{{"_id", workspaceId}}).Decode(&previousVersion); err != nil {
 		if errors.Is(err, mongo.ErrNoDocuments) {
 			c.AbortWithStatusJSON(404, gin.H{"error": "Not Found"})
 			return
@@ -80,7 +81,7 @@ func editWorkspace(c *gin.Context) {
 	}
 	previousVersion.Name = input.Name
 	previousVersion.Avatar = input.Avatar
-	if _, err := workspacesDb.ReplaceOne(context.TODO(), bson.D{{"_id", bson.ObjectIDFromHex(workspaceId)}}, previousVersion); err != nil {
+	if _, err := workspacesDb.ReplaceOne(context.TODO(), bson.D{{"_id", workspaceId}}, previousVersion); err != nil {
 		c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
 		return
 	}
@@ -113,7 +114,7 @@ func deleteWorkspace(c *gin.Context) {
 	id, _ := c.Get("id")
 	workspaceId := c.Param("workspaceId")
 	previousVersion := Workspace{}
-	if err := workspacesDb.FindOne(context.TODO(), bson.D{{"_id", bson.ObjectIDFromHex(workspaceId)}}).Decode(&previousVersion); err != nil {
+	if err := workspacesDb.FindOne(context.TODO(), bson.D{{"_id", workspaceId}}).Decode(&previousVersion); err != nil {
 		if errors.Is(err, mongo.ErrNoDocuments) {
 			c.AbortWithStatusJSON(404, gin.H{"error": "Not Found"})
 			return
@@ -126,7 +127,7 @@ func deleteWorkspace(c *gin.Context) {
 		c.AbortWithStatusJSON(400, gin.H{"error": "You are not an owner of this workplace"})
 		return
 	}
-	if _, err := workspacesDb.DeleteOne(context.TODO(), bson.D{{"_id", bson.ObjectIDFromHex(workspaceId)}}); err != nil {
+	if _, err := workspacesDb.DeleteOne(context.TODO(), bson.D{{"_id", workspaceId}}); err != nil {
 		c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
 		return
 	}
