@@ -91,6 +91,20 @@ const props = defineProps({
     type: String,
     default: "",
   },
+  role: {
+    type: String,
+    default: "",
+  },
+  footerButtons: {
+    type: Array,
+    default: () => [],
+  },
+  footerButtonsAlign: {
+    type: String,
+    default: "right",
+    validator: (value) =>
+      ["left", "center", "right", "space-between"].includes(value),
+  },
 });
 
 const emit = defineEmits(["update:visible"]);
@@ -639,6 +653,7 @@ const MenuList = defineComponent({
     class="window glass active draggable-window"
     :style="windowStyle"
     v-if="internalVisible"
+    :role="role"
     @pointerdown.capture="handleWindowPointerDown"
   >
     <div class="title-bar" @pointerdown.prevent.stop="startDrag">
@@ -678,6 +693,11 @@ const MenuList = defineComponent({
       </div>
     </div>
 
+    <footer :style="{ textAlign: footerButtonsAlign } " v-if="footerButtons.length">
+      <button v-for="(button, index) in footerButtons" :key="index" @click="button.onClick">
+        {{ button.label }}
+      </button>
+    </footer>
     <div
       v-for="handle in resizeHandles"
       :key="handle"

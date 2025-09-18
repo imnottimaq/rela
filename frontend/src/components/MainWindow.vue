@@ -41,7 +41,7 @@ let windowMenu = [
   {
     label: "Account",
     items: [
-      { type: "button", label: "Login", onClick: showLoginWindow },
+      { type: "link", label: "Login", onClick: showLoginWindow, href: "#login-window" },
       { type: "button", label: "Register", onClick: test, divider: true },
       { type: "button", label: "Logout", onClick: test },
     ],
