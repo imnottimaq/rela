@@ -82,3 +82,7 @@ type Member struct {
 	Name   string        `json:"name" bson:"name"`
 	Avatar string        `json:"avatar" bson:"avatar"`
 }
+type AssignTask struct {
+	TaskId bson.ObjectID `bson:"taskId" json:"taskId"`
+	UserId bson.ObjectID `bson:"userId" json:"userId"`
+}

@@ -13,11 +13,13 @@ import (
 
 // @Summary Create new board
 // @Router /api/v1/boards [post]
+// @Router /api/v1/workspaces/{workspaceId}/boards [post]
 // @Accept json
 // @Success 200
 // @Produce json
 // @Tags Boards
 // @Param data body CreateBoard true "Create board request"
+// @Param workspaceId query string true "Workspace ID"
 // @Param X-Authorization header string true "Bearer Token"
 func addBoard(c *gin.Context) {
 	id, _ := c.Get("id")
@@ -47,11 +49,13 @@ func addBoard(c *gin.Context) {
 
 // @Summary Delete board
 // @Router /api/v1/boards/{boardId} [delete]
+// @Router /api/v1/workspaces/{workspaceId}/boards/{boardId} [delete]
 // @Accept json
 // @Success 200
 // @Produce json
 // @Tags Boards
 // @Param boardId path bson.ObjectID true "Board ID"
+// @Param workspaceId query string true "Workspace ID"
 // @Param X-Authorization header string true "Bearer Token"
 func deleteBoard(c *gin.Context) {
 	id, _ := c.Get("id")
@@ -81,11 +85,13 @@ func deleteBoard(c *gin.Context) {
 
 // @Summary Edit board
 // @Router /api/v1/boards/{boardId} [patch]
+// @Router /api/v1/workspaces/{workspaceId}/boards/{boardId} [patch]
 // @Accept json
 // @Success 200
 // @Produce json
 // @Tags Boards
 // @Param boardId path bson.ObjectID true "Board ID"
+// @Param workspaceId query string true "Workspace ID"
 // @Param body path CreateBoard true "Edit board request"
 // @Param X-Authorization header string true "Bearer Token"
 func editBoard(c *gin.Context) {
@@ -128,10 +134,12 @@ func editBoard(c *gin.Context) {
 
 // @Summary Get all boards
 // @Router /api/v1/boards [get]
+// @Router /api/v1/workspaces/{workspaceId}/boards [get]
 // @Accept json
 // @Success 200 {array} Board
 // @Produce json
 // @Tags Boards
+// @Param workspaceId query string true "Workspace ID"
 // @Param X-Authorization header string true "Bearer Token"
 func getAllBoards(c *gin.Context) {
 	var cursor *mongo.Cursor

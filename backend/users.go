@@ -176,10 +176,12 @@ func deleteUser(c *gin.Context) {
 
 // @Summary Upload avatar for user
 // @Router /api/v1/users/upload_avatar [post]
+// @Router /api/v1/workspaces/{workspaceId}/upload_avatar [post]
 // @Accept mpfd
 // @Success 200
 // @Tags Users
 // @Param image formData string true "Avatar"
+// @Param workspaceId query string true "Workspace ID"
 // @Param X-Authorization header string true "Bearer Token"
 func uploadAvatar(c *gin.Context) {
 	if _, err := os.Stat("./img/"); err != nil {
@@ -193,7 +195,7 @@ func uploadAvatar(c *gin.Context) {
 		}
 	}
 	userId, _ := c.Get("id")
-	user := User{}
+	workspaceId := c.Param("workspaceId")
 	avatar, err := c.FormFile("img")
 	if err != nil {
 		fmt.Printf(fmt.Sprintf("%v", err))
@@ -203,16 +205,17 @@ func uploadAvatar(c *gin.Context) {
 		c.AbortWithStatusJSON(400, gin.H{"error": "Wrong file format"})
 		return
 	}
-	err = usersDb.FindOne(context.TODO(), bson.D{{"_id", userId}}).Decode(&user)
-	if err != nil {
-		c.AbortWithStatusJSON(500, gin.H{"error": "Failed to find user"})
-		return
-	}
 	filename := filepath.Join("img", "/"+fmt.Sprintf("%v", uuid.New()))
 	if err := c.SaveUploadedFile(avatar, filename); err != nil {
 		c.AbortWithStatusJSON(500, gin.H{"error": "Error while saving image"})
 		return
-	} else {
+	}
+	if workspaceId == "" {
+		user := User{}
+		if err := usersDb.FindOne(context.TODO(), bson.D{{"_id", userId}}).Decode(&user); err != nil {
+			c.AbortWithStatusJSON(500, gin.H{"error": "Failed to find user"})
+			return
+		}
 		user.Avatar = filename
 		_, err = usersDb.ReplaceOne(context.TODO(), bson.D{{"_id", userId}}, user)
 		if err != nil {
@@ -222,7 +225,27 @@ func uploadAvatar(c *gin.Context) {
 				log.Fatal("Failed to remove avatar")
 			}
 		}
-
+		c.AbortWithStatus(200)
+	} else {
+		user := Workspace{}
+		if err := workspacesDb.FindOne(context.TODO(), bson.D{{"_id", workspaceId}}).Decode(&user); err != nil {
+			if errors.Is(err, mongo.ErrNoDocuments) {
+				c.AbortWithStatusJSON(404, gin.H{"error": "Not Found"})
+				return
+			} else {
+				c.AbortWithStatusJSON(500, gin.H{"error": "Failed to find workspace"})
+				return
+			}
+		}
+		user.Avatar = filename
+		_, err = workspacesDb.ReplaceOne(context.TODO(), bson.D{{"_id", workspaceId}}, user)
+		if err != nil {
+			c.AbortWithStatusJSON(500, gin.H{"error": "Failed to pin image to user"})
+			err = os.Remove("./img/" + filename)
+			if err != nil {
+				log.Fatal("Failed to remove avatar")
+			}
+		}
 		c.AbortWithStatus(200)
 	}
 
@@ -272,6 +295,9 @@ func refreshAccessToken(c *gin.Context) {
 func getUserDetails(c *gin.Context) {
 	userId, _ := c.Get("id")
 	var user User
-	usersDb.FindOne(context.TODO(), bson.D{{"_id", userId}}).Decode(&user)
+	if err := usersDb.FindOne(context.TODO(), bson.D{{"_id", userId}}).Decode(&user); err != nil {
+		c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
+		return
+	}
 	c.AbortWithStatusJSON(200, user)
 }

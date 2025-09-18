@@ -13,6 +13,13 @@ import (
 	"time"
 )
 
+// @Summary Create new workspace
+// @Router /api/v1/workspaces/create [post]
+// @Accept json
+// @Success 200
+// @Tags Workspaces
+// @Param data body CreateBoard true "Create new workspace"
+// @Param X-Authorization header string true "Bearer Token"
 func createWorkspace(c *gin.Context) {
 	userId, _ := c.Get("id")
 	var input Workspace
@@ -40,6 +47,12 @@ func createWorkspace(c *gin.Context) {
 	c.AbortWithStatus(200)
 }
 
+// @Summary Edit workspace
+// @Router /api/v1/workspaces/{workspaceId}/ [patch]
+// @Success 200
+// @Tags Workspaces
+// @Param X-Authorization header string true "Bearer Token"
+// @Param workspaceId query string true "Workspace ID"
 func editWorkspace(c *gin.Context) {
 	id, _ := c.Get("id")
 	workspaceId := c.Param("workspaceId")
@@ -72,17 +85,30 @@ func editWorkspace(c *gin.Context) {
 		return
 	}
 }
+
+// @Summary Get all workspaces for the current user
+// @Router /api/v1/users/workspaces/ [get]
+// @Success 200
+// @Tags Workspaces
+// @Param X-Authorization header string true "Bearer Token"
 func getAllWorkspaces(c *gin.Context) {
 	id, _ := c.Get("id")
 	cursor, _ := workspacesDb.Find(context.TODO(), bson.D{{"members", id}})
 	defer cursor.Close(context.TODO())
-	workspaces := []Workspace{}
+	var workspaces []Workspace
 	if err := cursor.All(context.TODO(), &workspaces); err != nil {
 		c.JSON(500, gin.H{"error": "failed to decode workspaces"})
 		return
 	}
 	c.IndentedJSON(200, workspaces)
 }
+
+// @Summary Delete workspace
+// @Router /api/v1/workspaces/{workspaceId}/ [delete]
+// @Success 200
+// @Tags Workspaces
+// @Param X-Authorization header string true "Bearer Token"
+// @Param workspaceId query string true "Workspace ID"
 func deleteWorkspace(c *gin.Context) {
 	id, _ := c.Get("id")
 	workspaceId := c.Param("workspaceId")
@@ -106,6 +132,12 @@ func deleteWorkspace(c *gin.Context) {
 	}
 }
 
+// @Summary Accept invite
+// @Router /api/v1/workspaces/add/{joinToken} [post]
+// @Success 200
+// @Tags Workspaces
+// @Param X-Authorization header string true "Bearer Token"
+// @Param joinToken query string true "Join Token"
 func addMember(c *gin.Context) {
 	userId, _ := c.Get("id")
 	joinToken := c.Param("joinToken")
@@ -134,6 +166,12 @@ func addMember(c *gin.Context) {
 	c.AbortWithStatus(200)
 }
 
+// @Summary Create invite to the workspace
+// @Router /api/v1/workspaces/{workspaceId}/new_invite [get]
+// @Success 200
+// @Tags Workspaces
+// @Param X-Authorization header string true "Bearer Token"
+// @Param workspaceId query string true "Workspace ID"
 func createNewInvite(c *gin.Context) {
 	if workspaceId, exists := c.Get("workspaceId"); exists == true {
 		var i Workspace
@@ -156,11 +194,20 @@ func createNewInvite(c *gin.Context) {
 	}
 }
 
+// @Summary Kick member
+// @Router /api/v1/workspaces/{workspaceId}/kick [delete]
+// @Success 200
+// @Tags Workspaces
+// @Param X-Authorization header string true "Bearer Token"
+// @Param workspaceId query string true "Workspace ID"
 func kickMember(c *gin.Context) {
 	id, _ := c.Get("id")
 	workspaceId := c.Param("workspaceId")
 	var input KickUser
-	json.NewDecoder(c.Request.Body).Decode(&input)
+	if err := json.NewDecoder(c.Request.Body).Decode(&input); err != nil {
+		c.AbortWithStatusJSON(500, gin.H{"error": "Something went wrong when parsing request"})
+		return
+	}
 	if workspaceId != "" {
 		i, _ := bson.ObjectIDFromHex(workspaceId)
 		workspace := Workspace{}
@@ -189,11 +236,21 @@ func kickMember(c *gin.Context) {
 	}
 }
 
+// @Summary Promote member
+// @Router /api/v1/workspaces/{workspaceId}/promote/{userId} [patch]
+// @Success 200
+// @Tags Workspaces
+// @Param X-Authorization header string true "Bearer Token"
+// @Param workspaceId query string true "Workspace ID"
+// @Param userId query string true "User ID"
 func promoteMember(c *gin.Context) {
 	id, _ := c.Get("id")
 	workspaceId := c.Param("workspaceId")
 	var input KickUser
-	json.NewDecoder(c.Request.Body).Decode(&input)
+	if err := json.NewDecoder(c.Request.Body).Decode(&input); err != nil {
+		c.AbortWithStatusJSON(500, gin.H{"error": "Something went wrong when parsing request"})
+		return
+	}
 	if workspaceId != "" {
 		i, _ := bson.ObjectIDFromHex(workspaceId)
 		workspace := Workspace{}
@@ -224,6 +281,12 @@ func promoteMember(c *gin.Context) {
 	}
 }
 
+// @Summary Get all members info
+// @Router /api/v1/workspaces/{workspaceId}/members [get]
+// @Success 200
+// @Tags Workspaces
+// @Param X-Authorization header string true "Bearer Token"
+// @Param workspaceId query string true "Workspace ID"
 func getAllMembers(c *gin.Context) {
 	id, _ := c.Get("id")
 	userId := id.(bson.ObjectID)
@@ -258,7 +321,7 @@ func getAllMembers(c *gin.Context) {
 	}
 	defer cursor.Close(context.TODO())
 
-	members := []Member{}
+	var members []Member
 	if err := cursor.All(context.TODO(), &members); err != nil {
 		c.JSON(500, gin.H{"error": "failed to decode users"})
 		return
@@ -267,14 +330,22 @@ func getAllMembers(c *gin.Context) {
 	c.IndentedJSON(200, members)
 }
 
+// @Summary Assign task to someone
+// @Router /api/v1/workspaces/{workspaceId}/assign [post]
+// @Accept json
+// @Success 200
+// @Tags Tasks
+// @Param data body AssignTask true "Assign Task"
+// @Param X-Authorization header string true "Bearer Token"
+// @Param workspaceId query string true "Workspace ID"
 func assignTask(c *gin.Context) {
 	id, _ := c.Get("id")
 	workspaceId := c.Param("workspaceId")
-	var input struct {
-		TaskId bson.ObjectID `bson:"taskId" json:"taskId"`
-		UserId bson.ObjectID `bson:"userId" json:"userId"`
+	var input AssignTask
+	if err := json.NewDecoder(c.Request.Body).Decode(&input); err != nil {
+		c.AbortWithStatusJSON(500, gin.H{"error": "Something went wrong when parsing request"})
+		return
 	}
-	json.NewDecoder(c.Request.Body).Decode(&input)
 	workspace := Workspace{}
 	if err := workspacesDb.FindOne(context.TODO(), bson.D{{"_id", workspaceId}}).Decode(&workspace); err != nil {
 		if errors.Is(err, mongo.ErrNoDocuments) {

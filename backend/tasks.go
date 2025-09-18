@@ -19,9 +19,11 @@ import (
 // @Summary Get all tasks
 // @Description Return all tasks that current user owns
 // @Router /api/v1/tasks [get]
+// @Router /api/v1/workspaces/{workspaceId}/tasks [get]
 // @Success 200 {array} Task
 // @Produce json
 // @Tags Tasks
+// @Param workspaceId query string true "Workspace ID"
 // @Param X-Authorization header string true "Bearer Token"
 func getAllTasks(c *gin.Context) {
 	id, _ := c.Get("id")
@@ -47,11 +49,13 @@ func getAllTasks(c *gin.Context) {
 
 // @Summary Create new task
 // @Router /api/v1/tasks [post]
+// @Router /api/v1/workspaces/{workspaceId}/tasks [post]
 // @Accept json
 // @Success 200 {array} Task
 // @Produce json
 // @Tags Tasks
 // @Param data body CreateTask true "Create task request"
+// @Param workspaceId query string true "Workspace ID"
 // @Param X-Authorization header string true "Bearer Token"
 func createNewTask(c *gin.Context) {
 	id, _ := c.Get("id")
@@ -98,10 +102,12 @@ func createNewTask(c *gin.Context) {
 
 // @Summary Edit existing task
 // @Router /api/v1/tasks/{taskId} [patch]
+// @Router /api/v1/workspaces/{workspaceId}/tasks/{taskId} [patch]
 // @Accept json
 // @Success 200
 // @Tags Tasks
 // @Param taskId path bson.ObjectID true "Task ID"
+// @Param workspaceId query string true "Workspace ID"
 // @Param data body EditTask true "Edit task request"
 // @Param X-Authorization header string true "Bearer Token"
 func editExistingTask(c *gin.Context) {
@@ -133,12 +139,14 @@ func editExistingTask(c *gin.Context) {
 	return
 }
 
-// @Summary Edit existing task
+// @Summary Delete existing task
 // @Router /api/v1/tasks/{taskId} [delete]
+// @Router /api/v1/workspaces/{workspaceId}/tasks/{taskId} [delete]
 // @Success 200
 // @Produce json
 // @Tags Tasks
 // @Param taskId path bson.ObjectID true "Task ID"
+// @Param workspaceId query string true "Workspace ID"
 // @Param X-Authorization header string true "Bearer Token"
 func deleteExistingTask(c *gin.Context) {
 	input, _ := c.Get("output")

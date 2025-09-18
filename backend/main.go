@@ -98,19 +98,20 @@ func main() {
 		workspaces.GET("/members", rateLimiter, getAllMembers)
 		workspaces.PATCH("/", rateLimiter, editWorkspace)
 		workspaces.DELETE("/", rateLimiter, deleteWorkspace)
+		workspaces.POST("/upload_avatar", rateLimiter, uploadAvatar)
 
 		//Workspace tasks
 		workspaces.GET("/tasks/", rateLimiter, getAllTasks)
 		workspaces.POST("/tasks/", rateLimiter, createNewTask)
 		workspaces.PATCH("/tasks/:taskId", rateLimiter, editExistingTask)
 		workspaces.DELETE("/delete/:taskId", rateLimiter, deleteExistingTask)
+		workspaces.POST("/assign", rateLimiter, assignTask)
 
 		//Workspace boards
 		workspaces.GET("/boards", rateLimiter, getAllBoards)
 		workspaces.POST("/boards", rateLimiter, addBoard)
 		workspaces.DELETE("/boards/:boardId", rateLimiter, deleteBoard)
 		workspaces.PATCH("/boards/:boardId", rateLimiter, editBoard)
-		workspaces.POST("/assign", rateLimiter, assignTask)
 
 		//Docs
 		r.GET("/api/v1/docs/*any", ginSwagger.WrapHandler(swaggerfiles.Handler))
