@@ -1,9 +1,12 @@
 import { createSafeFetch } from "@asouei/safe-fetch";
 import { debugAPI } from "../utils/debug";
 
+const rawBaseURL = import.meta.env.VITE_API_BASE_URL || `${window.location.origin}/api/`;
+const baseURL = rawBaseURL.endsWith("/") ? rawBaseURL : `${rawBaseURL}/`;
+
 const createApi = (mode = "") => {
 	const api = createSafeFetch({
-		baseURL: `${window.location.origin}/api/v1/`,
+		baseURL,
 		timeoutMs: 10000,
 		retries: {
 			retries: 2,
@@ -60,7 +63,7 @@ const createApi = (mode = "") => {
 // const api = createApi("debug");
 
 const api = createSafeFetch({
-	baseURL: `${window.location.origin}/api/v1/`,
+	baseURL,
 	timeoutMs: 10000,
 	retries: {
 		retries: 2,
