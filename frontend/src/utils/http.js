@@ -1,0 +1,250 @@
+import axios from "axios";
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, "");
+const ACCESS_TOKEN_KEY = "rela.access_token";
+const REFRESH_TOKEN_KEY = "rela.refresh_token";
+const DEFAULT_REFRESH_PATH = "/users/refresh";
+const REFRESH_PATH = import.meta.env.VITE_API_REFRESH_PATH || DEFAULT_REFRESH_PATH;
+
+const apiClient = axios.create({
+  baseURL: API_BASE_URL || "",
+});
+
+let refreshRequest = null;
+
+const getSafeStorage = () => {
+  if (typeof window === "undefined") {
+    return null;
+  }
+  return window.localStorage;
+};
+
+export const getAccessToken = () => {
+  const storage = getSafeStorage();
+  return storage ? storage.getItem(ACCESS_TOKEN_KEY) : null;
+};
+
+export const getRefreshToken = () => {
+  const storage = getSafeStorage();
+  return storage ? storage.getItem(REFRESH_TOKEN_KEY) : null;
+};
+
+export const setAuthTokens = ({ accessToken, refreshToken }) => {
+  const storage = getSafeStorage();
+  if (!storage) {
+    return;
+  }
+  if (accessToken) {
+    storage.setItem(ACCESS_TOKEN_KEY, accessToken);
+  }
+  if (refreshToken) {
+    storage.setItem(REFRESH_TOKEN_KEY, refreshToken);
+  }
+};
+
+export const clearAuthTokens = () => {
+  const storage = getSafeStorage();
+  if (!storage) {
+    return;
+  }
+  storage.removeItem(ACCESS_TOKEN_KEY);
+  storage.removeItem(REFRESH_TOKEN_KEY);
+};
+
+const applyAuthHeader = (config, token) => {
+  if (!token) {
+    return config;
+  }
+  const authHeader = `Bearer ${token}`;
+  config.headers = {
+    ...(config.headers || {}),
+    Authorization: authHeader,
+    "X-Authorization": authHeader,
+  };
+  return config;
+};
+
+const requestTokenRefresh = async () => {
+  if (refreshRequest) {
+    return refreshRequest;
+  }
+
+  const refreshToken = getRefreshToken();
+  if (!refreshToken) {
+    return Promise.reject(new Error("Missing refresh token"));
+  }
+
+  const url = `${API_BASE_URL || ""}${REFRESH_PATH}`;
+
+  refreshRequest = axios
+    .post(url, { token: refreshToken })
+    .then(({ data }) => {
+      const newAccessToken = data?.token;
+      const newRefreshToken = data?.refreshToken || refreshToken;
+      if (!newAccessToken) {
+        throw new Error("Invalid refresh token response");
+      }
+      setAuthTokens({ accessToken: newAccessToken, refreshToken: newRefreshToken });
+      return newAccessToken;
+    })
+    .catch((error) => {
+      clearAuthTokens();
+      throw error;
+    })
+    .finally(() => {
+      refreshRequest = null;
+    });
+
+  return refreshRequest;
+};
+
+apiClient.interceptors.request.use((config) => {
+  const token = getAccessToken();
+  return applyAuthHeader(config, token);
+});
+
+apiClient.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const { config, response } = error;
+    if (!response || !config) {
+      return Promise.reject(error);
+    }
+
+    if (response.status === 403 && !config._retry) {
+      config._retry = true;
+      try {
+        const newToken = await requestTokenRefresh();
+        applyAuthHeader(config, newToken);
+        return apiClient(config);
+      } catch (refreshError) {
+        return Promise.reject(refreshError);
+      }
+    }
+
+    return Promise.reject(error);
+  }
+);
+
+export const authApi = {
+  login(payload) {
+    return apiClient.post("/users/login", payload);
+  },
+  createUser(payload) {
+    return apiClient.post("/users/create", payload);
+  },
+  deleteUser(payload) {
+    return apiClient.delete("/users/delete", { data: payload });
+  },
+  getUserInfo() {
+    return apiClient.get("/users/get_info");
+  },
+  getUserWorkspaces() {
+    return apiClient.get("/users/workspaces/");
+  },
+  uploadAvatar(formData) {
+    return apiClient.post("/users/upload_avatar", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+  },
+};
+
+export const boardsApi = {
+  getBoards(workspaceId) {
+    return apiClient.get("/boards", { params: { workspaceId } });
+  },
+  createBoard(workspaceId, payload) {
+    return apiClient.post("/boards", payload, { params: { workspaceId } });
+  },
+  updateBoard(boardId, workspaceId, payload) {
+    return apiClient.patch(`/boards/${boardId}`, payload, { params: { workspaceId } });
+  },
+  deleteBoard(boardId, workspaceId) {
+    return apiClient.delete(`/boards/${boardId}`, { params: { workspaceId } });
+  },
+};
+
+export const tasksApi = {
+  getTasks(workspaceId) {
+    return apiClient.get("/tasks", { params: { workspaceId } });
+  },
+  createTask(workspaceId, payload) {
+    return apiClient.post("/tasks", payload, { params: { workspaceId } });
+  },
+  updateTask(taskId, workspaceId, payload) {
+    return apiClient.patch(`/tasks/${taskId}`, payload, { params: { workspaceId } });
+  },
+  deleteTask(taskId, workspaceId) {
+    return apiClient.delete(`/tasks/${taskId}`, { params: { workspaceId } });
+  },
+};
+
+export const workspaceApi = {
+  createWorkspace(payload) {
+    return apiClient.post("/workspaces/create", payload);
+  },
+  deleteWorkspace(workspaceId) {
+    return apiClient.delete(`/workspaces/${workspaceId}/`);
+  },
+  updateWorkspace(workspaceId, payload) {
+    return apiClient.patch(`/workspaces/${workspaceId}/`, payload);
+  },
+  getBoards(workspaceId) {
+    return apiClient.get(`/workspaces/${workspaceId}/boards`, { params: { workspaceId } });
+  },
+  createBoard(workspaceId, payload) {
+    return apiClient.post(`/workspaces/${workspaceId}/boards`, payload, { params: { workspaceId } });
+  },
+  updateBoard(workspaceId, boardId, payload) {
+    return apiClient.patch(`/workspaces/${workspaceId}/boards/${boardId}`, payload, {
+      params: { workspaceId },
+    });
+  },
+  deleteBoard(workspaceId, boardId) {
+    return apiClient.delete(`/workspaces/${workspaceId}/boards/${boardId}`, {
+      params: { workspaceId },
+    });
+  },
+  getTasks(workspaceId) {
+    return apiClient.get(`/workspaces/${workspaceId}/tasks`, { params: { workspaceId } });
+  },
+  createTask(workspaceId, payload) {
+    return apiClient.post(`/workspaces/${workspaceId}/tasks`, payload, { params: { workspaceId } });
+  },
+  updateTask(workspaceId, taskId, payload) {
+    return apiClient.patch(`/workspaces/${workspaceId}/tasks/${taskId}`, payload, {
+      params: { workspaceId },
+    });
+  },
+  deleteTask(workspaceId, taskId) {
+    return apiClient.delete(`/workspaces/${workspaceId}/tasks/${taskId}`, {
+      params: { workspaceId },
+    });
+  },
+  assignTask(workspaceId, payload) {
+    return apiClient.post(`/workspaces/${workspaceId}/assign`, payload, { params: { workspaceId } });
+  },
+  getMembers(workspaceId) {
+    return apiClient.get(`/workspaces/${workspaceId}/members`, { params: { workspaceId } });
+  },
+  kickMember(workspaceId) {
+    return apiClient.delete(`/workspaces/${workspaceId}/kick`, {
+      params: { workspaceId },
+    });
+  },
+  getInvite(workspaceId) {
+    return apiClient.get(`/workspaces/${workspaceId}/new_invite`, { params: { workspaceId } });
+  },
+  promoteMember(workspaceId, userId, payload) {
+    return apiClient.patch(`/workspaces/${workspaceId}/promote/${userId}`, payload, {
+      params: { workspaceId, userId },
+    });
+  },
+  acceptInvite(joinToken) {
+    return apiClient.post(`/workspaces/add/${joinToken}`);
+  },
+};
+
+export const rawApiClient = apiClient;
+
+export default apiClient;

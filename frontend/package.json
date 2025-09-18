@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "7.css": "^0.21.1",
+    "axios": "^1.12.2",
     "vue": "^3.4.0"
   },
   "devDependencies": {
