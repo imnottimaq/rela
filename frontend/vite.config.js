@@ -1,18 +1,9 @@
-// vite.config.js
-import { defineConfig } from "vite";
-import react from "@vitejs/plugin-react";
-import tailwindcss from "@tailwindcss/vite";
+import { defineConfig } from 'vite';
+import vue from '@vitejs/plugin-vue';
 
-// https://vite.dev/config/
 export default defineConfig({
-	plugins: [react(), tailwindcss()],
-	server: {
-		port: 3000,
-		proxy: {
-			"/api/v1": {
-				target: "http://localhost:8080",
-				changeOrigin: true,
-			},
-		},
-	},
+  plugins: [vue()],
+  server: {
+    host: '0.0.0.0'
+  }
 });
