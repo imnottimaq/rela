@@ -243,6 +243,13 @@ const isPrimaryPointer = (event) => {
   return event.isPrimary !== false;
 };
 
+const blurEventTarget = (event) => {
+  const target = event?.currentTarget;
+  if (target && typeof target.blur === "function") {
+    target.blur();
+  }
+};
+
 const startDrag = (event) => {
   if (isResizing.value || !isPrimaryPointer(event)) return;
   isDragging.value = true;
@@ -450,6 +457,8 @@ const MenuList = defineComponent({
           event.preventDefault();
         }
       }
+
+      blurEventTarget(event);
     };
 
     const renderInteractiveContent = (item) => {
@@ -468,7 +477,10 @@ const MenuList = defineComponent({
             onClick:
               item.disabled || !item.onClick
                 ? undefined
-                : (event) => item.onClick(event),
+                : (event) => {
+                    item.onClick(event);
+                    blurEventTarget(event);
+                  },
           },
           children
         );

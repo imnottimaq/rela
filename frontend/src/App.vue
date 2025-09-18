@@ -55,7 +55,7 @@ const windowMenu = [
   {
     label: "Account",
     items: [
-      { type: "button", label: "Login", onClick: () => { loginVisible.value = true; }},
+      { type: "button", label: "Login", onClick: () => { loginVisible.value = true;  }},
       { type: "button", label: "Register", onClick: test, divider: true },
       { type: "button", label: "Logout", onClick: test },
     ],
