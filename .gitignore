@@ -52,3 +52,4 @@ img
 *.njsproj
 *.sln
 *.sw?
+backend/.env_local
