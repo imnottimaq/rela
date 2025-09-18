@@ -1,15 +1,18 @@
 <template>
   <main :style="mainStyle">
-    <WindowComponent 
-    title="Welcome to Rela"
-    :buttons="[
-      { label: 'Minimize', onClick: test },
-      { label: 'Maximize', onClick: test },
-      { label: 'Close', onClick: test }
-    ]"
+    <WindowComponent
+      title="Welcome to Rela"
+      :buttons="[
+        { label: 'Minimize', onClick: test },
+        { label: 'Maximize', onClick: test },
+        { label: 'Close', onClick: test }
+      ]"
+      :menu="windowMenu"
+      :initial-position="{ x: 160, y: 120 }"
+      :initial-size="{ width: 640, height: 460 }"
     >
-      <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed eleifend velit lectus, in tempor tellus tincidunt sit amet. Sed eget viverra arcu. Nunc non velit tempus, consequat ligula ut, luctus quam. Phasellus consequat quam et ornare bibendum. Sed rutrum fermentum ipsum, a tincidunt libero blandit quis. Aliquam commodo nulla sapien, eget convallis nibh euismod at. Integer pulvinar tincidunt justo, vel porta nisi ullamcorper et. Vivamus dapibus tortor ut sapien maximus, in iaculis lectus viverra. Nullam faucibus lacinia arcu non vehicula. Nam nec accumsan erat. </p>
-        <img class="demo" src="./assets/confused_travolta.gif" alt="Confused Travolta" />
+      <p>Rela is WIP task tracker with ability to self-host it.<br />Use Account to login or register.</p>
+      <img class="demo" src="./assets/confused_travolta.gif" alt="Confused Travolta" />
     </WindowComponent>
   </main>
 </template>
@@ -23,6 +26,35 @@ const mainStyle = `background-image: url(${background})`;
 const test = () => {
   alert("Test function");
 };
+
+const windowMenu = [
+  {
+    label: "Workspaces",
+    items: [
+      { type: "button", label: "New Workspace", onClick: test, divider: true },
+      { type: "button", label: "Workspace 1", onClick: test },
+      { type: "button", label: "Workspace 2", onClick: test },
+      { type: "button", label: "Workspace 3", onClick: test },
+    ],
+  },
+  {
+    label: "Boards",
+    items: [
+      { type: "button", label: "New Board", onClick: test, divider: true },
+      { type: "button", label: "Board 1", onClick: test },
+      { type: "button", label: "Board 2", onClick: test },
+      { type: "button", label: "Board 3", onClick: test },
+    ],
+  },
+  {
+    label: "Account",
+    items: [
+      { type: "button", label: "Login", onClick: test },
+      { type: "button", label: "Register", onClick: test, divider: true },
+      { type: "button", label: "Logout", onClick: test },
+    ],
+  },
+];
 </script>
 
 <style scoped>
