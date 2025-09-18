@@ -1,5 +1,11 @@
-FROM golang:tip-alpine3.22
+FROM golang:1.24.2-alpine
+
 WORKDIR /app
-COPY . backend/
-RUN go mod tidy
-CMD ["go","run","."]
+
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY . .
+
+RUN go build -o /app/app .
+CMD ["/app/app"]

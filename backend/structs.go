@@ -10,8 +10,10 @@ type Task struct {
 	Name        string        `json:"name" bson:"name"`
 	Description *string       `json:"description" bson:"description"`
 	CreatedAt   int64         `json:"created_at" bson:"created_at"`
-	OwnedBy     bson.ObjectID `json:"created_by" bson:"created_by"`
+	CreatedBy   bson.ObjectID `json:"created_by" bson:"created_by"`
 	Board       bson.ObjectID `json:"board" bson:"board"`
+	AssignedTo  bson.ObjectID `json:"assigned_to" bson:"assigned_to"`
+	Deadline    *int64        `json:"deadline" bson:"deadline"`
 }
 
 type CreateTask struct {
@@ -25,6 +27,7 @@ type EditTask struct {
 	Description *string `json:"description" bson:"description"`
 	CompletedAt *int64  `json:"completed_at" bson:"completed_at"`
 	Board       *string `json:"board" bson:"board"`
+	Deadline    *int64  `json:"deadline" bson:"deadline"`
 }
 type User struct {
 	Avatar         string        `json:"avatar" bson:"avatar"`
@@ -40,12 +43,12 @@ type CreateUser struct {
 	Email    string `json:"email" bson:"email"`
 	Password string `json:"password" bson:"password"`
 }
-type Token struct {
+type TokenSwagger struct {
 	Token string `json:"token" bson:"token"`
 }
-type LoginToken struct {
+type Token struct {
 	Id        bson.ObjectID `json:"id" bson:"id"`
-	ExpiresAt int64         `json:"exp" bson:"expires_at"`
+	ExpiresAt int64         `json:"exp" bson:"exp"`
 	Type      string        `json:"type" bson:"type"`
 	jwt.RegisteredClaims
 }
@@ -60,4 +63,26 @@ type Board struct {
 }
 type CreateBoard struct {
 	Name string `json:"name" bson:"name"`
+}
+
+type Workspace struct {
+	Id      bson.ObjectID   `bson:"_id,omitempty" json:"_id"`
+	Avatar  string          `json:"avatar" bson:"avatar"`
+	Name    string          `json:"name"`
+	OwnedBy bson.ObjectID   `bson:"owned_by" json:"owned_by"`
+	Members []bson.ObjectID `bson:"members" json:"members"`
+}
+
+type KickUser struct {
+	Id bson.ObjectID `bson:"id" json:"id"`
+}
+
+type Member struct {
+	Id     bson.ObjectID `bson:"_id" json:"_id"`
+	Name   string        `json:"name" bson:"name"`
+	Avatar string        `json:"avatar" bson:"avatar"`
+}
+type AssignTask struct {
+	TaskId bson.ObjectID `bson:"taskId" json:"taskId"`
+	UserId bson.ObjectID `bson:"userId" json:"userId"`
 }
