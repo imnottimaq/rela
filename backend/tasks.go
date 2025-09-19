@@ -27,20 +27,20 @@ import (
 // @Param X-Authorization header string true "Bearer Token"
 func getAllTasks(c *gin.Context) {
 	id, _ := c.Get("id")
-	var tasks []Task
+    tasks := make([]Task, 0)
 	if workspaceId := c.Param("workspaceId"); workspaceId == "" {
 		cursor, _ := tasksDb.Find(context.TODO(), bson.D{{"created_by", id}})
 
-		_ = cursor.All(context.TODO(), &tasks)
-		c.IndentedJSON(200, tasks)
+        _ = cursor.All(context.TODO(), &tasks)
+        c.IndentedJSON(200, gin.H{"tasks": tasks})
 		if err := cursor.Close(context.TODO()); err != nil {
 			log.Print("Failed to close cursor")
 		}
 		return
 	} else {
 		cursor, _ := tasksDb.Find(context.TODO(), bson.D{{"created_by", workspaceId}})
-		_ = cursor.All(context.TODO(), &tasks)
-		c.IndentedJSON(200, tasks)
+        _ = cursor.All(context.TODO(), &tasks)
+        c.IndentedJSON(200, gin.H{"tasks": tasks})
 		if err := cursor.Close(context.TODO()); err != nil {
 			log.Print("Failed to close cursor")
 		}

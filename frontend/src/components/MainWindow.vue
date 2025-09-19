@@ -1,15 +1,10 @@
 <template>
-              <!-- :buttons="[
-        { label: 'Minimize', onClick: test },
-        { label: 'Maximize', onClick: test },
-        { label: 'Close', onClick: test }
-      ]" -->
     <WindowComponent
       class="main-window"
       title="Welcome to Rela"
       :menu="windowMenu"
       :initial-position="{ x: 160, y: 120 }"
-      :initial-size="{ width: 300, height: 460 }"
+      :initial-size="{ width: 450, height: 500 }"
       :min-size="{ width: 300, height: 460 }"
       v-model:visible="mainVisible"
       storage-key="rela-window-main"
@@ -23,8 +18,10 @@ import WindowComponent from './WindowComponent.vue';
 import { showLoginWindow } from '../composables/useLoginWindow';
 import { showRegisterWindow } from '../composables/useRegisterWindow';
 import { showProfileWindow } from '../composables/useProfileWindow';
-import { computed, ref } from 'vue';
+import { computed, ref, onMounted, watch } from 'vue';
 import { useAuth } from '../composables/useAuth';
+import { useWorkspaces, openWorkspaceWindow, refreshWorkspaces } from '../composables/useWorkspaces';
+import { showCreateWorkspaceWindow } from '../composables/useCreateWorkspaceWindow';
 
 const mainVisible = ref(true);
 const { isAuthenticated, logout } = useAuth();
@@ -33,8 +30,10 @@ const openProfile = () => {
   showProfileWindow();
 };
 
+const { workspaces } = useWorkspaces();
+
 const openWorkspaceCreation = () => {
-  console.log("Workspace creation placeholder window");
+  showCreateWorkspaceWindow();
 };
 
 const unauthenticatedMenu = [
@@ -47,26 +46,56 @@ const unauthenticatedMenu = [
   },
 ];
 
-const authenticatedMenu = [
-  {
-    label: "Account",
-    items: [
-      { type: "button", label: "Profile", onClick: openProfile },
-      { type: "separator" },
-      { type: "button", label: "Logout", onClick: logout },
-    ],
-  },
-  {
-    label: "Workspace",
-    items: [,
-      { type: "button", label: "Create workspace", onClick: openWorkspaceCreation },
-    ],
-  },
-];
+const authenticatedMenu = computed(() => {
+  const ws = workspaces.value || [];
+  const items = [
+    {
+      type: "button",
+      label: "Create workspace",
+      onClick: openWorkspaceCreation,
+      divider: ws.length > 0,
+    },
+  ];
+  if (ws.length > 0) {
+    items.push({ type: "separator" });
+  }
+  items.push(
+    ...ws.map((w) => ({
+      type: "button",
+      label: w.name || String(w._id || w.id),
+      onClick: () => openWorkspaceWindow(w),
+    }))
+  );
+
+  return [
+    {
+      label: "Account",
+      items: [
+        { type: "button", label: "Profile", onClick: openProfile },
+        { type: "separator" },
+        { type: "button", label: "Logout", onClick: logout },
+      ],
+    },
+    {
+      label: "Workspace",
+      items,
+    },
+  ];
+});
 
 const windowMenu = computed(() =>
-  isAuthenticated.value ? authenticatedMenu : unauthenticatedMenu
+  isAuthenticated.value ? authenticatedMenu.value : unauthenticatedMenu
 );
+
+onMounted(() => {
+  if (isAuthenticated.value) {
+    refreshWorkspaces();
+  }
+});
+
+watch(() => isAuthenticated.value, (v) => {
+  if (v) refreshWorkspaces();
+});
 
 
 </script>

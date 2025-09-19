@@ -151,9 +151,9 @@ func getAllBoards(c *gin.Context) {
 	} else {
 		cursor, _ = boardsDb.Find(context.TODO(), bson.D{{"owned_by", userId}})
 	}
-	var boards []Board
-	_ = cursor.All(context.TODO(), &boards)
-	c.IndentedJSON(200, boards)
+    boards := make([]Board, 0)
+    _ = cursor.All(context.TODO(), &boards)
+    c.IndentedJSON(200, gin.H{"boards": boards})
 	if err := cursor.Close(context.TODO()); err != nil {
 		log.Print("Failed to close cursor")
 	}

@@ -88,7 +88,7 @@ func editWorkspace(c *gin.Context) {
 }
 
 // @Summary Get all workspaces for the current user
-// @Router /api/v1/users/workspaces/ [get]
+// @Router /api/v1/users/workspaces [get]
 // @Success 200
 // @Tags Workspaces
 // @Param X-Authorization header string true "Bearer Token"
@@ -96,12 +96,12 @@ func getAllWorkspaces(c *gin.Context) {
 	id, _ := c.Get("id")
 	cursor, _ := workspacesDb.Find(context.TODO(), bson.D{{"members", id}})
 	defer cursor.Close(context.TODO())
-	var workspaces []Workspace
-	if err := cursor.All(context.TODO(), &workspaces); err != nil {
-		c.JSON(500, gin.H{"error": "failed to decode workspaces"})
-		return
-	}
-	c.IndentedJSON(200, workspaces)
+    workspaces := make([]Workspace, 0)
+    if err := cursor.All(context.TODO(), &workspaces); err != nil {
+        c.JSON(500, gin.H{"error": "failed to decode workspaces"})
+        return
+    }
+	c.IndentedJSON(200, gin.H{"workspaces": workspaces})
 }
 
 // @Summary Delete workspace
@@ -322,13 +322,13 @@ func getAllMembers(c *gin.Context) {
 	}
 	defer cursor.Close(context.TODO())
 
-	var members []Member
-	if err := cursor.All(context.TODO(), &members); err != nil {
-		c.JSON(500, gin.H{"error": "failed to decode users"})
-		return
-	}
+    members := make([]Member, 0)
+    if err := cursor.All(context.TODO(), &members); err != nil {
+        c.JSON(500, gin.H{"error": "failed to decode users"})
+        return
+    }
 
-	c.IndentedJSON(200, members)
+	c.IndentedJSON(200, gin.H{"members": members})
 }
 
 // @Summary Assign task to someone
