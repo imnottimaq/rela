@@ -67,10 +67,14 @@ func authMiddleware() gin.HandlerFunc {
 				return []byte(pepper), nil
 			})
 			if err != nil {
-				c.AbortWithStatusJSON(500, "Internal Server Error")
+				c.AbortWithStatusJSON(403, gin.H{"error": "invalid or malformed access token"})
 				return
 			}
-			claims := token.Claims.(*Token)
+			claims, ok := token.Claims.(*Token)
+			if !ok || !token.Valid {
+				c.AbortWithStatusJSON(403, gin.H{"error": "invalid or malformed access token"})
+				return
+			}
 			if claims.ExpiresAt < time.Now().UTC().Unix() {
 				c.AbortWithStatusJSON(403, "Authorization Required")
 				return

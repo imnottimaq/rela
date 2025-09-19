@@ -72,8 +72,6 @@ const windowMenu = computed(() =>
 </script>
 <style scoped>
 .demo {
-  max-width: 100%;
-  max-height: 100%;
   width: auto;
   height: auto;
   display: block;
