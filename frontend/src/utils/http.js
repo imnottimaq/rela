@@ -6,6 +6,28 @@ const REFRESH_TOKEN_KEY = "rela.refresh_token";
 const DEFAULT_REFRESH_PATH = "/users/refresh";
 const REFRESH_PATH = import.meta.env.VITE_API_REFRESH_PATH || DEFAULT_REFRESH_PATH;
 
+const authStateListeners = new Set();
+
+const notifyAuthStateChange = (hasToken) => {
+  authStateListeners.forEach((listener) => {
+    try {
+      listener(Boolean(hasToken));
+    } catch (listenerError) {
+      console.error("Auth state listener error", listenerError);
+    }
+  });
+};
+
+export const onAuthStateChange = (listener) => {
+  if (typeof listener !== "function") {
+    return () => {};
+  }
+  authStateListeners.add(listener);
+  return () => {
+    authStateListeners.delete(listener);
+  };
+};
+
 const apiClient = axios.create({
   baseURL: API_BASE_URL || "",
 });
@@ -32,6 +54,7 @@ export const getRefreshToken = () => {
 export const setAuthTokens = ({ accessToken, refreshToken }) => {
   const storage = getSafeStorage();
   if (!storage) {
+    notifyAuthStateChange(Boolean(accessToken));
     return;
   }
   if (accessToken) {
@@ -40,15 +63,18 @@ export const setAuthTokens = ({ accessToken, refreshToken }) => {
   if (refreshToken) {
     storage.setItem(REFRESH_TOKEN_KEY, refreshToken);
   }
+  notifyAuthStateChange(Boolean(storage.getItem(ACCESS_TOKEN_KEY)));
 };
 
 export const clearAuthTokens = () => {
   const storage = getSafeStorage();
   if (!storage) {
+    notifyAuthStateChange(false);
     return;
   }
   storage.removeItem(ACCESS_TOKEN_KEY);
   storage.removeItem(REFRESH_TOKEN_KEY);
+  notifyAuthStateChange(false);
 };
 
 const applyAuthHeader = (config, token) => {
@@ -77,7 +103,7 @@ const requestTokenRefresh = async () => {
   const url = `${API_BASE_URL || ""}${REFRESH_PATH}`;
 
   refreshRequest = axios
-    .post(url, { token: refreshToken })
+    .get(url, { headers: { Authorization: `Bearer ${refreshToken}` } })
     .then(({ data }) => {
       const newAccessToken = data?.token;
       const newRefreshToken = data?.refreshToken || refreshToken;

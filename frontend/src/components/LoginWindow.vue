@@ -34,11 +34,13 @@
 <script setup>
 import WindowComponent from './WindowComponent.vue';
 import { useLoginWindow } from '../composables/useLoginWindow';
-import { showRegisterWindow } from '../composables/useRegisterWindow';
+import { hideRegisterWindow, showRegisterWindow } from '../composables/useRegisterWindow';
 import { ref } from 'vue';
 import { authApi } from '../utils/http';
+import { useAuth } from '../composables/useAuth';
 
 const { loginVisible, hideLoginWindow } = useLoginWindow();
+const { handleAuthSuccess } = useAuth();
 
 const email = ref('');
 const password = ref('');
@@ -85,9 +87,16 @@ const login = async () => {
     if (emailError.value || passwordError.value) {
       return;
     }
-    let response = await authApi.login(email.value, password.value);
+    const response = await authApi.login(email.value, password.value);
+    const { token, refreshToken } = response?.data || {};
+    const stored = handleAuthSuccess({ token, refreshToken });
+    if (!stored) {
+      loginError.value = 'Login failed. Missing access token in response.';
+      return;
+    }
     console.log('Login successful:', response.data);
     hideLoginWindow();
+    hideRegisterWindow();
   } catch (error) {
     console.error('Login failed:', error);
     loginError.value = 'Login failed. Please check your credentials and try again.';

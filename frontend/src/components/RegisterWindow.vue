@@ -45,10 +45,12 @@
 import { ref } from 'vue';
 import WindowComponent from './WindowComponent.vue';
 import { useRegisterWindow } from '../composables/useRegisterWindow';
-import { showLoginWindow } from '../composables/useLoginWindow';
+import { hideLoginWindow, showLoginWindow } from '../composables/useLoginWindow';
 import { authApi } from '../utils/http';
+import { useAuth } from '../composables/useAuth';
 
 const { registerVisible, hideRegisterWindow } = useRegisterWindow();
+const { handleAuthSuccess } = useAuth();
 
 const name = ref('');
 const email = ref('');
@@ -132,9 +134,15 @@ const registerUser = async () => {
       return;
     }
 
-    await authApi.createUser(name.value, email.value, password.value);
+    const response = await authApi.createUser(name.value, email.value, password.value);
+    const { token, refreshToken } = response?.data || {};
+    const stored = handleAuthSuccess({ token, refreshToken });
+    if (!stored) {
+      registerError.value = 'Registration succeeded without an access token. Please try logging in.';
+      return;
+    }
     closeAndReset();
-    // showLoginWindow();
+    hideLoginWindow();
   } catch (error) {
     console.error('Registration failed:', error);
     registerError.value = 'Registration failed. Please check your details and try again.';
