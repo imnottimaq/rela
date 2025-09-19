@@ -29,21 +29,11 @@ const test = () => {
 const mainVisible = ref(true);
 
 let windowMenu = [
-//   {
-//     label: "Workspaces",
-//     items: [
-//       { type: "button", label: "New Workspace", onClick: test, divider: true },
-//       { type: "button", label: "Workspace 1", onClick: test },
-//       { type: "button", label: "Workspace 2", onClick: test },
-//       { type: "button", label: "Workspace 3", onClick: test },
-//     ],
-//   },
   {
     label: "Account",
     items: [
-      { type: "link", label: "Login", onClick: showLoginWindow, href: "#login-window" },
-      { type: "button", label: "Register", onClick: test, divider: true },
-      { type: "button", label: "Logout", onClick: test },
+      { type: "button", label: "Login", onClick: showLoginWindow },
+      { type: "button", label: "Register", onClick: test, divider: true }
     ],
   },
 ];

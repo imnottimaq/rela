@@ -1,11 +1,9 @@
 <template>
     <WindowComponent
-      id="login-window"
       title="Login"
       :buttons="[{ label: 'Close', onClick: hideLoginWindow }]"
       v-model:visible="loginVisible"
       storage-key="rela-window-login"
-      role="dialog"
       footer-buttons-align="right"
       :footer-buttons="[
         { label: 'Cancel', onClick: hideLoginWindow },
