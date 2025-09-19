@@ -114,18 +114,20 @@ const requestTokenRefresh = async () => {
     return refreshRequest;
   }
 
-  const refreshToken = getRefreshToken();
-  if (!refreshToken) {
-    return Promise.reject(new Error("Missing refresh token"));
+  const url = `${API_BASE_URL || ""}${REFRESH_PATH}`;
+  const storedRefreshToken = getRefreshToken();
+  const requestConfig = {
+    withCredentials: true,
+  };
+  if (storedRefreshToken) {
+    requestConfig.headers = { Authorization: `Bearer ${storedRefreshToken}` };
   }
 
-  const url = `${API_BASE_URL || ""}${REFRESH_PATH}`;
-
   refreshRequest = axios
-    .get(url, { headers: { Authorization: `Bearer ${refreshToken}` } })
+    .get(url, requestConfig)
     .then(({ data }) => {
       const newAccessToken = data?.token;
-      const newRefreshToken = data?.refreshToken || refreshToken;
+      const newRefreshToken = data?.refreshToken || storedRefreshToken;
       if (!newAccessToken) {
         throw new Error("Invalid refresh token response");
       }
@@ -185,7 +187,7 @@ export const authApi = {
     return apiClient.get("/users/get_info");
   },
   getUserWorkspaces() {
-    return apiClient.get("/users/workspaces/");
+    return apiClient.get("/users/workspaces");
   },
   uploadAvatar(formData) {
     return apiClient.post("/users/upload_avatar", formData, {
