@@ -7,14 +7,8 @@ import (
 	"github.com/goccy/go-json"
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
-	"log"
 	"time"
 )
-
-// @Title			Rela API Docs
-// @Description	Simple WIP task tracker that can be self-hosted
-// @Version		1.0
-// @BasePath		/api/v1
 
 // @Summary Get all tasks
 // @Description Return all tasks that current user owns
@@ -23,26 +17,29 @@ import (
 // @Success 200 {array} Task
 // @Produce json
 // @Tags Tasks
-// @Param workspaceId query string true "Workspace ID"
-// @Param X-Authorization header string true "Bearer Token"
+// @Param workspaceId path string true "Workspace ID"
+// @Param Authorization header string true "Bearer Token"
 func getAllTasks(c *gin.Context) {
 	id, _ := c.Get("id")
-    tasks := make([]Task, 0)
-	if workspaceId := c.Param("workspaceId"); workspaceId == "" {
-		cursor, _ := tasksDb.Find(context.TODO(), bson.D{{"created_by", id}})
+	tasks := make([]Task, 0)
+	if wId := c.Param("workspaceId"); wId == "" {
+		cursor, _ := tasksDb.Find(context.TODO(), bson.D{{"created_by", id.(bson.ObjectID)}})
 
-        _ = cursor.All(context.TODO(), &tasks)
-        c.IndentedJSON(200, gin.H{"tasks": tasks})
+		_ = cursor.All(context.TODO(), &tasks)
+		c.IndentedJSON(200, gin.H{"tasks": tasks})
 		if err := cursor.Close(context.TODO()); err != nil {
-			log.Print("Failed to close cursor")
+			c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
+			return
 		}
 		return
 	} else {
+		workspaceId, _ := bson.ObjectIDFromHex(wId)
 		cursor, _ := tasksDb.Find(context.TODO(), bson.D{{"created_by", workspaceId}})
-        _ = cursor.All(context.TODO(), &tasks)
-        c.IndentedJSON(200, gin.H{"tasks": tasks})
+		_ = cursor.All(context.TODO(), &tasks)
+		c.IndentedJSON(200, gin.H{"tasks": tasks})
 		if err := cursor.Close(context.TODO()); err != nil {
-			log.Print("Failed to close cursor")
+			c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
+			return
 		}
 	}
 }
@@ -55,8 +52,8 @@ func getAllTasks(c *gin.Context) {
 // @Produce json
 // @Tags Tasks
 // @Param data body CreateTask true "Create task request"
-// @Param workspaceId query string true "Workspace ID"
-// @Param X-Authorization header string true "Bearer Token"
+// @Param workspaceId path string true "Workspace ID"
+// @Param Authorization header string true "Bearer Token"
 func createNewTask(c *gin.Context) {
 	id, _ := c.Get("id")
 	var input CreateTask
@@ -77,7 +74,7 @@ func createNewTask(c *gin.Context) {
 		c.AbortWithStatusJSON(400, gin.H{"error": "Board does not exist"})
 		return
 	} else {
-		c.AbortWithStatusJSON(500, gin.H{"error": "Internal server error"})
+		c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
 	}
 	newTask := Task{
 		Name:        input.Name,
@@ -92,7 +89,7 @@ func createNewTask(c *gin.Context) {
 	}
 	task, err := tasksDb.InsertOne(context.TODO(), newTask)
 	if err != nil {
-		c.AbortWithStatusJSON(500, gin.H{"error": "Failed to push task to database"})
+		c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
 		return
 	}
 	newTask.Id = task.InsertedID.(bson.ObjectID)
@@ -107,9 +104,9 @@ func createNewTask(c *gin.Context) {
 // @Success 200
 // @Tags Tasks
 // @Param taskId path bson.ObjectID true "Task ID"
-// @Param workspaceId query string true "Workspace ID"
+// @Param workspaceId path string true "Workspace ID"
 // @Param data body EditTask true "Edit task request"
-// @Param X-Authorization header string true "Bearer Token"
+// @Param Authorization header string true "Bearer Token"
 func editExistingTask(c *gin.Context) {
 	input, _ := c.Get("output")
 	previousVersion := input.(Task)
@@ -117,22 +114,19 @@ func editExistingTask(c *gin.Context) {
 	taskId := c.Param("taskId")
 	err := json.NewDecoder(c.Request.Body).Decode(&valuesToEdit)
 	if err != nil {
-		c.AbortWithStatusJSON(400, gin.H{"error": "Something went wrong when parsing request"})
+		c.AbortWithStatusJSON(500, gin.H{"error": "Something went wrong when parsing request"})
 		return
-	}
-	if valuesToEdit.Name != nil {
-		previousVersion.Name = *valuesToEdit.Name
-		if previousVersion.Name == "" {
-			c.AbortWithStatusJSON(400, gin.H{"error": "Name cannot be empty"})
-			return
-		}
-	}
-	if valuesToEdit.Description != nil {
+	} else if valuesToEdit.Name != "" {
+		previousVersion.Name = valuesToEdit.Name
+	} else if valuesToEdit.Description != "" {
 		previousVersion.Description = valuesToEdit.Description
+	} else if valuesToEdit.Deadline <= time.Now().UTC().Unix() {
+		c.AbortWithStatusJSON(400, gin.H{"error": "Deadline cant be past current time"})
+		return
 	}
 	_, err = tasksDb.ReplaceOne(context.TODO(), bson.D{{Key: "_id", Value: taskId}}, &previousVersion)
 	if err != nil {
-		c.AbortWithStatusJSON(500, gin.H{"error": "Failed to change task"})
+		c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
 		return
 	}
 	c.AbortWithStatus(200)
@@ -146,13 +140,12 @@ func editExistingTask(c *gin.Context) {
 // @Produce json
 // @Tags Tasks
 // @Param taskId path bson.ObjectID true "Task ID"
-// @Param workspaceId query string true "Workspace ID"
-// @Param X-Authorization header string true "Bearer Token"
+// @Param workspaceId path string true "Workspace ID"
+// @Param Authorization header string true "Bearer Token"
 func deleteExistingTask(c *gin.Context) {
 	input, _ := c.Get("output")
 	result := input.(Task)
-	_, err := tasksDb.DeleteOne(context.TODO(), bson.D{{Key: "_id", Value: result.Id}})
-	if err != nil {
+	if _, err := tasksDb.DeleteOne(context.TODO(), bson.D{{Key: "_id", Value: result.Id}}); err != nil {
 		c.AbortWithStatusJSON(500, gin.H{"error": "Failed to delete task"})
 		return
 	}

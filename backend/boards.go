@@ -19,8 +19,8 @@ import (
 // @Produce json
 // @Tags Boards
 // @Param data body CreateBoard true "Create board request"
-// @Param workspaceId query string true "Workspace ID"
-// @Param X-Authorization header string true "Bearer Token"
+// @Param workspaceId path string true "Workspace ID"
+// @Param Authorization header string true "Bearer Token"
 func addBoard(c *gin.Context) {
 	id, _ := c.Get("id")
 	workspaceId := c.Param("workspaceId")
@@ -55,8 +55,8 @@ func addBoard(c *gin.Context) {
 // @Produce json
 // @Tags Boards
 // @Param boardId path bson.ObjectID true "Board ID"
-// @Param workspaceId query string true "Workspace ID"
-// @Param X-Authorization header string true "Bearer Token"
+// @Param workspaceId path string true "Workspace ID"
+// @Param Authorization header string true "Bearer Token"
 func deleteBoard(c *gin.Context) {
 	id, _ := c.Get("id")
 	boardId := c.Param("boardId")
@@ -91,9 +91,9 @@ func deleteBoard(c *gin.Context) {
 // @Produce json
 // @Tags Boards
 // @Param boardId path bson.ObjectID true "Board ID"
-// @Param workspaceId query string true "Workspace ID"
+// @Param workspaceId path string true "Workspace ID"
 // @Param body path CreateBoard true "Edit board request"
-// @Param X-Authorization header string true "Bearer Token"
+// @Param Authorization header string true "Bearer Token"
 func editBoard(c *gin.Context) {
 	id, _ := c.Get("id")
 	boardId := c.Param("boardId")
@@ -139,8 +139,8 @@ func editBoard(c *gin.Context) {
 // @Success 200 {array} Board
 // @Produce json
 // @Tags Boards
-// @Param workspaceId query string true "Workspace ID"
-// @Param X-Authorization header string true "Bearer Token"
+// @Param workspaceId path string true "Workspace ID"
+// @Param Authorization header string true "Bearer Token"
 func getAllBoards(c *gin.Context) {
 	var cursor *mongo.Cursor
 	userId, _ := c.Get("id")
@@ -151,9 +151,9 @@ func getAllBoards(c *gin.Context) {
 	} else {
 		cursor, _ = boardsDb.Find(context.TODO(), bson.D{{"owned_by", userId}})
 	}
-    boards := make([]Board, 0)
-    _ = cursor.All(context.TODO(), &boards)
-    c.IndentedJSON(200, gin.H{"boards": boards})
+	boards := make([]Board, 0)
+	_ = cursor.All(context.TODO(), &boards)
+	c.IndentedJSON(200, gin.H{"boards": boards})
 	if err := cursor.Close(context.TODO()); err != nil {
 		log.Print("Failed to close cursor")
 	}

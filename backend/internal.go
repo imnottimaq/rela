@@ -55,12 +55,13 @@ func authMiddleware() gin.HandlerFunc {
 		if strings.Contains(c.Request.URL.Path, "/api/v1/docs") {
 			c.Next()
 		} else {
-			header := c.GetHeader("X-Authorization")
+			header := c.GetHeader("Authorization")
 			if header == "" {
 				c.AbortWithStatusJSON(403, gin.H{"error": "no access token"})
 				return
 			}
-			token, err := jwt.ParseWithClaims(header, &Token{}, func(token *jwt.Token) (any, error) {
+			trimmedHeader := strings.ReplaceAll(header, "Bearer ", "")
+			token, err := jwt.ParseWithClaims(trimmedHeader, &Token{}, func(token *jwt.Token) (any, error) {
 				if token.Method != jwt.SigningMethodHS256 {
 					return nil, fmt.Errorf("unknown signing method: %s", token.Method)
 				}
@@ -81,7 +82,6 @@ func authMiddleware() gin.HandlerFunc {
 			} else if claims.Type == "refresh" || claims.Type == "invite" {
 				c.AbortWithStatusJSON(400, "Invalid Token")
 			} else {
-				print(fmt.Sprintf("%v", claims.Id))
 				c.Set("id", claims.Id)
 				c.Next()
 			}

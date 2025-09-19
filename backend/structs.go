@@ -8,26 +8,26 @@ import (
 type Task struct {
 	Id          bson.ObjectID `json:"_id" bson:"_id,omitempty"`
 	Name        string        `json:"name" bson:"name"`
-	Description *string       `json:"description" bson:"description"`
+	Description string        `json:"description" bson:"description"`
 	CreatedAt   int64         `json:"created_at" bson:"created_at"`
 	CreatedBy   bson.ObjectID `json:"created_by" bson:"created_by"`
 	Board       bson.ObjectID `json:"board" bson:"board"`
 	AssignedTo  bson.ObjectID `json:"assigned_to" bson:"assigned_to"`
-	Deadline    *int64        `json:"deadline" bson:"deadline"`
+	Deadline    int64         `json:"deadline" bson:"deadline"`
 }
 
 type CreateTask struct {
 	Name        string        `json:"name" bson:"name"`
-	Description *string       `json:"description" bson:"description"`
+	Description string        `json:"description" bson:"description"`
 	Board       bson.ObjectID `json:"board" bson:"board"`
 }
 
 type EditTask struct {
-	Name        *string `json:"name" bson:"name"`
-	Description *string `json:"description" bson:"description"`
-	CompletedAt *int64  `json:"completed_at" bson:"completed_at"`
-	Board       *string `json:"board" bson:"board"`
-	Deadline    *int64  `json:"deadline" bson:"deadline"`
+	Name        string `json:"name" bson:"name"`
+	Description string `json:"description" bson:"description"`
+	CompletedAt int64  `json:"completed_at" bson:"completed_at"`
+	Board       string `json:"board" bson:"board"`
+	Deadline    int64  `json:"deadline" bson:"deadline"`
 }
 type User struct {
 	Avatar         string        `json:"avatar" bson:"avatar"`

@@ -52,6 +52,10 @@ func getAllowedOrigins() []string {
 	return origins
 }
 
+// @Title			Rela API Docs
+// @Description	Simple WIP task tracker that can be self-hosted
+// @Version		1.0
+// @BasePath		/api/v1
 func main() {
 	r := gin.Default()
 	corsConfig := cors.DefaultConfig()

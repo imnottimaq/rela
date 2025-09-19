@@ -1,3 +1,4 @@
+basePath: /api/v1
 definitions:
   main.AssignTask:
     properties:
@@ -99,20 +100,18 @@ definitions:
     type: object
 info:
   contact: {}
+  description: Simple WIP task tracker that can be self-hosted
+  title: Rela API Docs
+  version: "1.0"
 paths:
   /api/v1/boards:
     get:
       consumes:
       - application/json
       parameters:
-      - description: Workspace ID
-        in: query
-        name: workspaceId
-        required: true
-        type: string
       - description: Bearer Token
         in: header
-        name: X-Authorization
+        name: Authorization
         required: true
         type: string
       produces:
@@ -137,14 +136,9 @@ paths:
         required: true
         schema:
           $ref: '#/definitions/main.CreateBoard'
-      - description: Workspace ID
-        in: query
-        name: workspaceId
-        required: true
-        type: string
       - description: Bearer Token
         in: header
-        name: X-Authorization
+        name: Authorization
         required: true
         type: string
       produces:
@@ -160,14 +154,9 @@ paths:
       consumes:
       - application/json
       parameters:
-      - description: Workspace ID
-        in: query
-        name: workspaceId
-        required: true
-        type: string
       - description: Bearer Token
         in: header
-        name: X-Authorization
+        name: Authorization
         required: true
         type: string
       produces:
@@ -182,14 +171,9 @@ paths:
       consumes:
       - application/json
       parameters:
-      - description: Workspace ID
-        in: query
-        name: workspaceId
-        required: true
-        type: string
       - description: Bearer Token
         in: header
-        name: X-Authorization
+        name: Authorization
         required: true
         type: string
       produces:
@@ -204,14 +188,9 @@ paths:
     get:
       description: Return all tasks that current user owns
       parameters:
-      - description: Workspace ID
-        in: query
-        name: workspaceId
-        required: true
-        type: string
       - description: Bearer Token
         in: header
-        name: X-Authorization
+        name: Authorization
         required: true
         type: string
       produces:
@@ -236,14 +215,9 @@ paths:
         required: true
         schema:
           $ref: '#/definitions/main.CreateTask'
-      - description: Workspace ID
-        in: query
-        name: workspaceId
-        required: true
-        type: string
       - description: Bearer Token
         in: header
-        name: X-Authorization
+        name: Authorization
         required: true
         type: string
       produces:
@@ -261,14 +235,9 @@ paths:
   /api/v1/tasks/{taskId}:
     delete:
       parameters:
-      - description: Workspace ID
-        in: query
-        name: workspaceId
-        required: true
-        type: string
       - description: Bearer Token
         in: header
-        name: X-Authorization
+        name: Authorization
         required: true
         type: string
       produces:
@@ -283,11 +252,6 @@ paths:
       consumes:
       - application/json
       parameters:
-      - description: Workspace ID
-        in: query
-        name: workspaceId
-        required: true
-        type: string
       - description: Edit task request
         in: body
         name: data
@@ -296,7 +260,7 @@ paths:
           $ref: '#/definitions/main.EditTask'
       - description: Bearer Token
         in: header
-        name: X-Authorization
+        name: Authorization
         required: true
         type: string
       responses:
@@ -341,7 +305,7 @@ paths:
           $ref: '#/definitions/main.LoginUser'
       - description: Bearer Token
         in: header
-        name: X-Authorization
+        name: Authorization
         required: true
         type: string
       responses:
@@ -356,7 +320,7 @@ paths:
       parameters:
       - description: Bearer Token
         in: header
-        name: X-Authorization
+        name: Authorization
         required: true
         type: string
       produces:
@@ -401,12 +365,12 @@ paths:
       parameters:
       - description: Avatar
         in: formData
-        name: image
+        name: data
         required: true
-        type: string
+        type: file
       - description: Bearer Token
         in: header
-        name: X-Authorization
+        name: Authorization
         required: true
         type: string
       responses:
@@ -415,12 +379,12 @@ paths:
       summary: Upload avatar for user
       tags:
       - Users
-  /api/v1/users/workspaces/:
+  /api/v1/users/workspaces:
     get:
       parameters:
       - description: Bearer Token
         in: header
-        name: X-Authorization
+        name: Authorization
         required: true
         type: string
       responses:
@@ -434,11 +398,11 @@ paths:
       parameters:
       - description: Bearer Token
         in: header
-        name: X-Authorization
+        name: Authorization
         required: true
         type: string
       - description: Workspace ID
-        in: query
+        in: path
         name: workspaceId
         required: true
         type: string
@@ -452,11 +416,11 @@ paths:
       parameters:
       - description: Bearer Token
         in: header
-        name: X-Authorization
+        name: Authorization
         required: true
         type: string
       - description: Workspace ID
-        in: query
+        in: path
         name: workspaceId
         required: true
         type: string
@@ -479,11 +443,11 @@ paths:
           $ref: '#/definitions/main.AssignTask'
       - description: Bearer Token
         in: header
-        name: X-Authorization
+        name: Authorization
         required: true
         type: string
       - description: Workspace ID
-        in: query
+        in: path
         name: workspaceId
         required: true
         type: string
@@ -499,13 +463,13 @@ paths:
       - application/json
       parameters:
       - description: Workspace ID
-        in: query
+        in: path
         name: workspaceId
         required: true
         type: string
       - description: Bearer Token
         in: header
-        name: X-Authorization
+        name: Authorization
         required: true
         type: string
       produces:
@@ -531,13 +495,13 @@ paths:
         schema:
           $ref: '#/definitions/main.CreateBoard'
       - description: Workspace ID
-        in: query
+        in: path
         name: workspaceId
         required: true
         type: string
       - description: Bearer Token
         in: header
-        name: X-Authorization
+        name: Authorization
         required: true
         type: string
       produces:
@@ -554,13 +518,13 @@ paths:
       - application/json
       parameters:
       - description: Workspace ID
-        in: query
+        in: path
         name: workspaceId
         required: true
         type: string
       - description: Bearer Token
         in: header
-        name: X-Authorization
+        name: Authorization
         required: true
         type: string
       produces:
@@ -576,13 +540,13 @@ paths:
       - application/json
       parameters:
       - description: Workspace ID
-        in: query
+        in: path
         name: workspaceId
         required: true
         type: string
       - description: Bearer Token
         in: header
-        name: X-Authorization
+        name: Authorization
         required: true
         type: string
       produces:
@@ -598,11 +562,11 @@ paths:
       parameters:
       - description: Bearer Token
         in: header
-        name: X-Authorization
+        name: Authorization
         required: true
         type: string
       - description: Workspace ID
-        in: query
+        in: path
         name: workspaceId
         required: true
         type: string
@@ -617,11 +581,11 @@ paths:
       parameters:
       - description: Bearer Token
         in: header
-        name: X-Authorization
+        name: Authorization
         required: true
         type: string
       - description: Workspace ID
-        in: query
+        in: path
         name: workspaceId
         required: true
         type: string
@@ -636,11 +600,11 @@ paths:
       parameters:
       - description: Bearer Token
         in: header
-        name: X-Authorization
+        name: Authorization
         required: true
         type: string
       - description: Workspace ID
-        in: query
+        in: path
         name: workspaceId
         required: true
         type: string
@@ -655,16 +619,16 @@ paths:
       parameters:
       - description: Bearer Token
         in: header
-        name: X-Authorization
+        name: Authorization
         required: true
         type: string
       - description: Workspace ID
-        in: query
+        in: path
         name: workspaceId
         required: true
         type: string
       - description: User ID
-        in: query
+        in: path
         name: userId
         required: true
         type: string
@@ -679,13 +643,13 @@ paths:
       description: Return all tasks that current user owns
       parameters:
       - description: Workspace ID
-        in: query
+        in: path
         name: workspaceId
         required: true
         type: string
       - description: Bearer Token
         in: header
-        name: X-Authorization
+        name: Authorization
         required: true
         type: string
       produces:
@@ -711,13 +675,13 @@ paths:
         schema:
           $ref: '#/definitions/main.CreateTask'
       - description: Workspace ID
-        in: query
+        in: path
         name: workspaceId
         required: true
         type: string
       - description: Bearer Token
         in: header
-        name: X-Authorization
+        name: Authorization
         required: true
         type: string
       produces:
@@ -736,13 +700,13 @@ paths:
     delete:
       parameters:
       - description: Workspace ID
-        in: query
+        in: path
         name: workspaceId
         required: true
         type: string
       - description: Bearer Token
         in: header
-        name: X-Authorization
+        name: Authorization
         required: true
         type: string
       produces:
@@ -758,7 +722,7 @@ paths:
       - application/json
       parameters:
       - description: Workspace ID
-        in: query
+        in: path
         name: workspaceId
         required: true
         type: string
@@ -770,7 +734,7 @@ paths:
           $ref: '#/definitions/main.EditTask'
       - description: Bearer Token
         in: header
-        name: X-Authorization
+        name: Authorization
         required: true
         type: string
       responses:
@@ -779,16 +743,42 @@ paths:
       summary: Edit existing task
       tags:
       - Tasks
+  /api/v1/workspaces/{workspaceId}/upload_avatar:
+    post:
+      consumes:
+      - multipart/form-data
+      parameters:
+      - description: Avatar
+        in: formData
+        name: data
+        required: true
+        type: file
+      - description: Workspace ID
+        in: path
+        name: workspaceId
+        required: true
+        type: string
+      - description: Bearer Token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+      summary: Upload avatar for user
+      tags:
+      - Users
   /api/v1/workspaces/add/{joinToken}:
     post:
       parameters:
       - description: Bearer Token
         in: header
-        name: X-Authorization
+        name: Authorization
         required: true
         type: string
       - description: Join Token
-        in: query
+        in: path
         name: joinToken
         required: true
         type: string
@@ -811,7 +801,7 @@ paths:
           $ref: '#/definitions/main.CreateBoard'
       - description: Bearer Token
         in: header
-        name: X-Authorization
+        name: Authorization
         required: true
         type: string
       responses:

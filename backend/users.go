@@ -31,7 +31,7 @@ func createUser(c *gin.Context) {
 	randomBytes := make([]byte, 32)
 	_, err := rand.Read(randomBytes)
 	if err != nil {
-		c.AbortWithStatusJSON(500, gin.H{"error": "Internal server error"})
+		c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
 		return
 	}
 	generatedSalt := base64.URLEncoding.EncodeToString(randomBytes)
@@ -69,7 +69,7 @@ func createUser(c *gin.Context) {
 		if errors.Is(err, mongo.ErrNoDocuments) {
 			user, err := usersDb.InsertOne(context.TODO(), &newUser)
 			if err != nil {
-				c.AbortWithStatusJSON(500, gin.H{"error": "Internal server error"})
+				c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
 				return
 			}
 			refreshToken := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
@@ -79,23 +79,24 @@ func createUser(c *gin.Context) {
 			signedRefreshToken, err := refreshToken.SignedString([]byte(pepper))
 			if err != nil {
 				fmt.Println(err)
-				c.AbortWithStatusJSON(500, gin.H{"error": "Internal server error"})
+				c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
 				return
 			} else {
 				c.SetCookie("refreshToken", signedRefreshToken, 604800, "/", "", false, true)
 				bearerToken, err := generateAccessToken(signedRefreshToken, "access")
 				if err != nil {
 					fmt.Println(err)
-					c.AbortWithStatusJSON(500, gin.H{"error": "Internal server error"})
+					c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
 					return
 				}
 				c.AbortWithStatusJSON(200, gin.H{"token": bearerToken})
 				return
 			}
 		}
+	} else {
+		c.AbortWithStatusJSON(409, gin.H{"error": "User with that email already exists"})
+		return
 	}
-	c.AbortWithStatusJSON(400, gin.H{"error": "Bad request"})
-	return
 }
 
 // @Summary Login user
@@ -114,7 +115,7 @@ func loginUser(c *gin.Context) {
 			c.AbortWithStatusJSON(404, gin.H{"error": "User doesnt exist"})
 			return
 		} else {
-			c.AbortWithStatusJSON(500, gin.H{"error": "Internal server error"})
+			c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
 			return
 		}
 	}
@@ -125,13 +126,13 @@ func loginUser(c *gin.Context) {
 		})
 		signedRefreshToken, err := refreshToken.SignedString([]byte(pepper))
 		if err != nil {
-			c.AbortWithStatusJSON(500, gin.H{"error": "Internal server error"})
+			c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
 			return
 		} else {
 			c.SetCookie("refreshToken", signedRefreshToken, 604800, "/", "", false, true)
 			bearerToken, err := generateAccessToken(signedRefreshToken, "access")
 			if err != nil {
-				c.AbortWithStatusJSON(500, gin.H{"error": "Internal server error"})
+				c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
 				return
 			}
 			c.JSON(200, gin.H{"token": bearerToken})
@@ -146,7 +147,7 @@ func loginUser(c *gin.Context) {
 // @Success 200
 // @Tags Users
 // @Param data body LoginUser true "Delete user request"
-// @Param X-Authorization header string true "Bearer Token"
+// @Param Authorization header string true "Bearer Token"
 func deleteUser(c *gin.Context) {
 	userId, _ := c.Get("id")
 	middlewareInput, _ := c.Get("input")
@@ -181,9 +182,9 @@ func deleteUser(c *gin.Context) {
 // @Accept mpfd
 // @Success 200
 // @Tags Users
-// @Param image formData string true "Avatar"
-// @Param workspaceId query string true "Workspace ID"
-// @Param X-Authorization header string true "Bearer Token"
+// @Param data formData file true "Avatar"
+// @Param workspaceId path string true "Workspace ID"
+// @Param Authorization header string true "Bearer Token"
 func uploadAvatar(c *gin.Context) {
 	if _, err := os.Stat("./img/"); err != nil {
 		if os.IsNotExist(err) {
@@ -196,7 +197,8 @@ func uploadAvatar(c *gin.Context) {
 		}
 	}
 	userId, _ := c.Get("id")
-	workspaceId := c.Param("workspaceId")
+	wId := c.Param("workspaceId")
+	workspaceId, _ := bson.ObjectIDFromHex(wId)
 	avatar, err := c.FormFile("img")
 	if err != nil {
 		fmt.Printf(fmt.Sprintf("%v", err))
@@ -208,19 +210,19 @@ func uploadAvatar(c *gin.Context) {
 	}
 	filename := filepath.Join("img", "/"+fmt.Sprintf("%v", uuid.New()))
 	if err := c.SaveUploadedFile(avatar, filename); err != nil {
-		c.AbortWithStatusJSON(500, gin.H{"error": "Error while saving image"})
+		c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
 		return
 	}
-	if workspaceId == "" {
+	if workspaceId.IsZero() {
 		user := User{}
 		if err := usersDb.FindOne(context.TODO(), bson.D{{"_id", userId}}).Decode(&user); err != nil {
-			c.AbortWithStatusJSON(500, gin.H{"error": "Failed to find user"})
+			c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
 			return
 		}
 		user.Avatar = filename
 		_, err = usersDb.ReplaceOne(context.TODO(), bson.D{{"_id", userId}}, user)
 		if err != nil {
-			c.AbortWithStatusJSON(500, gin.H{"error": "Failed to pin image to user"})
+			c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
 			err = os.Remove("./img/" + filename)
 			if err != nil {
 				log.Fatal("Failed to remove avatar")
@@ -231,17 +233,17 @@ func uploadAvatar(c *gin.Context) {
 		user := Workspace{}
 		if err := workspacesDb.FindOne(context.TODO(), bson.D{{"_id", workspaceId}}).Decode(&user); err != nil {
 			if errors.Is(err, mongo.ErrNoDocuments) {
-				c.AbortWithStatusJSON(404, gin.H{"error": "Not Found"})
+				c.AbortWithStatusJSON(404, gin.H{"error": "Workspace doesnt exist"})
 				return
 			} else {
-				c.AbortWithStatusJSON(500, gin.H{"error": "Failed to find workspace"})
+				c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
 				return
 			}
 		}
 		user.Avatar = filename
 		_, err = workspacesDb.ReplaceOne(context.TODO(), bson.D{{"_id", workspaceId}}, user)
 		if err != nil {
-			c.AbortWithStatusJSON(500, gin.H{"error": "Failed to pin image to user"})
+			c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
 			err = os.Remove("./img/" + filename)
 			if err != nil {
 				log.Fatal("Failed to remove avatar")
@@ -292,7 +294,7 @@ func refreshAccessToken(c *gin.Context) {
 // @Success 200 {array} User
 // @Produce json
 // @Tags Users
-// @Param X-Authorization header string true "Bearer Token"
+// @Param Authorization header string true "Bearer Token"
 func getUserDetails(c *gin.Context) {
 	userId, _ := c.Get("id")
 	var user User

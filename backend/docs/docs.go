@@ -30,15 +30,8 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Workspace ID",
-                        "name": "workspaceId",
-                        "in": "query",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
                         "description": "Bearer Token",
-                        "name": "X-Authorization",
+                        "name": "Authorization",
                         "in": "header",
                         "required": true
                     }
@@ -78,15 +71,8 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "Workspace ID",
-                        "name": "workspaceId",
-                        "in": "query",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
                         "description": "Bearer Token",
-                        "name": "X-Authorization",
+                        "name": "Authorization",
                         "in": "header",
                         "required": true
                     }
@@ -113,15 +99,8 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Workspace ID",
-                        "name": "workspaceId",
-                        "in": "query",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
                         "description": "Bearer Token",
-                        "name": "X-Authorization",
+                        "name": "Authorization",
                         "in": "header",
                         "required": true
                     }
@@ -146,15 +125,8 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Workspace ID",
-                        "name": "workspaceId",
-                        "in": "query",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
                         "description": "Bearer Token",
-                        "name": "X-Authorization",
+                        "name": "Authorization",
                         "in": "header",
                         "required": true
                     }
@@ -179,15 +151,8 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Workspace ID",
-                        "name": "workspaceId",
-                        "in": "query",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
                         "description": "Bearer Token",
-                        "name": "X-Authorization",
+                        "name": "Authorization",
                         "in": "header",
                         "required": true
                     }
@@ -227,15 +192,8 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "Workspace ID",
-                        "name": "workspaceId",
-                        "in": "query",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
                         "description": "Bearer Token",
-                        "name": "X-Authorization",
+                        "name": "Authorization",
                         "in": "header",
                         "required": true
                     }
@@ -265,15 +223,8 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Workspace ID",
-                        "name": "workspaceId",
-                        "in": "query",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
                         "description": "Bearer Token",
-                        "name": "X-Authorization",
+                        "name": "Authorization",
                         "in": "header",
                         "required": true
                     }
@@ -294,13 +245,6 @@ const docTemplate = `{
                 "summary": "Edit existing task",
                 "parameters": [
                     {
-                        "type": "string",
-                        "description": "Workspace ID",
-                        "name": "workspaceId",
-                        "in": "query",
-                        "required": true
-                    },
-                    {
                         "description": "Edit task request",
                         "name": "data",
                         "in": "body",
@@ -312,7 +256,7 @@ const docTemplate = `{
                     {
                         "type": "string",
                         "description": "Bearer Token",
-                        "name": "X-Authorization",
+                        "name": "Authorization",
                         "in": "header",
                         "required": true
                     }
@@ -382,7 +326,7 @@ const docTemplate = `{
                     {
                         "type": "string",
                         "description": "Bearer Token",
-                        "name": "X-Authorization",
+                        "name": "Authorization",
                         "in": "header",
                         "required": true
                     }
@@ -408,7 +352,7 @@ const docTemplate = `{
                     {
                         "type": "string",
                         "description": "Bearer Token",
-                        "name": "X-Authorization",
+                        "name": "Authorization",
                         "in": "header",
                         "required": true
                     }
@@ -473,16 +417,16 @@ const docTemplate = `{
                 "summary": "Upload avatar for user",
                 "parameters": [
                     {
-                        "type": "string",
+                        "type": "file",
                         "description": "Avatar",
-                        "name": "image",
+                        "name": "data",
                         "in": "formData",
                         "required": true
                     },
                     {
                         "type": "string",
                         "description": "Bearer Token",
-                        "name": "X-Authorization",
+                        "name": "Authorization",
                         "in": "header",
                         "required": true
                     }
@@ -494,7 +438,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/users/workspaces/": {
+        "/api/v1/users/workspaces": {
             "get": {
                 "tags": [
                     "Workspaces"
@@ -504,7 +448,7 @@ const docTemplate = `{
                     {
                         "type": "string",
                         "description": "Bearer Token",
-                        "name": "X-Authorization",
+                        "name": "Authorization",
                         "in": "header",
                         "required": true
                     }
@@ -526,7 +470,7 @@ const docTemplate = `{
                     {
                         "type": "string",
                         "description": "Bearer Token",
-                        "name": "X-Authorization",
+                        "name": "Authorization",
                         "in": "header",
                         "required": true
                     },
@@ -534,7 +478,7 @@ const docTemplate = `{
                         "type": "string",
                         "description": "Join Token",
                         "name": "joinToken",
-                        "in": "query",
+                        "in": "path",
                         "required": true
                     }
                 ],
@@ -567,7 +511,7 @@ const docTemplate = `{
                     {
                         "type": "string",
                         "description": "Bearer Token",
-                        "name": "X-Authorization",
+                        "name": "Authorization",
                         "in": "header",
                         "required": true
                     }
@@ -589,7 +533,7 @@ const docTemplate = `{
                     {
                         "type": "string",
                         "description": "Bearer Token",
-                        "name": "X-Authorization",
+                        "name": "Authorization",
                         "in": "header",
                         "required": true
                     },
@@ -597,7 +541,7 @@ const docTemplate = `{
                         "type": "string",
                         "description": "Workspace ID",
                         "name": "workspaceId",
-                        "in": "query",
+                        "in": "path",
                         "required": true
                     }
                 ],
@@ -616,7 +560,7 @@ const docTemplate = `{
                     {
                         "type": "string",
                         "description": "Bearer Token",
-                        "name": "X-Authorization",
+                        "name": "Authorization",
                         "in": "header",
                         "required": true
                     },
@@ -624,7 +568,7 @@ const docTemplate = `{
                         "type": "string",
                         "description": "Workspace ID",
                         "name": "workspaceId",
-                        "in": "query",
+                        "in": "path",
                         "required": true
                     }
                 ],
@@ -657,7 +601,7 @@ const docTemplate = `{
                     {
                         "type": "string",
                         "description": "Bearer Token",
-                        "name": "X-Authorization",
+                        "name": "Authorization",
                         "in": "header",
                         "required": true
                     },
@@ -665,7 +609,7 @@ const docTemplate = `{
                         "type": "string",
                         "description": "Workspace ID",
                         "name": "workspaceId",
-                        "in": "query",
+                        "in": "path",
                         "required": true
                     }
                 ],
@@ -693,13 +637,13 @@ const docTemplate = `{
                         "type": "string",
                         "description": "Workspace ID",
                         "name": "workspaceId",
-                        "in": "query",
+                        "in": "path",
                         "required": true
                     },
                     {
                         "type": "string",
                         "description": "Bearer Token",
-                        "name": "X-Authorization",
+                        "name": "Authorization",
                         "in": "header",
                         "required": true
                     }
@@ -741,13 +685,13 @@ const docTemplate = `{
                         "type": "string",
                         "description": "Workspace ID",
                         "name": "workspaceId",
-                        "in": "query",
+                        "in": "path",
                         "required": true
                     },
                     {
                         "type": "string",
                         "description": "Bearer Token",
-                        "name": "X-Authorization",
+                        "name": "Authorization",
                         "in": "header",
                         "required": true
                     }
@@ -776,13 +720,13 @@ const docTemplate = `{
                         "type": "string",
                         "description": "Workspace ID",
                         "name": "workspaceId",
-                        "in": "query",
+                        "in": "path",
                         "required": true
                     },
                     {
                         "type": "string",
                         "description": "Bearer Token",
-                        "name": "X-Authorization",
+                        "name": "Authorization",
                         "in": "header",
                         "required": true
                     }
@@ -809,13 +753,13 @@ const docTemplate = `{
                         "type": "string",
                         "description": "Workspace ID",
                         "name": "workspaceId",
-                        "in": "query",
+                        "in": "path",
                         "required": true
                     },
                     {
                         "type": "string",
                         "description": "Bearer Token",
-                        "name": "X-Authorization",
+                        "name": "Authorization",
                         "in": "header",
                         "required": true
                     }
@@ -837,7 +781,7 @@ const docTemplate = `{
                     {
                         "type": "string",
                         "description": "Bearer Token",
-                        "name": "X-Authorization",
+                        "name": "Authorization",
                         "in": "header",
                         "required": true
                     },
@@ -845,7 +789,7 @@ const docTemplate = `{
                         "type": "string",
                         "description": "Workspace ID",
                         "name": "workspaceId",
-                        "in": "query",
+                        "in": "path",
                         "required": true
                     }
                 ],
@@ -866,7 +810,7 @@ const docTemplate = `{
                     {
                         "type": "string",
                         "description": "Bearer Token",
-                        "name": "X-Authorization",
+                        "name": "Authorization",
                         "in": "header",
                         "required": true
                     },
@@ -874,7 +818,7 @@ const docTemplate = `{
                         "type": "string",
                         "description": "Workspace ID",
                         "name": "workspaceId",
-                        "in": "query",
+                        "in": "path",
                         "required": true
                     }
                 ],
@@ -895,7 +839,7 @@ const docTemplate = `{
                     {
                         "type": "string",
                         "description": "Bearer Token",
-                        "name": "X-Authorization",
+                        "name": "Authorization",
                         "in": "header",
                         "required": true
                     },
@@ -903,7 +847,7 @@ const docTemplate = `{
                         "type": "string",
                         "description": "Workspace ID",
                         "name": "workspaceId",
-                        "in": "query",
+                        "in": "path",
                         "required": true
                     }
                 ],
@@ -924,7 +868,7 @@ const docTemplate = `{
                     {
                         "type": "string",
                         "description": "Bearer Token",
-                        "name": "X-Authorization",
+                        "name": "Authorization",
                         "in": "header",
                         "required": true
                     },
@@ -932,14 +876,14 @@ const docTemplate = `{
                         "type": "string",
                         "description": "Workspace ID",
                         "name": "workspaceId",
-                        "in": "query",
+                        "in": "path",
                         "required": true
                     },
                     {
                         "type": "string",
                         "description": "User ID",
                         "name": "userId",
-                        "in": "query",
+                        "in": "path",
                         "required": true
                     }
                 ],
@@ -965,13 +909,13 @@ const docTemplate = `{
                         "type": "string",
                         "description": "Workspace ID",
                         "name": "workspaceId",
-                        "in": "query",
+                        "in": "path",
                         "required": true
                     },
                     {
                         "type": "string",
                         "description": "Bearer Token",
-                        "name": "X-Authorization",
+                        "name": "Authorization",
                         "in": "header",
                         "required": true
                     }
@@ -1013,13 +957,13 @@ const docTemplate = `{
                         "type": "string",
                         "description": "Workspace ID",
                         "name": "workspaceId",
-                        "in": "query",
+                        "in": "path",
                         "required": true
                     },
                     {
                         "type": "string",
                         "description": "Bearer Token",
-                        "name": "X-Authorization",
+                        "name": "Authorization",
                         "in": "header",
                         "required": true
                     }
@@ -1051,13 +995,13 @@ const docTemplate = `{
                         "type": "string",
                         "description": "Workspace ID",
                         "name": "workspaceId",
-                        "in": "query",
+                        "in": "path",
                         "required": true
                     },
                     {
                         "type": "string",
                         "description": "Bearer Token",
-                        "name": "X-Authorization",
+                        "name": "Authorization",
                         "in": "header",
                         "required": true
                     }
@@ -1081,7 +1025,7 @@ const docTemplate = `{
                         "type": "string",
                         "description": "Workspace ID",
                         "name": "workspaceId",
-                        "in": "query",
+                        "in": "path",
                         "required": true
                     },
                     {
@@ -1096,7 +1040,46 @@ const docTemplate = `{
                     {
                         "type": "string",
                         "description": "Bearer Token",
-                        "name": "X-Authorization",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    }
+                }
+            }
+        },
+        "/api/v1/workspaces/{workspaceId}/upload_avatar": {
+            "post": {
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "tags": [
+                    "Users"
+                ],
+                "summary": "Upload avatar for user",
+                "parameters": [
+                    {
+                        "type": "file",
+                        "description": "Avatar",
+                        "name": "data",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Workspace ID",
+                        "name": "workspaceId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Bearer Token",
+                        "name": "Authorization",
                         "in": "header",
                         "required": true
                     }
@@ -1267,12 +1250,12 @@ const docTemplate = `{
 
 // SwaggerInfo holds exported Swagger Info so clients can modify it
 var SwaggerInfo = &swag.Spec{
-	Version:          "",
+	Version:          "1.0",
 	Host:             "",
-	BasePath:         "",
+	BasePath:         "/api/v1",
 	Schemes:          []string{},
-	Title:            "",
-	Description:      "",
+	Title:            "Rela API Docs",
+	Description:      "Simple WIP task tracker that can be self-hosted",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",
