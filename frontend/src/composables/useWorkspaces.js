@@ -18,6 +18,7 @@ export const refreshWorkspaces = async () => {
     const { data } = await authApi.getUserWorkspaces();
     const list = Array.isArray(data?.workspaces) ? data.workspaces : [];
     workspaces.value = list;
+    restoreWorkspaceWindowsFromStorage();
   } catch (err) {
     console.error("Failed to load workspaces", err);
     workspaces.value = [];
@@ -57,6 +58,36 @@ onAuthStateChange((hasToken) => {
   }
 });
 
+// Helpers to keep window visibility persisted based on WindowComponent storage
+const storageKeyForWorkspace = (ws) => {
+  const id = ws?._id || ws?.id || ws?.Id || ws?.name;
+  return id ? `rela-window-workspace-${id}` : null;
+};
+
+const restoreWorkspaceWindowsFromStorage = () => {
+  if (typeof window === "undefined") return;
+  const existingIds = new Set(openWorkspaceWindows.value.map((w) => w.id));
+  for (const ws of workspaces.value || []) {
+    const key = storageKeyForWorkspace(ws);
+    if (!key) continue;
+    try {
+      const raw = window.localStorage.getItem(key);
+      if (!raw) continue;
+      const parsed = JSON.parse(raw);
+      const visible = Boolean(parsed?.visible);
+      if (visible) {
+        const id = ws._id || ws.id || ws.Id || ws.name;
+        if (!existingIds.has(id)) {
+          openWorkspaceWindows.value.push({ id, name: ws.name || String(id), visible: true });
+          existingIds.add(id);
+        }
+      }
+    } catch (_) {
+      // ignore parsing errors
+    }
+  }
+};
+
 export function useWorkspaces() {
   return {
     workspaces,
@@ -68,4 +99,3 @@ export function useWorkspaces() {
     closeWorkspaceWindow,
   };
 }
-
