@@ -7,6 +7,7 @@ const DEFAULT_REFRESH_PATH = "/users/refresh";
 const REFRESH_PATH = import.meta.env.VITE_API_REFRESH_PATH || DEFAULT_REFRESH_PATH;
 
 const authStateListeners = new Set();
+const RETRY_FLAG = "__relaRetry403";
 
 const notifyAuthStateChange = (hasToken) => {
   authStateListeners.forEach((listener) => {
@@ -30,6 +31,7 @@ export const onAuthStateChange = (listener) => {
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL || "",
+  withCredentials: true
 });
 
 let refreshRequest = null;
@@ -51,9 +53,22 @@ export const getRefreshToken = () => {
   return storage ? storage.getItem(REFRESH_TOKEN_KEY) : null;
 };
 
+const setDefaultAuthHeader = (token) => {
+  if (token) {
+    apiClient.defaults.headers.common.Authorization = `Bearer ${token}`;
+    apiClient.defaults.headers.common["X-Authorization"] = token;
+    return;
+  }
+  delete apiClient.defaults.headers.common.Authorization;
+  delete apiClient.defaults.headers.common["X-Authorization"];
+};
+
 export const setAuthTokens = ({ accessToken, refreshToken }) => {
   const storage = getSafeStorage();
   if (!storage) {
+    if (typeof accessToken !== "undefined") {
+      setDefaultAuthHeader(accessToken || null);
+    }
     notifyAuthStateChange(Boolean(accessToken));
     return;
   }
@@ -63,17 +78,21 @@ export const setAuthTokens = ({ accessToken, refreshToken }) => {
   if (refreshToken) {
     storage.setItem(REFRESH_TOKEN_KEY, refreshToken);
   }
-  notifyAuthStateChange(Boolean(storage.getItem(ACCESS_TOKEN_KEY)));
+  const resultingAccessToken = storage.getItem(ACCESS_TOKEN_KEY);
+  setDefaultAuthHeader(resultingAccessToken);
+  notifyAuthStateChange(Boolean(resultingAccessToken));
 };
 
 export const clearAuthTokens = () => {
   const storage = getSafeStorage();
   if (!storage) {
+    setDefaultAuthHeader(null);
     notifyAuthStateChange(false);
     return;
   }
   storage.removeItem(ACCESS_TOKEN_KEY);
   storage.removeItem(REFRESH_TOKEN_KEY);
+  setDefaultAuthHeader(null);
   notifyAuthStateChange(false);
 };
 
@@ -137,12 +156,12 @@ apiClient.interceptors.response.use(
       return Promise.reject(error);
     }
 
-    if (response.status === 403 && !config._retry) {
-      config._retry = true;
+    if (response.status === 403 && !config[RETRY_FLAG]) {
+      config[RETRY_FLAG] = true;
       try {
         const newToken = await requestTokenRefresh();
-        applyAuthHeader(config, newToken);
-        return apiClient(config);
+        const updatedConfig = applyAuthHeader(config, newToken);
+        return apiClient(updatedConfig);
       } catch (refreshError) {
         return Promise.reject(refreshError);
       }

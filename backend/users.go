@@ -6,6 +6,11 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"log"
+	"os"
+	"path/filepath"
+	"time"
+
 	"github.com/gin-gonic/gin"
 	"github.com/goccy/go-json"
 	"github.com/golang-jwt/jwt/v5"
@@ -13,10 +18,6 @@ import (
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
 	"golang.org/x/crypto/argon2"
-	"log"
-	"os"
-	"path/filepath"
-	"time"
 )
 
 // @Summary Create new user
@@ -81,7 +82,7 @@ func createUser(c *gin.Context) {
 				c.AbortWithStatusJSON(500, gin.H{"error": "Internal server error"})
 				return
 			} else {
-				c.SetCookie("refreshToken", signedRefreshToken, 604800, "/", "", true, true)
+				c.SetCookie("refreshToken", signedRefreshToken, 604800, "/", "", false, true)
 				bearerToken, err := generateAccessToken(signedRefreshToken, "access")
 				if err != nil {
 					fmt.Println(err)
@@ -127,7 +128,7 @@ func loginUser(c *gin.Context) {
 			c.AbortWithStatusJSON(500, gin.H{"error": "Internal server error"})
 			return
 		} else {
-			c.SetCookie("refreshToken", signedRefreshToken, 604800, "/", "", true, true)
+			c.SetCookie("refreshToken", signedRefreshToken, 604800, "/", "", false, true)
 			bearerToken, err := generateAccessToken(signedRefreshToken, "access")
 			if err != nil {
 				c.AbortWithStatusJSON(500, gin.H{"error": "Internal server error"})

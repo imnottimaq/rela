@@ -3,7 +3,7 @@
     title="Profile"
     v-model:visible="profileVisible"
     storage-key="rela-window-profile"
-    :initial-size="{ width: 300, height: 320 }"
+    :initial-size="{ width: 350, height: 370 }"
     :min-size="{ width: 300, height: 320 }"
     footer-buttons-align="right"
     :footer-buttons="footerButtons"
@@ -33,7 +33,7 @@
           <span class="label">Created:</span>
           <span class="value">{{ formatDate(profile.createdAt) }}</span>
         </div>
-        <img src="https://cataas.com/cat/gif" alt="Random Cat" height="100%" style="aspect-ratio: 1 / 1; object-fit: cover;" />
+        <img src="https://cataas.com/cat?height=250&width=350" alt="Random Cat" class="cat-image" />
       </template>
       <template v-else>
         <p>No profile data available.</p>
@@ -152,4 +152,15 @@ const footerButtons = computed(() => [
 .error {
   color: #d00000;
 }
+
+.cat-image {
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+  display: block;
+  object-fit: contain;
+  margin: 0 auto;
+}
+
 </style>

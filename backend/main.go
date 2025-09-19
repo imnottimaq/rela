@@ -6,6 +6,7 @@ import (
 	_ "net/http/pprof"
 	"os"
 	"regexp"
+	"strings"
 	"time"
 
 	"go.mongodb.org/mongo-driver/v2/mongo"
@@ -23,6 +24,7 @@ var _ = godotenv.Load(".env_local")
 var port = os.Getenv("PORT")
 var pepper = os.Getenv("PEPPER")
 var mongodbCredentials = os.Getenv("MONGO_CREDS")
+var frontendOriginEnv = os.Getenv("FRONTEND_ORIGINS")
 var dbClient, _ = mongo.Connect(options.Client().ApplyURI(mongodbCredentials).SetServerAPIOptions(options.ServerAPI(options.ServerAPIVersion1)))
 
 var tasksDb = dbClient.Database("rela").Collection("tasks")
@@ -39,12 +41,21 @@ func rateLimitHandler(c *gin.Context, info ratelimit.Info) {
 	c.AbortWithStatusJSON(429, gin.H{"error": "too many requests"})
 }
 
+func getAllowedOrigins() []string {
+	if frontendOriginEnv == "" {
+		return []string{"http://localhost:5173", "http://localhost:8000", "http://localhost:5174"}
+	}
+	origins := strings.Split(frontendOriginEnv, ",")
+	for i := range origins {
+		origins[i] = strings.TrimSpace(origins[i])
+	}
+	return origins
+}
+
 func main() {
 	r := gin.Default()
 	corsConfig := cors.DefaultConfig()
-	corsConfig.AllowOrigins = []string{
-		"*",
-	}
+	corsConfig.AllowOrigins = getAllowedOrigins()
 	corsConfig.AllowMethods = []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"}
 	corsConfig.AllowHeaders = []string{"Origin", "Content-Type", "Accept", "Authorization", "X-Requested-With", "X-Authorization"}
 	corsConfig.AllowCredentials = true
