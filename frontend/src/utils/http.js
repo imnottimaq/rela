@@ -85,7 +85,7 @@ const applyAuthHeader = (config, token) => {
   config.headers = {
     ...(config.headers || {}),
     Authorization: authHeader,
-    "X-Authorization": authHeader,
+    "X-Authorization": token,
   };
   return config;
 };

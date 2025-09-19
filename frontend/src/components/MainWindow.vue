@@ -22,6 +22,7 @@
 import WindowComponent from './WindowComponent.vue';
 import { showLoginWindow } from '../composables/useLoginWindow';
 import { showRegisterWindow } from '../composables/useRegisterWindow';
+import { showProfileWindow } from '../composables/useProfileWindow';
 import { computed, ref } from 'vue';
 import { useAuth } from '../composables/useAuth';
 
@@ -29,7 +30,7 @@ const mainVisible = ref(true);
 const { isAuthenticated, logout } = useAuth();
 
 const openProfile = () => {
-  console.log("Profile placeholder window");
+  showProfileWindow();
 };
 
 const openWorkspaceCreation = () => {
