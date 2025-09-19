@@ -3,12 +3,14 @@
     <MainWindow />
 
     <LoginWindow />
+    <RegisterWindow />
   </main>
 </template>
 
 <script setup>
 import MainWindow from './components/MainWindow.vue';
 import LoginWindow from './components/LoginWindow.vue';
+import RegisterWindow from './components/RegisterWindow.vue';
 import background from './assets/windows7.jpg';
 
 const mainStyle = `background-image: url(${background})`;

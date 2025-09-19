@@ -20,11 +20,8 @@
 <script setup>
 import WindowComponent from './WindowComponent.vue';
 import { showLoginWindow } from '../composables/useLoginWindow';
+import { showRegisterWindow } from '../composables/useRegisterWindow';
 import { ref } from 'vue';
-
-const test = () => {
-  alert("Test function");
-};
 
 const mainVisible = ref(true);
 
@@ -33,7 +30,7 @@ let windowMenu = [
     label: "Account",
     items: [
       { type: "button", label: "Login", onClick: showLoginWindow },
-      { type: "button", label: "Register", onClick: test}
+      { type: "button", label: "Register", onClick: showRegisterWindow }
     ],
   },
 ];
