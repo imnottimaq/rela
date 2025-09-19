@@ -127,11 +127,11 @@ apiClient.interceptors.response.use(
 );
 
 export const authApi = {
-  login(payload) {
-    return apiClient.post("/users/login", payload);
+  login(email, password) {
+    return apiClient.post("/users/login", { email, password });
   },
-  createUser(payload) {
-    return apiClient.post("/users/create", payload);
+  createUser(name, email, password) {
+    return apiClient.post("/users/create", { name, email, password });
   },
   deleteUser(payload) {
     return apiClient.delete("/users/delete", { data: payload });
