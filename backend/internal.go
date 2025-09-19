@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -9,6 +10,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
+	"io"
 	"regexp"
 	"strings"
 	"time"
@@ -122,26 +124,59 @@ func userMiddleware() gin.HandlerFunc {
 		if c.Request.URL.Path == "/api/v1/users/refresh" {
 			c.Next()
 		} else {
-			var input LoginUser
-			err := json.NewDecoder(c.Request.Body).Decode(&input)
+			bodyBytes, err := io.ReadAll(c.Request.Body)
 			if err != nil {
 				c.AbortWithStatusJSON(500, gin.H{"error": "Something went wrong when parsing request"})
 				return
 			}
-			if input.Email == "" {
-				c.AbortWithStatusJSON(400, gin.H{"error": "Email is required"})
-				return
-			} else if !emailRegex.MatchString(input.Email) {
-				c.AbortWithStatusJSON(400, gin.H{"error": "Bad email"})
-				return
-			} else if input.Password == "" {
-				c.AbortWithStatusJSON(400, gin.H{"error": "Password is required"})
-				return
-			} else if !validatePassword(input.Password) {
-				c.AbortWithStatusJSON(400, gin.H{"error": "Password does not meet requirements"})
-				return
+			c.Request.Body = io.NopCloser(bytes.NewReader(bodyBytes))
+			switch c.Request.URL.Path {
+			case "/api/v1/users/create":
+				var input CreateUser
+				if err := json.Unmarshal(bodyBytes, &input); err != nil {
+					c.AbortWithStatusJSON(500, gin.H{"error": "Something went wrong when parsing request"})
+					return
+				}
+				if input.Email == "" {
+					c.AbortWithStatusJSON(400, gin.H{"error": "Email is required"})
+					return
+				} else if !emailRegex.MatchString(input.Email) {
+					c.AbortWithStatusJSON(400, gin.H{"error": "Bad email"})
+					return
+				} else if input.Password == "" {
+					c.AbortWithStatusJSON(400, gin.H{"error": "Password is required"})
+					return
+				} else if !validatePassword(input.Password) {
+					c.AbortWithStatusJSON(400, gin.H{"error": "Password does not meet requirements"})
+					return
+				} else if input.Name == "" {
+					c.AbortWithStatusJSON(400, gin.H{"error": "Name is required"})
+					return
+				}
+				c.Set("createInput", input)
+			case "/api/v1/users/login":
+				fallthrough
+			default:
+				var input LoginUser
+				if err := json.Unmarshal(bodyBytes, &input); err != nil {
+					c.AbortWithStatusJSON(500, gin.H{"error": "Something went wrong when parsing request"})
+					return
+				}
+				if input.Email == "" {
+					c.AbortWithStatusJSON(400, gin.H{"error": "Email is required"})
+					return
+				} else if !emailRegex.MatchString(input.Email) {
+					c.AbortWithStatusJSON(400, gin.H{"error": "Bad email"})
+					return
+				} else if input.Password == "" {
+					c.AbortWithStatusJSON(400, gin.H{"error": "Password is required"})
+					return
+				} else if !validatePassword(input.Password) {
+					c.AbortWithStatusJSON(400, gin.H{"error": "Password does not meet requirements"})
+					return
+				}
+				c.Set("input", input)
 			}
-			c.Set("input", input)
 			c.Next()
 		}
 	}
