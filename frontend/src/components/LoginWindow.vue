@@ -9,8 +9,8 @@
         { label: 'Cancel', onClick: hideLoginWindow },
         { label: 'Login', onClick: login, primary: true }
       ]"
-      :initialSize="{ width: 200, height: 300 }"
-      :minSize="{ width: 200, height: 300 }"
+      :initialSize="{ width: 300, height: 370 }"
+      :minSize="{ width: 300, height: 370 }"
     >
     <div style="text-align: left; padding: 0 10px;">
         <h1>Login to your account</h1>
@@ -19,11 +19,14 @@
       <div class="group" style="width: 100%">
         <label for="email">Email</label>
         <input id="email" type="email" v-model="email" />
+        <p v-if="emailError" class="error">{{ emailError }}</p>
       </div>
       <div class="group" style="width: 100%">
         <label for="password">Password</label>
         <input id="password" type="password" v-model="password" />
+        <p v-if="passwordError" class="error">{{ passwordError }}</p>
        </div>
+      <p v-if="loginError" class="error">{{ loginError }}</p>
     </div>
       
     </WindowComponent>
@@ -38,17 +41,55 @@ const { loginVisible, hideLoginWindow } = useLoginWindow();
 
 const email = ref('');
 const password = ref('');
+const emailError = ref('');
+const passwordError = ref('');
+const loginError = ref('');
+
+const validateEmail = (value) => {
+  if (!value) {
+    return false;
+  }
+  const normalized = value.trim().toLowerCase();
+  const emailPattern = /^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/;
+  return emailPattern.test(normalized);
+};
+
+const validatePassword = (value) => {
+  if (!value || value.length < 8) {
+    return false;
+  }
+  const hasLower = /[a-z]/.test(value);
+  const hasUpper = /[A-Z]/.test(value);
+  const hasDigit = /\d/.test(value);
+  const hasSpecial = /[!"#$%&'()*+,\-./:;<=>?@[\\\]^_{|}~]/.test(value);
+  return hasLower && hasUpper && hasDigit && hasSpecial;
+};
 
 const login = async () => {
   try {
+    emailError.value = '';
+    passwordError.value = '';
+    loginError.value = '';
+
+    if (!validateEmail(email.value)) {
+      emailError.value = 'Please enter a valid email address (e.g. user@example.com).';
+    } else {
+      email.value = email.value.trim().toLowerCase();
+    }
+
+    if (!validatePassword(password.value)) {
+      passwordError.value = 'Password must be at least 8 characters and include upper, lower, digit, and special character.';
+    }
+
+    if (emailError.value || passwordError.value) {
+      return;
+    }
     let response = await authApi.login(email.value, password.value);
     console.log('Login successful:', response.data);
     hideLoginWindow();
   } catch (error) {
     console.error('Login failed:', error);
+    loginError.value = 'Login failed. Please check your credentials and try again.';
   }
 };
-
-
-
 </script>
