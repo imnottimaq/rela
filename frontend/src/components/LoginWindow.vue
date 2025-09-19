@@ -10,6 +10,7 @@
         { label: 'Login', onClick: hideLoginWindow }
       ]"
       :initialSize="{ width: 200, height: 300 }"
+      :minSize="{ width: 200, height: 300 }"
     >
     <div style="text-align: left; padding: 0 10px;">
         <h1>Login to your account</h1>

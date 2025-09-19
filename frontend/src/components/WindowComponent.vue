@@ -62,6 +62,11 @@ const allocateLayer = () => {
 const resolveNumber = (value, fallback) =>
   typeof value === "number" && !Number.isNaN(value) ? value : fallback;
 
+const resolveOptionalNumber = (value) =>
+  typeof value === "number" && Number.isFinite(value) ? value : null;
+
+const defaultMinSize = { width: 256, height: 128 };
+
 const props = defineProps({
   title: {
     type: String,
@@ -82,6 +87,14 @@ const props = defineProps({
   initialSize: {
     type: Object,
     default: () => ({ width: 600, height: 420 }),
+  },
+  minSize: {
+    type: Object,
+    default: () => ({ width: 240, height: 160 }),
+  },
+  maxSize: {
+    type: Object,
+    default: () => ({ width: null, height: null }),
   },
   visible: {
     type: Boolean,
@@ -111,8 +124,26 @@ const emit = defineEmits(["update:visible"]);
 
 const fallbackPosition = { x: 80, y: 80 };
 const fallbackSize = { width: 600, height: 420 };
-const minWidth = 240;
-const minHeight = 160;
+const maxOffscreenRatio = 0.7;
+const minVisibleRatio = 1 - maxOffscreenRatio;
+
+const minSize = computed(() => ({
+  width: Math.max(1, resolveNumber(props.minSize?.width, defaultMinSize.width)),
+  height: Math.max(1, resolveNumber(props.minSize?.height, defaultMinSize.height)),
+}));
+
+const maxSize = computed(() => {
+  const widthLimit = resolveOptionalNumber(props.maxSize?.width);
+  const heightLimit = resolveOptionalNumber(props.maxSize?.height);
+
+  const minWidthValue = minSize.value.width;
+  const minHeightValue = minSize.value.height;
+
+  return {
+    width: widthLimit !== null ? Math.max(widthLimit, minWidthValue) : null,
+    height: heightLimit !== null ? Math.max(heightLimit, minHeightValue) : null,
+  };
+});
 
 const position = reactive({
   x: resolveNumber(props.initialPosition?.x, fallbackPosition.x),
@@ -194,31 +225,53 @@ const clampDimension = (value, min, max) => {
   return Math.max(value, min);
 };
 
-const clampToViewport = () => {
+const clampToViewport = (forceFullyVisible = false) => {
   if (typeof window === "undefined") return;
 
   const viewportWidth = window.innerWidth;
   const viewportHeight = window.innerHeight;
 
-  if (viewportWidth < minWidth) {
+  const minWidthValue = minSize.value.width;
+  const minHeightValue = minSize.value.height;
+  const maxWidthValue = maxSize.value.width;
+  const maxHeightValue = maxSize.value.height;
+
+  if (viewportWidth < minWidthValue) {
     size.width = viewportWidth;
-    position.x = 0;
   } else {
-    size.width = clampDimension(size.width, minWidth, viewportWidth);
+    const effectiveMaxWidth = typeof maxWidthValue === "number"
+      ? Math.min(maxWidthValue, viewportWidth)
+      : viewportWidth;
+    size.width = clampDimension(size.width, minWidthValue, effectiveMaxWidth);
   }
 
-  if (viewportHeight < minHeight) {
+  if (viewportHeight < minHeightValue) {
     size.height = viewportHeight;
-    position.y = 0;
   } else {
-    size.height = clampDimension(size.height, minHeight, viewportHeight);
+    const effectiveMaxHeight = typeof maxHeightValue === "number"
+      ? Math.min(maxHeightValue, viewportHeight)
+      : viewportHeight;
+    size.height = clampDimension(size.height, minHeightValue, effectiveMaxHeight);
   }
 
-  const maxX = Math.max(0, viewportWidth - size.width);
-  const maxY = Math.max(0, viewportHeight - size.height);
+  const maxOverflowX = size.width * maxOffscreenRatio;
+  const maxOverflowY = size.height * maxOffscreenRatio;
 
-  position.x = Math.min(Math.max(position.x, 0), maxX);
-  position.y = Math.min(Math.max(position.y, 0), maxY);
+  const minX = forceFullyVisible
+    ? Math.min(0, viewportWidth - size.width)
+    : -maxOverflowX;
+  const maxX = forceFullyVisible
+    ? Math.max(0, viewportWidth - size.width)
+    : viewportWidth - size.width * minVisibleRatio;
+  const minY = forceFullyVisible
+    ? Math.min(0, viewportHeight - size.height)
+    : -maxOverflowY;
+  const maxY = forceFullyVisible
+    ? Math.max(0, viewportHeight - size.height)
+    : viewportHeight - size.height * minVisibleRatio;
+
+  position.x = Math.min(Math.max(position.x, minX), maxX);
+  position.y = Math.min(Math.max(position.y, minY), maxY);
 };
 
 const parseStoredState = () => {
@@ -269,11 +322,19 @@ const applyStoredState = () => {
   }
 
   if (typeof storedSize.width === "number") {
-    size.width = clampDimension(storedSize.width, minWidth);
+    size.width = clampDimension(
+      storedSize.width,
+      minSize.value.width,
+      maxSize.value.width ?? undefined
+    );
   }
 
   if (typeof storedSize.height === "number") {
-    size.height = clampDimension(storedSize.height, minHeight);
+    size.height = clampDimension(
+      storedSize.height,
+      minSize.value.height,
+      maxSize.value.height ?? undefined
+    );
   }
 
   if (typeof storedState.visible === "boolean") {
@@ -287,7 +348,7 @@ const applyStoredState = () => {
     syncGlobalLayer(layer.value);
   }
 
-  clampToViewport();
+  clampToViewport(true);
 };
 
 const handleWindowResize = () => {
@@ -375,23 +436,43 @@ const handlePointerMove = (event) => {
   if (isResizing.value) {
     const dx = event.clientX - resizeStart.x;
     const dy = event.clientY - resizeStart.y;
+    const minWidthValue = minSize.value.width;
+    const minHeightValue = minSize.value.height;
+    const maxWidthValue = maxSize.value.width ?? undefined;
+    const maxHeightValue = maxSize.value.height ?? undefined;
 
     if (resizeDirection.value.includes("e")) {
-      size.width = Math.max(minWidth, resizeStart.width + dx);
+      size.width = clampDimension(
+        resizeStart.width + dx,
+        minWidthValue,
+        maxWidthValue
+      );
     }
 
     if (resizeDirection.value.includes("s")) {
-      size.height = Math.max(minHeight, resizeStart.height + dy);
+      size.height = clampDimension(
+        resizeStart.height + dy,
+        minHeightValue,
+        maxHeightValue
+      );
     }
 
     if (resizeDirection.value.includes("w")) {
-      const newWidth = Math.max(minWidth, resizeStart.width - dx);
+      const newWidth = clampDimension(
+        resizeStart.width - dx,
+        minWidthValue,
+        maxWidthValue
+      );
       position.x = resizeStart.left + (resizeStart.width - newWidth);
       size.width = newWidth;
     }
 
     if (resizeDirection.value.includes("n")) {
-      const newHeight = Math.max(minHeight, resizeStart.height - dy);
+      const newHeight = clampDimension(
+        resizeStart.height - dy,
+        minHeightValue,
+        maxHeightValue
+      );
       position.y = resizeStart.top + (resizeStart.height - newHeight);
       size.height = newHeight;
     }
@@ -408,6 +489,28 @@ function stopInteractions(event) {
   resizeDirection.value = "";
   detachListeners();
 }
+
+watch(
+  () => [
+    minSize.value.width,
+    minSize.value.height,
+    maxSize.value.width ?? Infinity,
+    maxSize.value.height ?? Infinity,
+  ],
+  () => {
+    size.width = clampDimension(
+      size.width,
+      minSize.value.width,
+      maxSize.value.width ?? undefined
+    );
+    size.height = clampDimension(
+      size.height,
+      minSize.value.height,
+      maxSize.value.height ?? undefined
+    );
+    clampToViewport();
+  }
+);
 
 watch(
   () => props.initialPosition,
@@ -820,5 +923,10 @@ const MenuList = defineComponent({
   width: 12px;
   height: 12px;
   cursor: nwse-resize;
+}
+
+.window footer button {
+  margin-left: 0.5em;
+
 }
 </style>
