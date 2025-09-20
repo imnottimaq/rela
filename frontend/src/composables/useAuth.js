@@ -20,6 +20,9 @@ const handleAuthSuccess = ({ token, refreshToken }) => {
   }
   // When logging into a new account, purge any UI state persisted from a previous user
   try {
+    if (typeof window !== "undefined") {
+      window.__relaDisableWindowPersistence = true;
+    }
     // Reset in-memory lists so the UI doesn't show stale data between auth flips
     workspaces.value = [];
     openWorkspaceWindows.value = [];
@@ -34,6 +37,9 @@ const handleAuthSuccess = ({ token, refreshToken }) => {
       }
     }
   } catch (_) {}
+  finally {
+    try { setTimeout(() => { if (typeof window !== "undefined") window.__relaDisableWindowPersistence = false; }, 0); } catch (_) {}
+  }
   setAuthTokens({ accessToken: token, refreshToken });
   return true;
 };
@@ -41,6 +47,7 @@ const handleAuthSuccess = ({ token, refreshToken }) => {
 const logout = () => {
   console.log("Logout placeholder: send HTTP request later");
   // Clear auth headers/tokens and notify listeners
+  try { if (typeof window !== "undefined") window.__relaDisableWindowPersistence = true; } catch (_) {}
   clearAuthTokens();
   // Proactively reset in-memory state for UI
   try {
@@ -56,6 +63,8 @@ const logout = () => {
   } catch (e) {
     // ignore storage errors
   }
+  // Re-enable persistence after the UI settles
+  try { setTimeout(() => { if (typeof window !== "undefined") window.__relaDisableWindowPersistence = false; }, 0); } catch (_) {}
 };
 
 export function useAuth() {

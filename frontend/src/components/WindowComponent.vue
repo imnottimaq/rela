@@ -289,6 +289,10 @@ const parseStoredState = () => {
 
 const persistState = () => {
   if (typeof window === "undefined" || !storageKey.value) return;
+  // Skip persistence when global guard is enabled (e.g., during logout/login switch)
+  try {
+    if (window.__relaDisableWindowPersistence) return;
+  } catch (_) {}
 
   const stateToPersist = {
     position: { x: position.x, y: position.y },
