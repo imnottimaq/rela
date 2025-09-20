@@ -1,16 +1,18 @@
 <template>
+          <!-- :initial-size="{ width: 450, height: 520 }"
+      :min-size="{ width: 300, height: 460 }" -->
     <WindowComponent
       class="main-window"
       title="Welcome to Rela"
       :menu="windowMenu"
       :initial-position="{ x: 160, y: 120 }"
-      :initial-size="{ width: 450, height: 520 }"
-      :min-size="{ width: 300, height: 460 }"
+      :initial-size="{ width: 450, height: 250 }"
+      :min-size="{ width: 300, height: 200 }"
       v-model:visible="mainVisible"
       storage-key="rela-window-main"
     >
       <p>Rela is WIP task tracker with ability to self-host it.<br />You can move and resize all windows.<br />Use Account to login or register.</p>
-      <img class="demo" src="../assets/confused_travolta.gif" alt="Confused Travolta" />
+      <!-- <img class="demo" src="../assets/confused_travolta.gif" alt="Confused Travolta" /> -->
     </WindowComponent>
 </template>
 <script setup>
