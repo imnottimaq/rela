@@ -15,6 +15,16 @@
       v-model:visible="win.visible"
       @close="closeWorkspaceWindow(win.id)"
     />
+
+    <BoardWindow
+      v-for="bwin in openBoardWindows"
+      :key="bwin.id"
+      :workspace-id="bwin.workspaceId"
+      :workspace-name="bwin.workspaceName"
+      :board="{ _id: bwin.id.split(':')[1], name: bwin.name }"
+      v-model:visible="bwin.visible"
+      @close="closeBoardWindow(bwin.id)"
+    />
   </main>
 </template>
 
@@ -26,12 +36,20 @@ import ProfileWindow from './components/ProfileWindow.vue';
 import ConfirmLogoutWindow from './components/ConfirmLogoutWindow.vue';
 import CreateWorkspaceWindow from './components/CreateWorkspaceWindow.vue';
 import WorkspaceWindow from './components/WorkspaceWindow.vue';
+import BoardWindow from './components/BoardWindow.vue';
 import { useWorkspaces } from './composables/useWorkspaces';
+import { useBoards, restoreBoardWindowsFromStorage } from './composables/useBoards';
 import background from './assets/windows7.jpg';
 
 const mainStyle = `background-image: url(${background})`;
 
 const { openWorkspaceWindows, closeWorkspaceWindow } = useWorkspaces();
+const { openBoardWindows, closeBoardWindow } = useBoards();
+
+// Attempt to restore board windows from storage on app init
+if (typeof window !== 'undefined') {
+  try { restoreBoardWindowsFromStorage(); } catch (_) {}
+}
 </script>
 
 <style scoped>
