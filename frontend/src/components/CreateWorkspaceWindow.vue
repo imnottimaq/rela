@@ -7,7 +7,7 @@
     footer-buttons-align="right"
     :footer-buttons="[
       { label: 'Cancel', onClick: onCancel },
-      { label: 'Create', onClick: onCreate, primary: true }
+      { label: 'Create', onClick: onCreate, primary: true, loading: isSubmitting, disabled: isSubmitting }
     ]"
     :initial-size="{ width: 320, height: 220 }"
     :min-size="{ width: 320, height: 220 }"
@@ -36,6 +36,7 @@ const { createWorkspaceVisible, hideCreateWorkspaceWindow } = useCreateWorkspace
 
 const name = ref('');
 const error = ref('');
+const isSubmitting = ref(false);
 
 const reset = () => {
   name.value = '';
@@ -55,6 +56,8 @@ const onCreate = async () => {
     return;
   }
   try {
+    if (isSubmitting.value) return;
+    isSubmitting.value = true;
     const { data } = await workspaceApi.createWorkspace({ name: trimmed });
     // Open newly created workspace window immediately using returned data
     if (data) {
@@ -66,6 +69,8 @@ const onCreate = async () => {
   } catch (e) {
     console.error('Create workspace failed', e);
     error.value = 'Failed to create workspace';
+  } finally {
+    isSubmitting.value = false;
   }
 };
 </script>

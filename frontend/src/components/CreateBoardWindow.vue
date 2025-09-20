@@ -7,7 +7,7 @@
     footer-buttons-align="right"
     :footer-buttons="[
       { label: 'Cancel', onClick: onCancel },
-      { label: 'Create', onClick: onCreate, primary: true }
+      { label: 'Create', onClick: onCreate, primary: true, loading: isSubmitting, disabled: isSubmitting }
     ]"
     :initial-size="{ width: 320, height: 200 }"
     :min-size="{ width: 320, height: 200 }"
@@ -37,6 +37,7 @@ const emit = defineEmits(['update:visible', 'created']);
 
 const name = ref('');
 const error = ref('');
+const isSubmitting = ref(false);
 
 const reset = () => {
   name.value = '';
@@ -66,6 +67,8 @@ const onCreate = async () => {
     return;
   }
   try {
+    if (isSubmitting.value) return;
+    isSubmitting.value = true;
     const { data } = await workspaceApi.createBoard(props.workspaceId, { name: trimmed });
     // Always emit something usable; fallback to just the name
     emit('created', data && typeof data === 'object' ? data : { name: trimmed });
@@ -74,6 +77,8 @@ const onCreate = async () => {
   } catch (e) {
     console.error('Create board failed', e);
     error.value = 'Failed to create board';
+  } finally {
+    isSubmitting.value = false;
   }
 };
 </script>

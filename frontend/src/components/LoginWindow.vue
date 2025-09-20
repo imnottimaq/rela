@@ -7,7 +7,7 @@
       footer-buttons-align="right"
       :footer-buttons="[
         { label: 'Cancel', onClick: hideLoginWindow },
-        { label: 'Login', onClick: login, primary: true }
+        { label: 'Login', onClick: login, primary: true, loading: isSubmitting, disabled: isSubmitting }
       ]"
       :initialSize="{ width: 300, height: 370 }"
       :minSize="{ width: 300, height: 370 }"
@@ -47,6 +47,7 @@ const password = ref('');
 const emailError = ref('');
 const passwordError = ref('');
 const loginError = ref('');
+const isSubmitting = ref(false);
 
 const validateEmail = (value) => {
   if (!value) {
@@ -87,6 +88,8 @@ const login = async () => {
     if (emailError.value || passwordError.value) {
       return;
     }
+    if (isSubmitting.value) return;
+    isSubmitting.value = true;
     const response = await authApi.login(email.value, password.value);
     const { token, refreshToken } = response?.data || {};
     const stored = handleAuthSuccess({ token, refreshToken });
@@ -100,6 +103,8 @@ const login = async () => {
   } catch (error) {
     console.error('Login failed:', error);
     loginError.value = 'Login failed. Please check your credentials and try again.';
+  } finally {
+    isSubmitting.value = false;
   }
 };
 </script>

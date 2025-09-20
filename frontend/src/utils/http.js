@@ -200,6 +200,9 @@ export const boardsApi = {
   getBoards(workspaceId) {
     return apiClient.get("/boards", { params: { workspaceId } });
   },
+  getBoard(boardId) {
+    return apiClient.get(`/boards/${boardId}`);
+  },
   createBoard(workspaceId, payload) {
     return apiClient.post("/boards", payload, { params: { workspaceId } });
   },

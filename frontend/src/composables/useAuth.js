@@ -1,4 +1,6 @@
 import { ref } from "vue";
+import { workspaces, openWorkspaceWindows } from "./useWorkspaces";
+import { openBoardWindows } from "./useBoards";
 import {
   getAccessToken,
   setAuthTokens,
@@ -16,13 +18,72 @@ const handleAuthSuccess = ({ token, refreshToken }) => {
   if (!token) {
     return false;
   }
+  // When logging into a new account, purge any UI state persisted from a previous user
+  try {
+    if (typeof window !== "undefined") {
+      window.__relaDisableWindowPersistence = true;
+    }
+    // Reset in-memory lists so the UI doesn't show stale data between auth flips
+    workspaces.value = [];
+    openWorkspaceWindows.value = [];
+    openBoardWindows.value = [];
+    // Remove any persisted window states to avoid restoring from a previous user
+    if (typeof window !== "undefined" && window.localStorage) {
+      const keys = Object.keys(window.localStorage);
+      for (const k of keys) {
+        if (k && k.startsWith("rela-window-")) {
+          try { window.localStorage.removeItem(k); } catch (_) {}
+        }
+      }
+    }
+  } catch (_) {}
+  finally {
+    try { setTimeout(() => { if (typeof window !== "undefined") window.__relaDisableWindowPersistence = false; }, 0); } catch (_) {}
+  }
   setAuthTokens({ accessToken: token, refreshToken });
   return true;
 };
 
 const logout = () => {
   console.log("Logout placeholder: send HTTP request later");
+  // Clear auth headers/tokens and notify listeners
+  try { if (typeof window !== "undefined") window.__relaDisableWindowPersistence = true; } catch (_) {}
   clearAuthTokens();
+  // Proactively reset in-memory state for UI
+  try {
+    workspaces.value = [];
+    openWorkspaceWindows.value = [];
+    openBoardWindows.value = [];
+  } catch (_) {}
+  // Then clear the entire localStorage as requested
+  try {
+    if (typeof window !== "undefined" && window.localStorage) {
+      let windowsToPreserve = ["rela-window-login", "rela-window-register", "rela-window-main"];
+      let preservedStates = {};
+      for (let w of windowsToPreserve) {
+        try {
+          let state = window.localStorage.getItem(w);
+          if (state) {
+            preservedStates[w] = state;
+          }
+        } catch (_) {}
+      }
+      // Clear everything
+      window.localStorage.clear();
+      // Restore main window state if it existed before
+      for (let w of windowsToPreserve) {
+        try {
+          if (preservedStates[w]) {
+            window.localStorage.setItem(w, preservedStates[w]);
+          }
+        } catch (_) {}
+      }
+    }
+  } catch (e) {
+    // ignore storage errors
+  }
+  // Re-enable persistence after the UI settles
+  try { setTimeout(() => { if (typeof window !== "undefined") window.__relaDisableWindowPersistence = false; }, 0); } catch (_) {}
 };
 
 export function useAuth() {
@@ -32,4 +93,3 @@ export function useAuth() {
     logout,
   };
 }
-

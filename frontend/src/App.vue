@@ -39,15 +39,17 @@ import WorkspaceWindow from './components/WorkspaceWindow.vue';
 import BoardWindow from './components/BoardWindow.vue';
 import { useWorkspaces } from './composables/useWorkspaces';
 import { useBoards, restoreBoardWindowsFromStorage } from './composables/useBoards';
+import { useAuth } from './composables/useAuth';
 import background from './assets/windows7.jpg';
 
 const mainStyle = `background-image: url(${background})`;
 
 const { openWorkspaceWindows, closeWorkspaceWindow } = useWorkspaces();
 const { openBoardWindows, closeBoardWindow } = useBoards();
+const { isAuthenticated } = useAuth();
 
-// Attempt to restore board windows from storage on app init
-if (typeof window !== 'undefined') {
+// Attempt to restore board windows from storage only when authenticated
+if (typeof window !== 'undefined' && isAuthenticated?.value) {
   try { restoreBoardWindowsFromStorage(); } catch (_) {}
 }
 </script>
