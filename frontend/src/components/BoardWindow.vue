@@ -18,8 +18,9 @@
 </template>
 
 <script setup>
-import { computed } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import WindowComponent from './WindowComponent.vue';
+import { boardsApi } from '../utils/http';
 
 const props = defineProps({
   workspaceId: { type: [String, Number], required: true },
@@ -35,18 +36,39 @@ const modelVisible = computed({
   set: (v) => emit('update:visible', v),
 });
 
-const boardId = computed(() => props.board?._id || props.board?.id || props.board?.Id || props.board?.name);
-const boardName = computed(() => props.board?.name || String(boardId.value));
+// Local copy that we can enrich with fetched data
+const localBoard = ref({ ...(props.board || {}) });
+
+const boardId = computed(() => localBoard.value?._id || localBoard.value?.id || localBoard.value?.Id || localBoard.value?.name);
+const boardName = computed(() => localBoard.value?.name || String(boardId.value));
 const workspaceName = computed(() => props.workspaceName || String(props.workspaceId));
 
 const close = () => {
   emit('update:visible', false);
   emit('close');
 };
+
+const fetchBoard = async () => {
+  const id = boardId.value;
+  // Fetch only if we have an id and no real name yet
+  if (!id) return;
+  if (localBoard.value?.name && localBoard.value.name !== String(id)) return;
+  try {
+    const { data } = await boardsApi.getBoard(id);
+    if (data && (data._id || data.id)) {
+      localBoard.value = { _id: data._id || data.id, name: data.name || String(id) };
+    }
+  } catch (e) {
+    // keep placeholder on failure
+    // console.error('Failed to fetch board info', e);
+  }
+};
+
+onMounted(fetchBoard);
+watch(() => boardId.value, () => fetchBoard());
 </script>
 
 <style scoped>
 .content { text-align: left; padding: 0 12px 12px; }
 .hint { color: #555; font-style: italic; }
 </style>
-
