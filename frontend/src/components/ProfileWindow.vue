@@ -47,10 +47,11 @@ import { computed, ref, watch } from "vue";
 import WindowComponent from "./WindowComponent.vue";
 import { useProfileWindow } from "../composables/useProfileWindow";
 import { useAuth } from "../composables/useAuth";
+import { showConfirmLogoutWindow } from "../composables/useConfirmLogoutWindow";
 import { authApi } from "../utils/http";
 
 const { profileVisible, hideProfileWindow } = useProfileWindow();
-const { isAuthenticated, logout } = useAuth();
+const { isAuthenticated } = useAuth();
 
 const profile = ref(null);
 const loading = ref(false);
@@ -116,8 +117,7 @@ watch(
 );
 
 const handleLogout = () => {
-  logout();
-  hideProfileWindow();
+  showConfirmLogoutWindow(() => hideProfileWindow());
 };
 
 const footerButtons = computed(() => [

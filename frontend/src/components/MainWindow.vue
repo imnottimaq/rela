@@ -20,11 +20,12 @@ import { showRegisterWindow } from '../composables/useRegisterWindow';
 import { showProfileWindow } from '../composables/useProfileWindow';
 import { computed, ref, onMounted, watch } from 'vue';
 import { useAuth } from '../composables/useAuth';
+import { showConfirmLogoutWindow } from '../composables/useConfirmLogoutWindow';
 import { useWorkspaces, openWorkspaceWindow, refreshWorkspaces } from '../composables/useWorkspaces';
 import { showCreateWorkspaceWindow } from '../composables/useCreateWorkspaceWindow';
 
 const mainVisible = ref(true);
-const { isAuthenticated, logout } = useAuth();
+const { isAuthenticated } = useAuth();
 
 const openProfile = () => {
   showProfileWindow();
@@ -73,7 +74,7 @@ const authenticatedMenu = computed(() => {
       items: [
         { type: "button", label: "Profile", onClick: openProfile },
         { type: "separator" },
-        { type: "button", label: "Logout", onClick: logout },
+        { type: "button", label: "Logout", onClick: () => showConfirmLogoutWindow() },
       ],
     },
     {

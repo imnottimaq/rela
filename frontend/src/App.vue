@@ -5,6 +5,7 @@
     <LoginWindow />
     <RegisterWindow />
     <ProfileWindow />
+    <ConfirmLogoutWindow />
     <CreateWorkspaceWindow />
 
     <WorkspaceWindow
@@ -22,6 +23,7 @@ import MainWindow from './components/MainWindow.vue';
 import LoginWindow from './components/LoginWindow.vue';
 import RegisterWindow from './components/RegisterWindow.vue';
 import ProfileWindow from './components/ProfileWindow.vue';
+import ConfirmLogoutWindow from './components/ConfirmLogoutWindow.vue';
 import CreateWorkspaceWindow from './components/CreateWorkspaceWindow.vue';
 import WorkspaceWindow from './components/WorkspaceWindow.vue';
 import { useWorkspaces } from './composables/useWorkspaces';
