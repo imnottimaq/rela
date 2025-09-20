@@ -58,7 +58,12 @@ const logout = () => {
   // Then clear the entire localStorage as requested
   try {
     if (typeof window !== "undefined" && window.localStorage) {
+      let mainWindow = window.localStorage.getItem("rela-window-main");
       window.localStorage.clear();
+        // Restore main window state if it existed before
+        if (mainWindow) {
+            try { window.localStorage.setItem("rela-window-main", mainWindow); } catch (_) {}
+        }
     }
   } catch (e) {
     // ignore storage errors
