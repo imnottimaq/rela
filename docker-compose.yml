@@ -5,8 +5,8 @@ services:
       dockerfile: Dockerfile
     image: rela-backend:latest
     container_name: rela-backend
-    expose:
-      - "4444"
+    ports:
+      - "4444:4444"
     env_file:
       - .env
     depends_on:
@@ -33,7 +33,7 @@ services:
     image: rela-nginx:latest
     container_name: rela-nginx
     ports:
-      - "8000:80"
+      - "1488:80"
     depends_on:
       - rela-backend
     restart: unless-stopped
