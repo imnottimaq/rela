@@ -98,13 +98,28 @@ definitions:
       salt:
         type: string
     type: object
+  main.Workspace:
+    properties:
+      _id:
+        type: string
+      avatar:
+        type: string
+      members:
+        items:
+          type: string
+        type: array
+      name:
+        type: string
+      owned_by:
+        type: string
+    type: object
 info:
   contact: {}
   description: Simple WIP task tracker that can be self-hosted
   title: Rela API Docs
   version: "1.0"
 paths:
-  /api/v1/boards:
+  /boards:
     get:
       consumes:
       - application/json
@@ -149,7 +164,7 @@ paths:
       summary: Create new board
       tags:
       - Boards
-  /api/v1/boards/{boardId}:
+  /boards/{boardId}:
     delete:
       consumes:
       - application/json
@@ -165,6 +180,30 @@ paths:
         "200":
           description: OK
       summary: Delete board
+      tags:
+      - Boards
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: Board ID
+        in: path
+        name: boardId
+        required: true
+        type: string
+      - description: Bearer Token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.Board'
+      summary: Get board by id
       tags:
       - Boards
     patch:
@@ -184,7 +223,7 @@ paths:
       summary: Edit board
       tags:
       - Boards
-  /api/v1/tasks:
+  /tasks:
     get:
       description: Return all tasks that current user owns
       parameters:
@@ -232,7 +271,7 @@ paths:
       summary: Create new task
       tags:
       - Tasks
-  /api/v1/tasks/{taskId}:
+  /tasks/{taskId}:
     delete:
       parameters:
       - description: Bearer Token
@@ -269,7 +308,7 @@ paths:
       summary: Edit existing task
       tags:
       - Tasks
-  /api/v1/users/create:
+  /users/create:
     post:
       consumes:
       - application/json
@@ -292,7 +331,7 @@ paths:
       summary: Create new user
       tags:
       - Users
-  /api/v1/users/delete:
+  /users/delete:
     delete:
       consumes:
       - application/json
@@ -314,7 +353,7 @@ paths:
       summary: Delete user
       tags:
       - Users
-  /api/v1/users/get_info:
+  /users/get_info:
     get:
       description: For this route, you must have bearer token
       parameters:
@@ -335,7 +374,7 @@ paths:
       summary: Get user info
       tags:
       - Users
-  /api/v1/users/login:
+  /users/login:
     post:
       consumes:
       - application/json
@@ -358,7 +397,7 @@ paths:
       summary: Login user
       tags:
       - Users
-  /api/v1/users/upload_avatar:
+  /users/upload_avatar:
     post:
       consumes:
       - multipart/form-data
@@ -379,7 +418,7 @@ paths:
       summary: Upload avatar for user
       tags:
       - Users
-  /api/v1/users/workspaces:
+  /users/workspaces:
     get:
       parameters:
       - description: Bearer Token
@@ -393,7 +432,7 @@ paths:
       summary: Get all workspaces for the current user
       tags:
       - Workspaces
-  /api/v1/workspaces/{workspaceId}/:
+  /workspaces/{workspaceId}/:
     delete:
       parameters:
       - description: Bearer Token
@@ -410,6 +449,26 @@ paths:
         "200":
           description: OK
       summary: Delete workspace
+      tags:
+      - Workspaces
+    get:
+      parameters:
+      - description: Bearer Token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Workspace ID
+        in: path
+        name: workspaceId
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.Workspace'
+      summary: Get workspace by id
       tags:
       - Workspaces
     patch:
@@ -430,7 +489,7 @@ paths:
       summary: Edit workspace
       tags:
       - Workspaces
-  /api/v1/workspaces/{workspaceId}/assign:
+  /workspaces/{workspaceId}/assign:
     post:
       consumes:
       - application/json
@@ -457,7 +516,7 @@ paths:
       summary: Assign task to someone
       tags:
       - Tasks
-  /api/v1/workspaces/{workspaceId}/boards:
+  /workspaces/{workspaceId}/boards:
     get:
       consumes:
       - application/json
@@ -512,7 +571,7 @@ paths:
       summary: Create new board
       tags:
       - Boards
-  /api/v1/workspaces/{workspaceId}/boards/{boardId}:
+  /workspaces/{workspaceId}/boards/{boardId}:
     delete:
       consumes:
       - application/json
@@ -533,6 +592,35 @@ paths:
         "200":
           description: OK
       summary: Delete board
+      tags:
+      - Boards
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: Board ID
+        in: path
+        name: boardId
+        required: true
+        type: string
+      - description: Workspace ID
+        in: path
+        name: workspaceId
+        required: true
+        type: string
+      - description: Bearer Token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.Board'
+      summary: Get board by id
       tags:
       - Boards
     patch:
@@ -557,7 +645,29 @@ paths:
       summary: Edit board
       tags:
       - Boards
-  /api/v1/workspaces/{workspaceId}/kick:
+  /workspaces/{workspaceId}/info:
+    get:
+      parameters:
+      - description: Bearer Token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Workspace ID
+        in: path
+        name: workspaceId
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Get workspace info (basic, members, boards)
+      tags:
+      - Workspaces
+  /workspaces/{workspaceId}/kick:
     delete:
       parameters:
       - description: Bearer Token
@@ -576,7 +686,7 @@ paths:
       summary: Kick member
       tags:
       - Workspaces
-  /api/v1/workspaces/{workspaceId}/members:
+  /workspaces/{workspaceId}/members:
     get:
       parameters:
       - description: Bearer Token
@@ -595,7 +705,7 @@ paths:
       summary: Get all members info
       tags:
       - Workspaces
-  /api/v1/workspaces/{workspaceId}/new_invite:
+  /workspaces/{workspaceId}/new_invite:
     get:
       parameters:
       - description: Bearer Token
@@ -614,7 +724,7 @@ paths:
       summary: Create invite to the workspace
       tags:
       - Workspaces
-  /api/v1/workspaces/{workspaceId}/promote/{userId}:
+  /workspaces/{workspaceId}/promote/{userId}:
     patch:
       parameters:
       - description: Bearer Token
@@ -638,7 +748,7 @@ paths:
       summary: Promote member
       tags:
       - Workspaces
-  /api/v1/workspaces/{workspaceId}/tasks:
+  /workspaces/{workspaceId}/tasks:
     get:
       description: Return all tasks that current user owns
       parameters:
@@ -696,7 +806,7 @@ paths:
       summary: Create new task
       tags:
       - Tasks
-  /api/v1/workspaces/{workspaceId}/tasks/{taskId}:
+  /workspaces/{workspaceId}/tasks/{taskId}:
     delete:
       parameters:
       - description: Workspace ID
@@ -743,7 +853,7 @@ paths:
       summary: Edit existing task
       tags:
       - Tasks
-  /api/v1/workspaces/{workspaceId}/upload_avatar:
+  /workspaces/{workspaceId}/upload_avatar:
     post:
       consumes:
       - multipart/form-data
@@ -769,7 +879,7 @@ paths:
       summary: Upload avatar for user
       tags:
       - Users
-  /api/v1/workspaces/add/{joinToken}:
+  /workspaces/add/{joinToken}:
     post:
       parameters:
       - description: Bearer Token
@@ -788,7 +898,7 @@ paths:
       summary: Accept invite
       tags:
       - Workspaces
-  /api/v1/workspaces/create:
+  /workspaces/create:
     post:
       consumes:
       - application/json

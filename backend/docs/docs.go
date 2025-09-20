@@ -15,7 +15,7 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
-        "/api/v1/boards": {
+        "/boards": {
             "get": {
                 "consumes": [
                     "application/json"
@@ -84,7 +84,43 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/boards/{boardId}": {
+        "/boards/{boardId}": {
+            "get": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Boards"
+                ],
+                "summary": "Get board by id",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Board ID",
+                        "name": "boardId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Bearer Token",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/main.Board"
+                        }
+                    }
+                }
+            },
             "delete": {
                 "consumes": [
                     "application/json"
@@ -138,7 +174,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/tasks": {
+        "/tasks": {
             "get": {
                 "description": "Return all tasks that current user owns",
                 "produces": [
@@ -211,7 +247,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/tasks/{taskId}": {
+        "/tasks/{taskId}": {
             "delete": {
                 "produces": [
                     "application/json"
@@ -268,7 +304,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/users/create": {
+        "/users/create": {
             "post": {
                 "consumes": [
                     "application/json"
@@ -304,7 +340,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/users/delete": {
+        "/users/delete": {
             "delete": {
                 "consumes": [
                     "application/json"
@@ -338,7 +374,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/users/get_info": {
+        "/users/get_info": {
             "get": {
                 "description": "For this route, you must have bearer token",
                 "produces": [
@@ -370,7 +406,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/users/login": {
+        "/users/login": {
             "post": {
                 "consumes": [
                     "application/json"
@@ -406,7 +442,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/users/upload_avatar": {
+        "/users/upload_avatar": {
             "post": {
                 "consumes": [
                     "multipart/form-data"
@@ -438,7 +474,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/users/workspaces": {
+        "/users/workspaces": {
             "get": {
                 "tags": [
                     "Workspaces"
@@ -460,7 +496,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/workspaces/add/{joinToken}": {
+        "/workspaces/add/{joinToken}": {
             "post": {
                 "tags": [
                     "Workspaces"
@@ -489,7 +525,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/workspaces/create": {
+        "/workspaces/create": {
             "post": {
                 "consumes": [
                     "application/json"
@@ -523,7 +559,37 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/workspaces/{workspaceId}/": {
+        "/workspaces/{workspaceId}/": {
+            "get": {
+                "tags": [
+                    "Workspaces"
+                ],
+                "summary": "Get workspace by id",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer Token",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Workspace ID",
+                        "name": "workspaceId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/main.Workspace"
+                        }
+                    }
+                }
+            },
             "delete": {
                 "tags": [
                     "Workspaces"
@@ -579,7 +645,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/workspaces/{workspaceId}/assign": {
+        "/workspaces/{workspaceId}/assign": {
             "post": {
                 "consumes": [
                     "application/json"
@@ -620,7 +686,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/workspaces/{workspaceId}/boards": {
+        "/workspaces/{workspaceId}/boards": {
             "get": {
                 "consumes": [
                     "application/json"
@@ -703,7 +769,50 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/workspaces/{workspaceId}/boards/{boardId}": {
+        "/workspaces/{workspaceId}/boards/{boardId}": {
+            "get": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Boards"
+                ],
+                "summary": "Get board by id",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Board ID",
+                        "name": "boardId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Workspace ID",
+                        "name": "workspaceId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Bearer Token",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/main.Board"
+                        }
+                    }
+                }
+            },
             "delete": {
                 "consumes": [
                     "application/json"
@@ -771,7 +880,40 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/workspaces/{workspaceId}/kick": {
+        "/workspaces/{workspaceId}/info": {
+            "get": {
+                "tags": [
+                    "Workspaces"
+                ],
+                "summary": "Get workspace info (basic, members, boards)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer Token",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Workspace ID",
+                        "name": "workspaceId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/workspaces/{workspaceId}/kick": {
             "delete": {
                 "tags": [
                     "Workspaces"
@@ -800,7 +942,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/workspaces/{workspaceId}/members": {
+        "/workspaces/{workspaceId}/members": {
             "get": {
                 "tags": [
                     "Workspaces"
@@ -829,7 +971,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/workspaces/{workspaceId}/new_invite": {
+        "/workspaces/{workspaceId}/new_invite": {
             "get": {
                 "tags": [
                     "Workspaces"
@@ -858,7 +1000,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/workspaces/{workspaceId}/promote/{userId}": {
+        "/workspaces/{workspaceId}/promote/{userId}": {
             "patch": {
                 "tags": [
                     "Workspaces"
@@ -894,7 +1036,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/workspaces/{workspaceId}/tasks": {
+        "/workspaces/{workspaceId}/tasks": {
             "get": {
                 "description": "Return all tasks that current user owns",
                 "produces": [
@@ -981,7 +1123,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/workspaces/{workspaceId}/tasks/{taskId}": {
+        "/workspaces/{workspaceId}/tasks/{taskId}": {
             "delete": {
                 "produces": [
                     "application/json"
@@ -1052,7 +1194,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/workspaces/{workspaceId}/upload_avatar": {
+        "/workspaces/{workspaceId}/upload_avatar": {
             "post": {
                 "consumes": [
                     "multipart/form-data"
@@ -1241,6 +1383,29 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "salt": {
+                    "type": "string"
+                }
+            }
+        },
+        "main.Workspace": {
+            "type": "object",
+            "properties": {
+                "_id": {
+                    "type": "string"
+                },
+                "avatar": {
+                    "type": "string"
+                },
+                "members": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "name": {
+                    "type": "string"
+                },
+                "owned_by": {
                     "type": "string"
                 }
             }
