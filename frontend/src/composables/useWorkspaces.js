@@ -39,6 +39,16 @@ export const openWorkspaceWindow = (ws) => {
   const existing = openWorkspaceWindows.value.find((w) => w.id === id);
   if (existing) {
     existing.visible = true;
+    if (typeof window !== "undefined") {
+      try {
+        const key = id ? `rela-window-workspace-${id}` : null;
+        if (key) {
+          window.dispatchEvent(
+            new CustomEvent("rela:focus-window", { detail: key })
+          );
+        }
+      } catch (_) {}
+    }
     return;
   }
   openWorkspaceWindows.value.push({ id, name, visible: true });

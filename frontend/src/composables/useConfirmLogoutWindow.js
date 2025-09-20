@@ -13,6 +13,15 @@ export const showConfirmLogoutWindow = (onConfirmed) => {
     onConfirmedRef.value = null;
   }
   logoutConfirmVisible.value = true;
+  if (typeof window !== "undefined") {
+    try {
+      window.dispatchEvent(
+        new CustomEvent("rela:focus-window", {
+          detail: "rela-window-confirm-logout",
+        })
+      );
+    } catch (_) {}
+  }
 };
 
 export const hideConfirmLogoutWindow = () => {
@@ -29,4 +38,3 @@ export function useConfirmLogoutWindow() {
     __onConfirmedRef: onConfirmedRef,
   };
 }
-

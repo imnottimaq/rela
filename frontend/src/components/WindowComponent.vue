@@ -10,6 +10,7 @@ import {
   ref,
   watch,
 } from "vue";
+import { onUnmounted } from "vue";
 
 const layerManagerKey = "__relaWindowLayerManager__";
 
@@ -611,6 +612,32 @@ onMounted(() => {
   if (typeof window !== "undefined") {
     clampToViewport();
     window.addEventListener("resize", handleWindowResize);
+    // Listen for global focus requests to bring window to front
+    const focusHandler = (event) => {
+      try {
+        const detail = event?.detail;
+        const key =
+          typeof detail === "string"
+            ? detail
+            : detail?.key || detail?.storageKey || null;
+        if (!key) return;
+        if (!storageKey.value) return;
+        if (key === storageKey.value) {
+          if (internalVisible.value) {
+            bringToFront();
+          }
+        }
+      } catch (_) {
+        /* ignore */
+      }
+    };
+    window.addEventListener("rela:focus-window", focusHandler);
+    // Ensure cleanup on unmount
+    onUnmounted(() => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("rela:focus-window", focusHandler);
+      }
+    });
   }
 });
 
