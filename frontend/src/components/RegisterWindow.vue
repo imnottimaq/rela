@@ -7,7 +7,7 @@
       footer-buttons-align="right"
       :footer-buttons="[
         { label: 'Cancel', onClick: closeAndReset },
-        { label: 'Register', onClick: registerUser, primary: true }
+        { label: 'Register', onClick: registerUser, primary: true, loading: isSubmitting, disabled: isSubmitting }
       ]"
       :initialSize="{ width: 320, height: 460 }"
       :minSize="{ width: 320, height: 460 }"
@@ -62,6 +62,7 @@ const emailError = ref('');
 const passwordError = ref('');
 const confirmPasswordError = ref('');
 const registerError = ref('');
+const isSubmitting = ref(false);
 
 const resetState = () => {
   name.value = '';
@@ -134,6 +135,8 @@ const registerUser = async () => {
       return;
     }
 
+    if (isSubmitting.value) return;
+    isSubmitting.value = true;
     const response = await authApi.createUser(name.value, email.value, password.value);
     const { token, refreshToken } = response?.data || {};
     const stored = handleAuthSuccess({ token, refreshToken });
@@ -146,6 +149,8 @@ const registerUser = async () => {
   } catch (error) {
     console.error('Registration failed:', error);
     registerError.value = 'Registration failed. Please check your details and try again.';
+  } finally {
+    isSubmitting.value = false;
   }
 };
 

@@ -824,7 +824,14 @@ const MenuList = defineComponent({
     </div>
 
     <footer :style="{ textAlign: footerButtonsAlign } " v-if="footerButtons.length">
-      <button v-for="(button, index) in footerButtons" :key="index" @click="button.onClick">
+      <button
+        v-for="(button, index) in footerButtons"
+        :key="index"
+        @click="button.onClick"
+        :disabled="button.disabled || button.loading"
+        :class="{ 'is-loading': !!button.loading }"
+        :aria-busy="button.loading ? 'true' : null"
+      >
         {{ button.label }}
       </button>
     </footer>
@@ -955,5 +962,11 @@ const MenuList = defineComponent({
 .window footer button {
   margin-left: 0.5em;
 
+}
+
+/* Show progress cursor on loading buttons, even when disabled */
+.window footer button.is-loading,
+.window footer button.is-loading:disabled {
+  cursor: progress !important;
 }
 </style>
