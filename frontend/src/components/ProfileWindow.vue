@@ -3,7 +3,7 @@
     title="Profile"
     v-model:visible="profileVisible"
     storage-key="rela-window-profile"
-    :initial-size="{ width: 350, height: 370 }"
+    :initial-size="{ width: 350, height: 380 }"
     :min-size="{ width: 300, height: 320 }"
     footer-buttons-align="right"
     :footer-buttons="footerButtons"

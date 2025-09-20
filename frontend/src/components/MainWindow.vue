@@ -4,7 +4,7 @@
       title="Welcome to Rela"
       :menu="windowMenu"
       :initial-position="{ x: 160, y: 120 }"
-      :initial-size="{ width: 450, height: 500 }"
+      :initial-size="{ width: 450, height: 520 }"
       :min-size="{ width: 300, height: 460 }"
       v-model:visible="mainVisible"
       storage-key="rela-window-main"
