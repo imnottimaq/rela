@@ -87,7 +87,6 @@ func authMiddleware() gin.HandlerFunc {
 			}
 		}
 	}
-
 }
 
 func taskMiddleware() gin.HandlerFunc {

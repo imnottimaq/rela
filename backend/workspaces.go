@@ -352,32 +352,32 @@ func getAllMembers(c *gin.Context) {
 // @Param Authorization header string true "Bearer Token"
 // @Param workspaceId path string true "Workspace ID"
 func getWorkspace(c *gin.Context) {
-    id, _ := c.Get("id")
-    userId := id.(bson.ObjectID)
-    workspaceIdStr := c.Param("workspaceId")
-    workspaceId, err := bson.ObjectIDFromHex(workspaceIdStr)
-    if err != nil {
-        c.JSON(400, gin.H{"error": "invalid workspaceId"})
-        return
-    }
+	id, _ := c.Get("id")
+	userId := id.(bson.ObjectID)
+	workspaceIdStr := c.Param("workspaceId")
+	workspaceId, err := bson.ObjectIDFromHex(workspaceIdStr)
+	if err != nil {
+		c.JSON(400, gin.H{"error": "invalid workspaceId"})
+		return
+	}
 
-    workspace := Workspace{}
-    if err := workspacesDb.FindOne(context.TODO(), bson.M{"_id": workspaceId}).Decode(&workspace); err != nil {
-        if errors.Is(err, mongo.ErrNoDocuments) {
-            c.JSON(404, gin.H{"error": "workspace not found"})
-            return
-        }
-        c.JSON(500, gin.H{"error": err.Error()})
-        return
-    }
+	workspace := Workspace{}
+	if err := workspacesDb.FindOne(context.TODO(), bson.M{"_id": workspaceId}).Decode(&workspace); err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			c.JSON(404, gin.H{"error": "workspace not found"})
+			return
+		}
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
 
-    // Ensure requester is a member or owner
-    if slices.Index(workspace.Members, userId) == -1 && workspace.OwnedBy != userId {
-        c.JSON(403, gin.H{"error": "forbidden"})
-        return
-    }
+	// Ensure requester is a member or owner
+	if slices.Index(workspace.Members, userId) == -1 && workspace.OwnedBy != userId {
+		c.JSON(403, gin.H{"error": "forbidden"})
+		return
+	}
 
-    c.IndentedJSON(200, workspace)
+	c.IndentedJSON(200, workspace)
 }
 
 // @Summary Get workspace info (basic, members, boards)
@@ -387,75 +387,79 @@ func getWorkspace(c *gin.Context) {
 // @Param Authorization header string true "Bearer Token"
 // @Param workspaceId path string true "Workspace ID"
 func getWorkspaceInfo(c *gin.Context) {
-    // Auth context
-    id, _ := c.Get("id")
-    userId := id.(bson.ObjectID)
+	id, _ := c.Get("id")
+	userId := id.(bson.ObjectID)
 
-    // Parse workspace id
-    workspaceIdStr := c.Param("workspaceId")
-    workspaceId, err := bson.ObjectIDFromHex(workspaceIdStr)
-    if err != nil {
-        c.JSON(400, gin.H{"error": "invalid workspaceId"})
-        return
-    }
+	workspaceIdStr := c.Param("workspaceId")
+	workspaceId, err := bson.ObjectIDFromHex(workspaceIdStr)
+	if err != nil {
+		c.JSON(400, gin.H{"error": "invalid workspaceId"})
+		return
+	}
 
-    // Fetch workspace
-    workspace := Workspace{}
-    if err := workspacesDb.FindOne(context.TODO(), bson.M{"_id": workspaceId}).Decode(&workspace); err != nil {
-        if errors.Is(err, mongo.ErrNoDocuments) {
-            c.JSON(404, gin.H{"error": "workspace not found"})
-            return
-        }
-        c.JSON(500, gin.H{"error": err.Error()})
-        return
-    }
+	pipeline := mongo.Pipeline{
+		{{"$match", bson.D{{"_id", workspaceId}}}},
+		{{"$lookup", bson.D{
+			{"from", "users"},
+			{"localField", "members"},
+			{"foreignField", "_id"},
+			{"as", "memberDetails"},
+			{"pipeline", bson.A{
+				bson.D{{"$project", bson.D{
+					{"name", 1},
+					{"avatar", 1},
+				}}},
+			}},
+		}}},
+		{{"$lookup", bson.D{
+			{"from", "boards"},
+			{"localField", "_id"},
+			{"foreignField", "owned_by"},
+			{"as", "boards"},
+		}}},
+	}
 
-    // Authorization: requester must be a member or owner
-    if slices.Index(workspace.Members, userId) == -1 && workspace.OwnedBy != userId {
-        c.JSON(403, gin.H{"error": "forbidden"})
-        return
-    }
+	cursor, err := workspacesDb.Aggregate(context.TODO(), pipeline)
+	if err != nil {
+		c.JSON(500, gin.H{"error": "failed to fetch workspace info"})
+		return
+	}
+	defer cursor.Close(context.TODO())
 
-    // Fetch members of the workspace
-    members := make([]Member, 0)
-    if len(workspace.Members) > 0 {
-        cursor, err := usersDb.Find(context.TODO(), bson.M{"_id": bson.M{"$in": workspace.Members}})
-        if err != nil {
-            c.JSON(500, gin.H{"error": "failed to fetch users"})
-            return
-        }
-        if err := cursor.All(context.TODO(), &members); err != nil {
-            c.JSON(500, gin.H{"error": "failed to decode users"})
-            return
-        }
-        if err := cursor.Close(context.TODO()); err != nil {
-            c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
-            return
-        }
-    }
+	var results []bson.M
+	if err := cursor.All(context.TODO(), &results); err != nil {
+		c.JSON(500, gin.H{"error": "failed to decode results"})
+		return
+	}
 
-    // Fetch boards that belong to this workspace
-    boards := make([]Board, 0)
-    boardCursor, err := boardsDb.Find(context.TODO(), bson.M{"owned_by": workspace.Id})
-    if err != nil {
-        c.JSON(500, gin.H{"error": "failed to fetch boards"})
-        return
-    }
-    if err := boardCursor.All(context.TODO(), &boards); err != nil {
-        c.JSON(500, gin.H{"error": "failed to decode boards"})
-        return
-    }
-    if err := boardCursor.Close(context.TODO()); err != nil {
-        c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
-        return
-    }
+	if len(results) == 0 {
+		c.JSON(404, gin.H{"error": "workspace not found"})
+		return
+	}
 
-    c.IndentedJSON(200, gin.H{
-        "workspace": workspace,
-        "members":   members,
-        "boards":    boards,
-    })
+	result := results[0]
+
+	members := result["members"].(bson.A)
+	ownedBy := result["owned_by"].(bson.ObjectID)
+
+	authorized := ownedBy == userId
+	if !authorized {
+		for _, member := range members {
+			if member.(bson.ObjectID) == userId {
+				authorized = true
+				break
+			}
+		}
+	}
+
+	if !authorized {
+		c.JSON(403, gin.H{"error": "forbidden"})
+		return
+	}
+
+	c.JSON(200, result)
 }
+
 // @Summary Assign task to someone
 // @Router /workspaces/{workspaceId}/assign [post]
 // @Accept json

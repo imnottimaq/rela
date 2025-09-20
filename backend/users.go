@@ -6,7 +6,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"log"
+	"golang.org/x/crypto/argon2"
 	"os"
 	"path/filepath"
 	"time"
@@ -17,7 +17,6 @@ import (
 	"github.com/google/uuid"
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
-	"golang.org/x/crypto/argon2"
 )
 
 // @Summary Create new user
@@ -51,6 +50,9 @@ func createUser(c *gin.Context) {
 	} else if input.Password == "" {
 		c.AbortWithStatusJSON(400, gin.H{"error": "Password is required"})
 		return
+	} else if len(input.Password) > 128 {
+		c.AbortWithStatusJSON(400, gin.H{"error": "Password too long"})
+		return
 	} else if !validatePassword(input.Password) {
 		c.AbortWithStatusJSON(400, gin.H{"error": "Password does not meet requirements"})
 		return
@@ -58,24 +60,34 @@ func createUser(c *gin.Context) {
 		c.AbortWithStatusJSON(400, gin.H{"error": "Name is required"})
 		return
 	}
-	newUser := User{
-		Salt:           generatedSalt,
-		Name:           input.Name,
-		HashedPassword: base64.RawStdEncoding.EncodeToString(argon2.IDKey([]byte(input.Password+pepper), []byte(generatedSalt), uint32(3), uint32(128*1024), uint8(2), uint32(32))),
-		Email:          input.Email,
-	}
 	err = usersDb.FindOne(context.TODO(), bson.D{{Key: "email", Value: input.Email}}).Decode(&i)
 	if err != nil {
 		if errors.Is(err, mongo.ErrNoDocuments) {
-			user, err := usersDb.InsertOne(context.TODO(), &newUser)
-			if err != nil {
+			newUser := User{
+				Salt:           generatedSalt,
+				Name:           input.Name,
+				HashedPassword: base64.RawStdEncoding.EncodeToString(argon2.IDKey([]byte(input.Password+pepper), []byte(generatedSalt), uint32(1), uint32(32*1024), uint8(4), uint32(32))),
+				Email:          input.Email,
+			}
+			type dbResult struct {
+				result *mongo.InsertOneResult
+				err    error
+			}
+			dbChan := make(chan dbResult, 1)
+			go func() {
+				result, err := usersDb.InsertOne(context.TODO(), newUser)
+				dbChan <- dbResult{result, err}
+			}()
+			dbRes := <-dbChan
+			if dbRes.err != nil {
 				c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
 				return
 			}
-			refreshToken := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-				"id":  user.InsertedID.(bson.ObjectID),
+			claims := jwt.MapClaims{
 				"exp": time.Now().UTC().Unix() + 604800, // Current expire time is 7 days, this is subject to change
-			})
+			}
+			claims["id"] = dbRes.result.InsertedID.(bson.ObjectID)
+			refreshToken := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 			signedRefreshToken, err := refreshToken.SignedString([]byte(pepper))
 			if err != nil {
 				fmt.Println(err)
@@ -119,7 +131,7 @@ func loginUser(c *gin.Context) {
 			return
 		}
 	}
-	if base64.RawStdEncoding.EncodeToString(argon2.IDKey([]byte(input.Password+pepper), []byte(i.Salt), uint32(3), uint32(128*1024), uint8(2), uint32(32))) == i.HashedPassword {
+	if base64.RawStdEncoding.EncodeToString(argon2.IDKey([]byte(input.Password+pepper), []byte(i.Salt), uint32(1), uint32(32*1024), uint8(4), uint32(32))) == i.HashedPassword {
 		refreshToken := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 			"id":  i.Id,
 			"exp": time.Now().UTC().Unix() + 604800, // Current expire time is 7 days, this is subject to change
@@ -158,7 +170,7 @@ func deleteUser(c *gin.Context) {
 		c.AbortWithStatusJSON(500, gin.H{"error": "Failed to delete user"})
 		return
 	}
-	if user.Email == input.Email && base64.RawStdEncoding.EncodeToString(argon2.IDKey([]byte(input.Password+pepper), []byte(user.Salt), uint32(3), uint32(128*1024), uint8(2), uint32(32))) == user.HashedPassword && userId == user.Id {
+	if user.Email == input.Email && base64.RawStdEncoding.EncodeToString(argon2.IDKey([]byte(input.Password+pepper), []byte(user.Salt), uint32(1), uint32(32*1024), uint8(4), uint32(32))) == user.HashedPassword && userId == user.Id {
 		_, err = usersDb.DeleteOne(context.TODO(), bson.D{{Key: "_id", Value: userId}})
 		if err != nil {
 			c.AbortWithStatusJSON(500, gin.H{"error": "Failed to delete user"})
@@ -167,7 +179,7 @@ func deleteUser(c *gin.Context) {
 		c.SetCookie("refreshToken", "", -1, "/", "", true, true)
 		c.AbortWithStatus(200)
 		return
-	} else if user.Email != input.Email || base64.RawStdEncoding.EncodeToString(argon2.IDKey([]byte(input.Password+pepper), []byte(user.Salt), uint32(3), uint32(128*1024), uint8(2), uint32(32))) != user.HashedPassword {
+	} else if user.Email != input.Email || base64.RawStdEncoding.EncodeToString(argon2.IDKey([]byte(input.Password+pepper), []byte(user.Salt), uint32(1), uint32(32*1024), uint8(4), uint32(32))) != user.HashedPassword {
 		c.AbortWithStatus(400)
 		return
 	} else if userId != user.Id {
@@ -190,10 +202,10 @@ func uploadAvatar(c *gin.Context) {
 		if os.IsNotExist(err) {
 			err = os.Mkdir("./img/", 0777)
 			if err != nil {
-				log.Fatal("Failed to create img/")
+				print("Failed to create img/")
 			}
 		} else {
-			log.Fatal("Something went wrong when checking if img/ exists")
+			print("Something went wrong when checking if img/ exists")
 		}
 	}
 	userId, _ := c.Get("id")
@@ -225,7 +237,7 @@ func uploadAvatar(c *gin.Context) {
 			c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
 			err = os.Remove("./img/" + filename)
 			if err != nil {
-				log.Fatal("Failed to remove avatar")
+				panic("Failed to remove avatar")
 			}
 		}
 		c.AbortWithStatus(200)
@@ -246,7 +258,7 @@ func uploadAvatar(c *gin.Context) {
 			c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
 			err = os.Remove("./img/" + filename)
 			if err != nil {
-				log.Fatal("Failed to remove avatar")
+				panic("Failed to remove avatar")
 			}
 		}
 		c.AbortWithStatus(200)

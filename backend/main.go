@@ -2,8 +2,6 @@ package main
 
 import (
 	_ "Rela/docs"
-	"log"
-	_ "net/http/pprof"
 	"os"
 	"regexp"
 	"strings"
@@ -13,7 +11,6 @@ import (
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 
 	"github.com/gin-contrib/cors"
-	"github.com/gin-contrib/pprof"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 	ratelimit "github.com/khaaleoo/gin-rate-limiter/core"
@@ -26,7 +23,7 @@ var port = os.Getenv("PORT")
 var pepper = os.Getenv("PEPPER")
 var mongodbCredentials = os.Getenv("MONGO_CREDS")
 var frontendOriginEnv = os.Getenv("FRONTEND_ORIGINS")
-var dbClient, _ = mongo.Connect(options.Client().ApplyURI(mongodbCredentials).SetServerAPIOptions(options.ServerAPI(options.ServerAPIVersion1)))
+var dbClient, _ = mongo.Connect(options.Client().ApplyURI(mongodbCredentials).SetServerAPIOptions(options.ServerAPI(options.ServerAPIVersion1)).SetMaxPoolSize(100).SetMinPoolSize(10).SetMaxConnIdleTime(30 * time.Second))
 
 var tasksDb = dbClient.Database("rela").Collection("tasks")
 var usersDb = dbClient.Database("rela").Collection("users")
@@ -52,7 +49,6 @@ func getAllowedOrigins() []string {
 // @BasePath		/api/v1
 func main() {
 	r := gin.Default()
-	pprof.Register(r)
 	corsConfig := cors.DefaultConfig()
 	corsConfig.AllowOrigins = getAllowedOrigins()
 	corsConfig.AllowMethods = []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"}
@@ -139,16 +135,16 @@ func main() {
 		r.GET("/api/v1/docs/*any", ginSwagger.WrapHandler(swaggerfiles.Handler))
 	}
 	if pepper == "" {
-		log.Print("WARNING Server-side secret is not present, this is big security flaw")
+		print("WARNING Server-side secret is not present, this is big security flaw")
 	} else if mongodbCredentials == "" {
-		log.Fatal("FATAL MongoDB credentials is not present")
+		panic("FATAL MongoDB credentials is not present")
 	} else if port == "" {
-		log.Print("WARNING Port is not present, falling back to default")
+		print("WARNING Port is not present, falling back to default")
 		if err := r.Run(":8080"); err != nil {
-			log.Fatal("Failed to start server")
+			panic("Failed to start server")
 		}
 	}
 	if err := r.Run(port); err != nil {
-		log.Fatal("Failed to start server")
+		panic("Failed to start server")
 	}
 }

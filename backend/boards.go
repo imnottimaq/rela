@@ -1,15 +1,14 @@
 package main
 
 import (
-    "context"
-    "errors"
-    "fmt"
-    "slices"
-    "github.com/gin-gonic/gin"
-    "github.com/goccy/go-json"
-    "go.mongodb.org/mongo-driver/v2/bson"
-    "go.mongodb.org/mongo-driver/v2/mongo"
-    "log"
+	"context"
+	"errors"
+	"fmt"
+	"github.com/gin-gonic/gin"
+	"github.com/goccy/go-json"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"slices"
 )
 
 // @Summary Create new board
@@ -64,7 +63,7 @@ func deleteBoard(c *gin.Context) {
 	workspaceId := c.Param("workspaceId")
 	i, _ := bson.ObjectIDFromHex(workspaceId)
 	var board Board
-	if err := boardsDb.FindOne(context.TODO(), bson.D{{"_id", boardId}}).Decode(board); err != nil {
+	if err := boardsDb.FindOne(context.TODO(), bson.D{{"_id", boardId}}).Decode(&board); err != nil {
 		if errors.Is(err, mongo.ErrNoDocuments) {
 			c.AbortWithStatusJSON(404, gin.H{"error": "Board does not exist"})
 			return
@@ -156,7 +155,7 @@ func getAllBoards(c *gin.Context) {
 	_ = cursor.All(context.TODO(), &boards)
 	c.IndentedJSON(200, gin.H{"boards": boards})
 	if err := cursor.Close(context.TODO()); err != nil {
-		log.Print("Failed to close cursor")
+		print("Failed to close cursor")
 	}
 	return
 }
@@ -172,48 +171,48 @@ func getAllBoards(c *gin.Context) {
 // @Param workspaceId path string true "Workspace ID"
 // @Param Authorization header string true "Bearer Token"
 func getBoard(c *gin.Context) {
-    userId, _ := c.Get("id")
-    boardIdStr := c.Param("boardId")
-    if boardIdStr == "" {
-        c.AbortWithStatusJSON(400, gin.H{"error": "Board id cannot be empty"})
-        return
-    }
-    boardId, err := bson.ObjectIDFromHex(boardIdStr)
-    if err != nil {
-        c.AbortWithStatusJSON(400, gin.H{"error": "invalid boardId"})
-        return
-    }
+	userId, _ := c.Get("id")
+	boardIdStr := c.Param("boardId")
+	if boardIdStr == "" {
+		c.AbortWithStatusJSON(400, gin.H{"error": "Board id cannot be empty"})
+		return
+	}
+	boardId, err := bson.ObjectIDFromHex(boardIdStr)
+	if err != nil {
+		c.AbortWithStatusJSON(400, gin.H{"error": "invalid boardId"})
+		return
+	}
 
-    var board Board
-    if err := boardsDb.FindOne(context.TODO(), bson.M{"_id": boardId}).Decode(&board); err != nil {
-        if errors.Is(err, mongo.ErrNoDocuments) {
-            c.AbortWithStatusJSON(404, gin.H{"error": "Board does not exist"})
-            return
-        }
-        c.AbortWithStatusJSON(500, gin.H{"error": "Failed to fetch board"})
-        return
-    }
+	var board Board
+	if err := boardsDb.FindOne(context.TODO(), bson.M{"_id": boardId}).Decode(&board); err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			c.AbortWithStatusJSON(404, gin.H{"error": "Board does not exist"})
+			return
+		}
+		c.AbortWithStatusJSON(500, gin.H{"error": "Failed to fetch board"})
+		return
+	}
 
-    // Authorization: allow if the board is owned by user or by a workspace where user is a member
-    if board.OwnedBy == userId.(bson.ObjectID) {
-        c.JSON(200, board)
-        return
-    }
-    // If owned by a workspace, ensure membership
-    var workspace Workspace
-    if err := workspacesDb.FindOne(context.TODO(), bson.M{"_id": board.OwnedBy}).Decode(&workspace); err != nil {
-        if errors.Is(err, mongo.ErrNoDocuments) {
-            // Not a workspace owner id; deny
-            c.AbortWithStatusJSON(403, gin.H{"error": "forbidden"})
-            return
-        }
-        c.AbortWithStatusJSON(500, gin.H{"error": "Failed to check permissions"})
-        return
-    }
-    // Check membership
-    if slices.Index(workspace.Members, userId.(bson.ObjectID)) == -1 && workspace.OwnedBy != userId.(bson.ObjectID) {
-        c.AbortWithStatusJSON(403, gin.H{"error": "forbidden"})
-        return
-    }
-    c.JSON(200, board)
+	// Authorization: allow if the board is owned by user or by a workspace where user is a member
+	if board.OwnedBy == userId.(bson.ObjectID) {
+		c.JSON(200, board)
+		return
+	}
+	// If owned by a workspace, ensure membership
+	var workspace Workspace
+	if err := workspacesDb.FindOne(context.TODO(), bson.M{"_id": board.OwnedBy}).Decode(&workspace); err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			// Not a workspace owner id; deny
+			c.AbortWithStatusJSON(403, gin.H{"error": "forbidden"})
+			return
+		}
+		c.AbortWithStatusJSON(500, gin.H{"error": "Failed to check permissions"})
+		return
+	}
+	// Check membership
+	if slices.Index(workspace.Members, userId.(bson.ObjectID)) == -1 && workspace.OwnedBy != userId.(bson.ObjectID) {
+		c.AbortWithStatusJSON(403, gin.H{"error": "forbidden"})
+		return
+	}
+	c.JSON(200, board)
 }
