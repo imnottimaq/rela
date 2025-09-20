@@ -9,7 +9,7 @@
       v-model:visible="mainVisible"
       storage-key="rela-window-main"
     >
-      <p>Rela is WIP task tracker with ability to self-host it.<br />You can drag and resize all windows.<br />Use Account to login or register.</p>
+      <p>Rela is WIP task tracker with ability to self-host it.<br />You can move and resize all windows.<br />Use Account to login or register.</p>
       <img class="demo" src="../assets/confused_travolta.gif" alt="Confused Travolta" />
     </WindowComponent>
 </template>
