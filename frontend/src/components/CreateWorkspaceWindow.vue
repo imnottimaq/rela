@@ -28,6 +28,7 @@ import { ref } from 'vue';
 import WindowComponent from './WindowComponent.vue';
 import { workspaceApi } from '../utils/http';
 import { useWorkspaces } from '../composables/useWorkspaces';
+import { openWorkspaceWindow } from '../composables/useWorkspaces';
 import { useCreateWorkspaceWindow } from '../composables/useCreateWorkspaceWindow';
 
 const { refreshWorkspaces } = useWorkspaces();
@@ -54,8 +55,13 @@ const onCreate = async () => {
     return;
   }
   try {
-    await workspaceApi.createWorkspace({ name: trimmed });
-    await refreshWorkspaces();
+    const { data } = await workspaceApi.createWorkspace({ name: trimmed });
+    // Open newly created workspace window immediately using returned data
+    if (data) {
+      openWorkspaceWindow(data);
+    }
+    // Refresh list to sync menus and cache, but don't auto-open others
+    await refreshWorkspaces({ skipRestore: true });
     onCancel();
   } catch (e) {
     console.error('Create workspace failed', e);
@@ -67,4 +73,3 @@ const onCreate = async () => {
 <style scoped>
 .error { color: #d00000; }
 </style>
-

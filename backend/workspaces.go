@@ -25,17 +25,13 @@ func createWorkspace(c *gin.Context) {
 	id, _ := c.Get("id")
 	userId := id.(bson.ObjectID)
 	var input Workspace
-	var i Workspace
 	if err := json.NewDecoder(c.Request.Body).Decode(&input); err != nil {
 		c.AbortWithStatusJSON(500, gin.H{"error": "Something went wrong when parsing request"})
 		return
 	} else if input.Name == "" {
 		c.AbortWithStatusJSON(400, gin.H{"error": "Field 'name' is not specified"})
 		return
-	} else if err := workspacesDb.FindOne(context.TODO(), bson.D{{"name", input.Name}}).Decode(&i); err == nil {
-		c.AbortWithStatusJSON(400, gin.H{"error": "Workspace with this name already exists"})
-		return
-	}
+	} // FUCK IT, WE DONT CARE ABOUT UNIQUE WORKSPACE NAMES
 	output := Workspace{
 		Name:    input.Name,
 		OwnedBy: userId,

@@ -10,7 +10,8 @@ export const workspacesError = ref("");
 export const openWorkspaceWindows = ref([]); // [{ id, name, visible }]
 
 // Fetch user workspaces
-export const refreshWorkspaces = async () => {
+export const refreshWorkspaces = async (options = {}) => {
+  const { skipRestore = false } = options || {};
   if (loadingWorkspaces.value) return;
   loadingWorkspaces.value = true;
   workspacesError.value = "";
@@ -18,7 +19,9 @@ export const refreshWorkspaces = async () => {
     const { data } = await authApi.getUserWorkspaces();
     const list = Array.isArray(data?.workspaces) ? data.workspaces : [];
     workspaces.value = list;
-    restoreWorkspaceWindowsFromStorage();
+    if (!skipRestore) {
+      restoreWorkspaceWindowsFromStorage();
+    }
   } catch (err) {
     console.error("Failed to load workspaces", err);
     workspaces.value = [];
