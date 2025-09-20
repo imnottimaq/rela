@@ -12,10 +12,11 @@ import (
 	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 
-	ratelimit "github.com/JGLTechnologies/gin-rate-limit"
 	"github.com/gin-contrib/cors"
+	"github.com/gin-contrib/pprof"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
+	ratelimit "github.com/khaaleoo/gin-rate-limiter/core"
 	swaggerfiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
 )
@@ -34,13 +35,6 @@ var workspacesDb = dbClient.Database("rela").Collection("workspaces")
 
 var emailRegex = regexp.MustCompile(`^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$`)
 
-func keyFunc(c *gin.Context) string {
-	return c.ClientIP()
-}
-func rateLimitHandler(c *gin.Context, info ratelimit.Info) {
-	c.AbortWithStatusJSON(429, gin.H{"error": "too many requests"})
-}
-
 func getAllowedOrigins() []string {
 	if frontendOriginEnv == "" {
 		return []string{"http://localhost:5173", "http://localhost:8000", "http://localhost:5174"}
@@ -58,6 +52,7 @@ func getAllowedOrigins() []string {
 // @BasePath		/api/v1
 func main() {
 	r := gin.Default()
+	pprof.Register(r)
 	corsConfig := cors.DefaultConfig()
 	corsConfig.AllowOrigins = getAllowedOrigins()
 	corsConfig.AllowMethods = []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"}
@@ -65,15 +60,12 @@ func main() {
 	corsConfig.AllowCredentials = true
 	r.Use(cors.New(corsConfig))
 	r.MaxMultipartMemory = 8 << 20
-	store := ratelimit.InMemoryStore(&ratelimit.InMemoryOptions{
-		Rate:  time.Second,
-		Limit: 5,
+	// Rate Limiter
+	rateLimiter := ratelimit.RequireRateLimiter(ratelimit.RateLimiter{
+		RateLimiterType: ratelimit.IPRateLimiter,
+		Key:             "rela",
+		Option:          ratelimit.RateLimiterOption{Limit: 5, Burst: 100, Len: 1 * time.Minute},
 	})
-	rateLimiter := ratelimit.RateLimiter(store, &ratelimit.Options{
-		ErrorHandler: rateLimitHandler,
-		KeyFunc:      keyFunc,
-	})
-
 	// Groups
 	protected := r.Group("/api/v1")
 	workspaces := protected.Group("/workspaces/:workspaceId")
@@ -82,6 +74,7 @@ func main() {
 	boards := protected.Group("/boards")
 
 	//Middleware
+	r.Use(rateLimiter)
 	protected.Use(authMiddleware())
 	boards.Use(authMiddleware())
 	tasks.Use(authMiddleware())
@@ -89,60 +82,58 @@ func main() {
 	users.Use(userMiddleware())
 	workspaces.Use(authMiddleware())
 	{
-		//Tasks
-		r.Static("/app", "../frontend/dist/")
-		r.Static("/assets", "../frontend/dist/assets")
 		r.Static("/img", "./img")
-		tasks.GET("/", rateLimiter, getAllTasks)
-		tasks.POST("/", rateLimiter, createNewTask)
-		tasks.PATCH("/:taskId", rateLimiter, editExistingTask)
-		tasks.DELETE("/:taskId", rateLimiter, deleteExistingTask)
+		//Tasks
+		tasks.GET("/", getAllTasks)
+		tasks.POST("/", createNewTask)
+		tasks.PATCH("/:taskId", editExistingTask)
+		tasks.DELETE("/:taskId", deleteExistingTask)
 
 		//Boards
-		boards.GET("/", rateLimiter, getAllBoards)
-		boards.POST("/", rateLimiter, addBoard)
-		boards.DELETE("/:boardId", rateLimiter, deleteBoard)
-		boards.PATCH("/:boardId", rateLimiter, editBoard)
+		boards.GET("/", getAllBoards)
+		boards.POST("/", addBoard)
+		boards.DELETE("/:boardId", deleteBoard)
+		boards.PATCH("/:boardId", editBoard)
 
 		//Users
-		users.POST("/create", rateLimiter, createUser)
-		users.POST("/login", rateLimiter, loginUser)
-		users.GET("/refresh", rateLimiter, refreshAccessToken)
+		users.POST("/create", createUser)
+		users.POST("/login", loginUser)
+		users.GET("/refresh", refreshAccessToken)
 
-		protected.GET("/users/workspaces", rateLimiter, getAllWorkspaces)
-		protected.DELETE("/users/delete", rateLimiter, deleteUser)
-		protected.POST("/users/upload_avatar", rateLimiter, uploadAvatar)
-		protected.GET("/users/get_info", rateLimiter, getUserDetails)
+		protected.GET("/users/workspaces", getAllWorkspaces)
+		protected.DELETE("/users/delete", deleteUser)
+		protected.POST("/users/upload_avatar", uploadAvatar)
+		protected.GET("/users/get_info", getUserDetails)
 
 		//Workspace management
-		protected.POST("/workspaces/create", rateLimiter, createWorkspace)
-		workspaces.POST("/add/:joinToken", rateLimiter, addMember)
-		workspaces.GET("/new_invite", rateLimiter, createNewInvite)
-		workspaces.DELETE("/kick", rateLimiter, kickMember)
-		workspaces.PATCH("/promote/:userId", rateLimiter, promoteMember)
-		workspaces.GET("/members", rateLimiter, getAllMembers)
-		workspaces.GET("/", rateLimiter, getWorkspace)
-		workspaces.GET("/info", rateLimiter, getWorkspaceInfo)
-		workspaces.PATCH("/", rateLimiter, editWorkspace)
-		workspaces.DELETE("/", rateLimiter, deleteWorkspace)
-		workspaces.POST("/upload_avatar", rateLimiter, uploadAvatar)
+		protected.POST("/workspaces/create", createWorkspace)
+		workspaces.POST("/add/:joinToken", addMember)
+		workspaces.GET("/new_invite", createNewInvite)
+		workspaces.DELETE("/kick", kickMember)
+		workspaces.PATCH("/promote/:userId", promoteMember)
+		workspaces.GET("/members", getAllMembers)
+		workspaces.GET("/", getWorkspace)
+		workspaces.GET("/info", getWorkspaceInfo)
+		workspaces.PATCH("/", editWorkspace)
+		workspaces.DELETE("/", deleteWorkspace)
+		workspaces.POST("/upload_avatar", uploadAvatar)
 
 		//Workspace tasks
-		workspaces.GET("/tasks/", rateLimiter, getAllTasks)
-		workspaces.POST("/tasks/", rateLimiter, createNewTask)
-		workspaces.PATCH("/tasks/:taskId", rateLimiter, editExistingTask)
-		workspaces.DELETE("/delete/:taskId", rateLimiter, deleteExistingTask)
-		workspaces.POST("/assign", rateLimiter, assignTask)
+		workspaces.GET("/tasks/", getAllTasks)
+		workspaces.POST("/tasks/", createNewTask)
+		workspaces.PATCH("/tasks/:taskId", editExistingTask)
+		workspaces.DELETE("/delete/:taskId", deleteExistingTask)
+		workspaces.POST("/assign", assignTask)
 
 		//Workspace boards
-		workspaces.GET("/boards", rateLimiter, getAllBoards)
-		workspaces.GET("/boards/:boardId", rateLimiter, getBoard)
-		workspaces.POST("/boards", rateLimiter, addBoard)
-		workspaces.DELETE("/boards/:boardId", rateLimiter, deleteBoard)
-		workspaces.PATCH("/boards/:boardId", rateLimiter, editBoard)
+		workspaces.GET("/boards", getAllBoards)
+		workspaces.GET("/boards/:boardId", getBoard)
+		workspaces.POST("/boards", addBoard)
+		workspaces.DELETE("/boards/:boardId", deleteBoard)
+		workspaces.PATCH("/boards/:boardId", editBoard)
 
 		//Single board by id
-		boards.GET("/:boardId", rateLimiter, getBoard)
+		boards.GET("/:boardId", getBoard)
 
 		//Docs
 		r.GET("/api/v1/docs/*any", ginSwagger.WrapHandler(swaggerfiles.Handler))
