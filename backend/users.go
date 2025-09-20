@@ -21,7 +21,7 @@ import (
 )
 
 // @Summary Create new user
-// @Router /api/v1/users/create [post]
+// @Router /users/create [post]
 // @Accept json
 // @Success 200 {array} TokenSwagger
 // @Produce json
@@ -100,7 +100,7 @@ func createUser(c *gin.Context) {
 }
 
 // @Summary Login user
-// @Router /api/v1/users/login [post]
+// @Router /users/login [post]
 // @Accept json
 // @Success 200 {array} TokenSwagger
 // @Produce json
@@ -142,7 +142,7 @@ func loginUser(c *gin.Context) {
 }
 
 // @Summary Delete user
-// @Router /api/v1/users/delete [delete]
+// @Router /users/delete [delete]
 // @Accept json
 // @Success 200
 // @Tags Users
@@ -177,8 +177,8 @@ func deleteUser(c *gin.Context) {
 }
 
 // @Summary Upload avatar for user
-// @Router /api/v1/users/upload_avatar [post]
-// @Router /api/v1/workspaces/{workspaceId}/upload_avatar [post]
+// @Router /users/upload_avatar [post]
+// @Router /workspaces/{workspaceId}/upload_avatar [post]
 // @Accept mpfd
 // @Success 200
 // @Tags Users
@@ -256,7 +256,7 @@ func uploadAvatar(c *gin.Context) {
 
 // @Summary Refresh bearer token
 // @Description For this route, you must have refresh token, that is sent to your browser when you log into user account as an http-only cookie
-// @Router /api/v1/users/refresh [get]
+// @Router /users/refresh [get]
 // @Success 200 {array} TokenSwagger
 // @Produce json
 // @Tags Users
@@ -290,7 +290,7 @@ func refreshAccessToken(c *gin.Context) {
 
 // @Summary Get user info
 // @Description For this route, you must have bearer token
-// @Router /api/v1/users/get_info [get]
+// @Router /users/get_info [get]
 // @Success 200 {array} User
 // @Produce json
 // @Tags Users

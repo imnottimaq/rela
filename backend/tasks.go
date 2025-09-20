@@ -12,8 +12,8 @@ import (
 
 // @Summary Get all tasks
 // @Description Return all tasks that current user owns
-// @Router /api/v1/tasks [get]
-// @Router /api/v1/workspaces/{workspaceId}/tasks [get]
+// @Router /tasks [get]
+// @Router /workspaces/{workspaceId}/tasks [get]
 // @Success 200 {array} Task
 // @Produce json
 // @Tags Tasks
@@ -45,8 +45,8 @@ func getAllTasks(c *gin.Context) {
 }
 
 // @Summary Create new task
-// @Router /api/v1/tasks [post]
-// @Router /api/v1/workspaces/{workspaceId}/tasks [post]
+// @Router /tasks [post]
+// @Router /workspaces/{workspaceId}/tasks [post]
 // @Accept json
 // @Success 200 {array} Task
 // @Produce json
@@ -98,8 +98,8 @@ func createNewTask(c *gin.Context) {
 }
 
 // @Summary Edit existing task
-// @Router /api/v1/tasks/{taskId} [patch]
-// @Router /api/v1/workspaces/{workspaceId}/tasks/{taskId} [patch]
+// @Router /tasks/{taskId} [patch]
+// @Router /workspaces/{workspaceId}/tasks/{taskId} [patch]
 // @Accept json
 // @Success 200
 // @Tags Tasks
@@ -134,8 +134,8 @@ func editExistingTask(c *gin.Context) {
 }
 
 // @Summary Delete existing task
-// @Router /api/v1/tasks/{taskId} [delete]
-// @Router /api/v1/workspaces/{workspaceId}/tasks/{taskId} [delete]
+// @Router /tasks/{taskId} [delete]
+// @Router /workspaces/{workspaceId}/tasks/{taskId} [delete]
 // @Success 200
 // @Produce json
 // @Tags Tasks
