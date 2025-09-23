@@ -16,15 +16,22 @@ import (
 	"time"
 )
 
+var (
+	lowerRegex   = regexp.MustCompile(`[a-z]`)
+	upperRegex   = regexp.MustCompile(`[A-Z]`)
+	digitRegex   = regexp.MustCompile(`\d`)
+	specialRegex = regexp.MustCompile(`[!"#$%&'()*+,\-./:;<=>?@[\\\]^_{|}~]`)
+)
+
 func validatePassword(password string) bool {
 	if len(password) < 8 {
 		return false
 	}
 
-	hasLower := regexp.MustCompile(`[a-z]`).MatchString(password)
-	hasUpper := regexp.MustCompile(`[A-Z]`).MatchString(password)
-	hasDigit := regexp.MustCompile(`\d`).MatchString(password)
-	hasSpecial := regexp.MustCompile(`[!"#$%&'()*+,\-./:;<=>?@[\\\]^_{|}~]`).MatchString(password)
+	hasLower := lowerRegex.MatchString(password)
+	hasUpper := upperRegex.MatchString(password)
+	hasDigit := digitRegex.MatchString(password)
+	hasSpecial := specialRegex.MatchString(password)
 
 	return hasLower && hasUpper && hasDigit && hasSpecial
 }
@@ -91,31 +98,30 @@ func authMiddleware() gin.HandlerFunc {
 
 func taskMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if c.Request.Method == "PATCH" || c.Request.Method == "DELETE" {
+		if !(c.Request.Method == "PATCH") && !(c.Request.Method == "DELETE") {
 			c.Next()
+			return
+		}
+		input, _ := c.Get("id")
+		userId := input.(bson.ObjectID)
+		taskId := c.Param("taskId")
+		if taskId == "" {
+			c.AbortWithStatusJSON(400, gin.H{"error": "Task id is required"})
+			return
+		}
+		var output Task
+		if err := tasksDb.FindOne(context.TODO(), bson.D{{"_id", taskId}}).Decode(&output); err != nil {
+			if errors.Is(err, mongo.ErrNoDocuments) {
+				c.AbortWithStatusJSON(404, gin.H{"error": "Not Found"})
+				return
+			}
 		} else {
-			input, _ := c.Get("id")
-			userId := input.(bson.ObjectID)
-			if taskId := c.Param("taskId"); taskId == "" {
-				print(taskId)
-				c.AbortWithStatusJSON(400, gin.H{"error": "Task id is required"})
+			if userId != output.CreatedBy {
+				c.AbortWithStatusJSON(403, gin.H{"error": "You do not own this task"})
 				return
 			} else {
-				var output Task
-				if err := tasksDb.FindOne(context.TODO(), bson.D{{"_id", taskId}}).Decode(&output); err != nil {
-					if errors.Is(err, mongo.ErrNoDocuments) {
-						c.AbortWithStatusJSON(404, gin.H{"error": "Not Found"})
-						return
-					}
-				} else {
-					if userId != output.CreatedBy {
-						c.AbortWithStatusJSON(403, gin.H{"error": "You do not own this task"})
-						return
-					} else {
-						c.Set("taskObj", output)
-						c.Next()
-					}
-				}
+				c.Set("taskObj", output)
+				c.Next()
 			}
 		}
 	}
@@ -126,61 +132,56 @@ func userMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if c.Request.URL.Path == "/api/v1/users/refresh" {
 			c.Next()
-		} else {
-			bodyBytes, err := io.ReadAll(c.Request.Body)
-			if err != nil {
+			return
+		}
+		bodyBytes, err := io.ReadAll(c.Request.Body)
+		if err != nil {
+			c.AbortWithStatusJSON(500, gin.H{"error": "Something went wrong when parsing request"})
+			return
+		}
+		c.Request.Body = io.NopCloser(bytes.NewReader(bodyBytes))
+		switch c.Request.URL.Path {
+		case "/api/v1/users/create":
+			var input CreateUser
+			if err := json.Unmarshal(bodyBytes, &input); err != nil {
 				c.AbortWithStatusJSON(500, gin.H{"error": "Something went wrong when parsing request"})
 				return
 			}
-			c.Request.Body = io.NopCloser(bytes.NewReader(bodyBytes))
-			switch c.Request.URL.Path {
-			case "/api/v1/users/create":
-				var input CreateUser
-				if err := json.Unmarshal(bodyBytes, &input); err != nil {
-					c.AbortWithStatusJSON(500, gin.H{"error": "Something went wrong when parsing request"})
-					return
-				}
-				if input.Email == "" {
-					c.AbortWithStatusJSON(400, gin.H{"error": "Email is required"})
-					return
-				} else if !emailRegex.MatchString(input.Email) {
-					c.AbortWithStatusJSON(400, gin.H{"error": "Bad email"})
-					return
-				} else if input.Password == "" {
-					c.AbortWithStatusJSON(400, gin.H{"error": "Password is required"})
-					return
-				} else if !validatePassword(input.Password) {
-					c.AbortWithStatusJSON(400, gin.H{"error": "Password does not meet requirements"})
-					return
-				} else if input.Name == "" {
-					c.AbortWithStatusJSON(400, gin.H{"error": "Name is required"})
-					return
-				}
-				c.Set("createInput", input)
-			case "/api/v1/users/login":
-				fallthrough
-			default:
-				var input LoginUser
-				if err := json.Unmarshal(bodyBytes, &input); err != nil {
-					c.AbortWithStatusJSON(500, gin.H{"error": "Something went wrong when parsing request"})
-					return
-				}
-				if input.Email == "" {
-					c.AbortWithStatusJSON(400, gin.H{"error": "Email is required"})
-					return
-				} else if !emailRegex.MatchString(input.Email) {
-					c.AbortWithStatusJSON(400, gin.H{"error": "Bad email"})
-					return
-				} else if input.Password == "" {
-					c.AbortWithStatusJSON(400, gin.H{"error": "Password is required"})
-					return
-				} else if !validatePassword(input.Password) {
-					c.AbortWithStatusJSON(400, gin.H{"error": "Password does not meet requirements"})
-					return
-				}
-				c.Set("input", input)
+			if input.Email == "" {
+				c.AbortWithStatusJSON(400, gin.H{"error": "Email is required"})
+				return
+			} else if !emailRegex.MatchString(input.Email) {
+				c.AbortWithStatusJSON(400, gin.H{"error": "Bad email"})
+				return
+			} else if input.Password == "" {
+				c.AbortWithStatusJSON(400, gin.H{"error": "Password is required"})
+				return
+			} else if !validatePassword(input.Password) {
+				c.AbortWithStatusJSON(400, gin.H{"error": "Password does not meet requirements"})
+				return
+			} else if input.Name == "" {
+				c.AbortWithStatusJSON(400, gin.H{"error": "Name is required"})
+				return
 			}
-			c.Next()
+			c.Set("createInput", input)
+		case "/api/v1/users/login":
+			var input LoginUser
+			if err := json.Unmarshal(bodyBytes, &input); err != nil {
+				c.AbortWithStatusJSON(500, gin.H{"error": "Something went wrong when parsing request"})
+				return
+			}
+			if input.Email == "" {
+				c.AbortWithStatusJSON(400, gin.H{"error": "Email is required"})
+				return
+			} else if !emailRegex.MatchString(input.Email) {
+				c.AbortWithStatusJSON(400, gin.H{"error": "Bad email"})
+				return
+			} else if input.Password == "" {
+				c.AbortWithStatusJSON(400, gin.H{"error": "Password is required"})
+				return
+			}
+			c.Set("input", input)
 		}
+		c.Next()
 	}
 }

@@ -17,9 +17,12 @@ const docTemplate = `{
     "paths": {
         "/boards": {
             "get": {
-                "consumes": [
-                    "application/json"
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
                 ],
+                "description": "Returns all boards owned by the current user, or all boards for a given workspace.",
                 "produces": [
                     "application/json"
                 ],
@@ -27,28 +30,28 @@ const docTemplate = `{
                     "Boards"
                 ],
                 "summary": "Get all boards",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer Token",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    }
-                ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "A list of boards",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/main.Board"
-                            }
+                            "$ref": "#/definitions/main.AllBoardsResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
                         }
                     }
                 }
             },
             "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Creates a new board for the current user or a workspace.",
                 "consumes": [
                     "application/json"
                 ],
@@ -58,34 +61,151 @@ const docTemplate = `{
                 "tags": [
                     "Boards"
                 ],
-                "summary": "Create new board",
+                "summary": "Create a new board",
                 "parameters": [
                     {
-                        "description": "Create board request",
+                        "description": "Board creation data",
                         "name": "data",
                         "in": "body",
                         "required": true,
                         "schema": {
                             "$ref": "#/definitions/main.CreateBoard"
                         }
-                    },
-                    {
-                        "type": "string",
-                        "description": "Bearer Token",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK"
+                        "description": "The created board",
+                        "schema": {
+                            "$ref": "#/definitions/main.Board"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request - no name given",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
+                        }
                     }
                 }
             }
         },
         "/boards/{boardId}": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Retrieves a specific board by its ID.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Boards"
+                ],
+                "summary": "Get a board by ID",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Board ID",
+                        "name": "boardId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The requested board",
+                        "schema": {
+                            "$ref": "#/definitions/main.Board"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request - invalid board ID",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden - you do not have access to this board",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found - board not found",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Deletes a specific board.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Boards"
+                ],
+                "summary": "Delete a board",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Board ID",
+                        "name": "boardId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Board deleted successfully"
+                    },
+                    "403": {
+                        "description": "Forbidden - you do not own this board",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found - board not found",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Edits the details of a specific board.",
                 "consumes": [
                     "application/json"
                 ],
@@ -95,7 +215,7 @@ const docTemplate = `{
                 "tags": [
                     "Boards"
                 ],
-                "summary": "Get board by id",
+                "summary": "Edit a board",
                 "parameters": [
                     {
                         "type": "string",
@@ -105,78 +225,57 @@ const docTemplate = `{
                         "required": true
                     },
                     {
-                        "type": "string",
-                        "description": "Bearer Token",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
+                        "description": "Fields to edit in the board",
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/main.CreateBoard"
+                        }
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "The updated board",
                         "schema": {
                             "$ref": "#/definitions/main.Board"
                         }
-                    }
-                }
-            },
-            "delete": {
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Boards"
-                ],
-                "summary": "Delete board",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer Token",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK"
-                    }
-                }
-            },
-            "patch": {
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Boards"
-                ],
-                "summary": "Edit board",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer Token",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK"
+                    },
+                    "400": {
+                        "description": "Bad request - invalid input",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden - you do not own this board",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found - board not found",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
+                        }
                     }
                 }
             }
         },
         "/tasks": {
             "get": {
-                "description": "Return all tasks that current user owns",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns all tasks owned by the current user, or all tasks for a given workspace.",
                 "produces": [
                     "application/json"
                 ],
@@ -184,28 +283,28 @@ const docTemplate = `{
                     "Tasks"
                 ],
                 "summary": "Get all tasks",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer Token",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    }
-                ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "A list of tasks",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/main.Task"
-                            }
+                            "$ref": "#/definitions/main.AllTasksResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
                         }
                     }
                 }
             },
             "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Creates a new task for the current user or a workspace.",
                 "consumes": [
                     "application/json"
                 ],
@@ -215,33 +314,35 @@ const docTemplate = `{
                 "tags": [
                     "Tasks"
                 ],
-                "summary": "Create new task",
+                "summary": "Create a new task",
                 "parameters": [
                     {
-                        "description": "Create task request",
+                        "description": "Task creation data",
                         "name": "data",
                         "in": "body",
                         "required": true,
                         "schema": {
                             "$ref": "#/definitions/main.CreateTask"
                         }
-                    },
-                    {
-                        "type": "string",
-                        "description": "Bearer Token",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "The created task",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/main.Task"
-                            }
+                            "$ref": "#/definitions/main.Task"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request - check your input",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
                         }
                     }
                 }
@@ -249,63 +350,115 @@ const docTemplate = `{
         },
         "/tasks/{taskId}": {
             "delete": {
-                "produces": [
-                    "application/json"
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
                 ],
+                "description": "Deletes a specific task.",
                 "tags": [
                     "Tasks"
                 ],
-                "summary": "Delete existing task",
+                "summary": "Delete an existing task",
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Bearer Token",
-                        "name": "Authorization",
-                        "in": "header",
+                        "description": "Task ID",
+                        "name": "taskId",
+                        "in": "path",
                         "required": true
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK"
+                        "description": "Task deleted successfully"
+                    },
+                    "403": {
+                        "description": "Forbidden - you do not have access to this task",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found - task or workspace not found",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
+                        }
                     }
                 }
             },
             "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Edits the details of a specific task.",
                 "consumes": [
                     "application/json"
                 ],
                 "tags": [
                     "Tasks"
                 ],
-                "summary": "Edit existing task",
+                "summary": "Edit an existing task",
                 "parameters": [
                     {
-                        "description": "Edit task request",
+                        "type": "string",
+                        "description": "Task ID",
+                        "name": "taskId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Fields to edit in the task",
                         "name": "data",
                         "in": "body",
                         "required": true,
                         "schema": {
                             "$ref": "#/definitions/main.EditTask"
                         }
-                    },
-                    {
-                        "type": "string",
-                        "description": "Bearer Token",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK"
+                        "description": "Task updated successfully"
+                    },
+                    "400": {
+                        "description": "Bad request - invalid input or deadline in the past",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden - you do not have access to this task",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found - task or workspace not found",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
+                        }
                     }
                 }
             }
         },
         "/users/create": {
             "post": {
+                "description": "Creates a new user and returns an access token.",
                 "consumes": [
                     "application/json"
                 ],
@@ -318,7 +471,7 @@ const docTemplate = `{
                 "summary": "Create new user",
                 "parameters": [
                     {
-                        "description": "Create user request",
+                        "description": "User creation data",
                         "name": "data",
                         "in": "body",
                         "required": true,
@@ -329,12 +482,27 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Access token",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/main.TokenSwagger"
-                            }
+                            "$ref": "#/definitions/main.TokenSwagger"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request - check your input",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
+                        }
+                    },
+                    "409": {
+                        "description": "User with that email already exists",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
                         }
                     }
                 }
@@ -342,6 +510,12 @@ const docTemplate = `{
         },
         "/users/delete": {
             "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Deletes the currently authenticated user.",
                 "consumes": [
                     "application/json"
                 ],
@@ -351,32 +525,48 @@ const docTemplate = `{
                 "summary": "Delete user",
                 "parameters": [
                     {
-                        "description": "Delete user request",
+                        "description": "User password for confirmation",
                         "name": "data",
                         "in": "body",
                         "required": true,
                         "schema": {
                             "$ref": "#/definitions/main.LoginUser"
                         }
-                    },
-                    {
-                        "type": "string",
-                        "description": "Bearer Token",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK"
+                        "description": "User deleted successfully"
+                    },
+                    "400": {
+                        "description": "Bad request - password mismatch",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
+                        }
                     }
                 }
             }
         },
         "/users/get_info": {
             "get": {
-                "description": "For this route, you must have bearer token",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Retrieves details for the currently authenticated user.",
                 "produces": [
                     "application/json"
                 ],
@@ -384,23 +574,23 @@ const docTemplate = `{
                     "Users"
                 ],
                 "summary": "Get user info",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer Token",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    }
-                ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "User details",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/main.User"
-                            }
+                            "$ref": "#/definitions/main.User"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
                         }
                     }
                 }
@@ -408,6 +598,7 @@ const docTemplate = `{
         },
         "/users/login": {
             "post": {
+                "description": "Logs in a user and returns an access token.",
                 "consumes": [
                     "application/json"
                 ],
@@ -420,7 +611,7 @@ const docTemplate = `{
                 "summary": "Login user",
                 "parameters": [
                     {
-                        "description": "Login user request",
+                        "description": "User login data",
                         "name": "data",
                         "in": "body",
                         "required": true,
@@ -431,12 +622,59 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Access token",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/main.TokenSwagger"
-                            }
+                            "$ref": "#/definitions/main.TokenSwagger"
+                        }
+                    },
+                    "404": {
+                        "description": "User not found",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
+                        }
+                    }
+                }
+            }
+        },
+        "/users/refresh": {
+            "get": {
+                "description": "Generates a new access token using the refresh token stored in an http-only cookie.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Users"
+                ],
+                "summary": "Refresh bearer token",
+                "responses": {
+                    "200": {
+                        "description": "New access token",
+                        "schema": {
+                            "$ref": "#/definitions/main.TokenSwagger"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid token",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
+                        }
+                    },
+                    "403": {
+                        "description": "Authorization required",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
                         }
                     }
                 }
@@ -444,72 +682,103 @@ const docTemplate = `{
         },
         "/users/upload_avatar": {
             "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Uploads an avatar image for the current user or a specified workspace.",
                 "consumes": [
                     "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
                 ],
                 "tags": [
                     "Users"
                 ],
-                "summary": "Upload avatar for user",
+                "summary": "Upload avatar for user or workspace",
                 "parameters": [
                     {
                         "type": "file",
-                        "description": "Avatar",
-                        "name": "data",
+                        "description": "Avatar image file (jpg or png)",
+                        "name": "img",
                         "in": "formData",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Bearer Token",
-                        "name": "Authorization",
-                        "in": "header",
                         "required": true
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK"
+                        "description": "Avatar uploaded successfully"
+                    },
+                    "400": {
+                        "description": "Bad request - no file or wrong format",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
+                        }
+                    },
+                    "404": {
+                        "description": "Workspace not found",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
+                        }
                     }
                 }
             }
         },
         "/users/workspaces": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns a list of all workspaces the current user is a member of.",
+                "produces": [
+                    "application/json"
+                ],
                 "tags": [
                     "Workspaces"
                 ],
                 "summary": "Get all workspaces for the current user",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer Token",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    }
-                ],
                 "responses": {
                     "200": {
-                        "description": "OK"
+                        "description": "A list of workspaces",
+                        "schema": {
+                            "$ref": "#/definitions/main.AllWorkspacesResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
+                        }
                     }
                 }
             }
         },
         "/workspaces/add/{joinToken}": {
             "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Adds the current user to a workspace using an invite token.",
+                "produces": [
+                    "application/json"
+                ],
                 "tags": [
                     "Workspaces"
                 ],
-                "summary": "Accept invite",
+                "summary": "Join a workspace",
                 "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer Token",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
                     {
                         "type": "string",
                         "description": "Join Token",
@@ -520,59 +789,96 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK"
+                        "description": "Successfully joined the workspace"
+                    },
+                    "400": {
+                        "description": "Bad request - invalid token",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found - workspace not found",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
+                        }
                     }
                 }
             }
         },
         "/workspaces/create": {
             "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Creates a new workspace for the current user.",
                 "consumes": [
+                    "application/json"
+                ],
+                "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "Workspaces"
                 ],
-                "summary": "Create new workspace",
+                "summary": "Create a new workspace",
                 "parameters": [
                     {
-                        "description": "Create new workspace",
+                        "description": "Workspace creation data",
                         "name": "data",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/main.CreateBoard"
+                            "$ref": "#/definitions/main.CreateWorkspace"
                         }
-                    },
-                    {
-                        "type": "string",
-                        "description": "Bearer Token",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK"
+                        "description": "The created workspace",
+                        "schema": {
+                            "$ref": "#/definitions/main.Workspace"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request - no name specified",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
+                        }
                     }
                 }
             }
         },
-        "/workspaces/{workspaceId}/": {
+        "/workspaces/{workspaceId}": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Retrieves a specific workspace by its ID.",
+                "produces": [
+                    "application/json"
+                ],
                 "tags": [
                     "Workspaces"
                 ],
-                "summary": "Get workspace by id",
+                "summary": "Get a workspace by ID",
                 "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer Token",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
                     {
                         "type": "string",
                         "description": "Workspace ID",
@@ -583,26 +889,52 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "The requested workspace",
                         "schema": {
                             "$ref": "#/definitions/main.Workspace"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request - invalid workspace ID",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden - you are not a member of this workspace",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found - workspace not found",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
                         }
                     }
                 }
             },
             "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Deletes a specific workspace.",
+                "produces": [
+                    "application/json"
+                ],
                 "tags": [
                     "Workspaces"
                 ],
-                "summary": "Delete workspace",
+                "summary": "Delete a workspace",
                 "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer Token",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
                     {
                         "type": "string",
                         "description": "Workspace ID",
@@ -613,84 +945,169 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK"
+                        "description": "Workspace deleted successfully"
+                    },
+                    "403": {
+                        "description": "Forbidden - you are not the owner of this workspace",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found - workspace not found",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
+                        }
                     }
                 }
             },
             "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Edits the details of a specific workspace.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
                 "tags": [
                     "Workspaces"
                 ],
-                "summary": "Edit workspace",
+                "summary": "Edit a workspace",
                 "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer Token",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
                     {
                         "type": "string",
                         "description": "Workspace ID",
                         "name": "workspaceId",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "description": "Fields to edit in the workspace",
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/main.EditWorkspace"
+                        }
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK"
+                        "description": "The updated workspace",
+                        "schema": {
+                            "$ref": "#/definitions/main.Workspace"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request - invalid input",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden - you are not the owner of this workspace",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found - workspace not found",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
+                        }
                     }
                 }
             }
         },
         "/workspaces/{workspaceId}/assign": {
             "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Assigns a task within a workspace to a specific user.",
                 "consumes": [
+                    "application/json"
+                ],
+                "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "Tasks"
                 ],
-                "summary": "Assign task to someone",
+                "summary": "Assign a task to a user",
                 "parameters": [
-                    {
-                        "description": "Assign Task",
-                        "name": "data",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/main.AssignTask"
-                        }
-                    },
-                    {
-                        "type": "string",
-                        "description": "Bearer Token",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
                     {
                         "type": "string",
                         "description": "Workspace ID",
                         "name": "workspaceId",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "description": "Task and User IDs",
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/main.AssignTask"
+                        }
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK"
+                        "description": "The updated task",
+                        "schema": {
+                            "$ref": "#/definitions/main.Task"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden - you are not the owner or the user to be assigned",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found - workspace or task not found",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
+                        }
                     }
                 }
             }
         },
         "/workspaces/{workspaceId}/boards": {
             "get": {
-                "consumes": [
-                    "application/json"
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
                 ],
+                "description": "Returns all boards owned by the current user, or all boards for a given workspace.",
                 "produces": [
                     "application/json"
                 ],
@@ -701,32 +1118,33 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Workspace ID",
+                        "description": "Workspace ID (optional)",
                         "name": "workspaceId",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Bearer Token",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
+                        "in": "path"
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "A list of boards",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/main.Board"
-                            }
+                            "$ref": "#/definitions/main.AllBoardsResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
                         }
                     }
                 }
             },
             "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Creates a new board for the current user or a workspace.",
                 "consumes": [
                     "application/json"
                 ],
@@ -736,51 +1154,61 @@ const docTemplate = `{
                 "tags": [
                     "Boards"
                 ],
-                "summary": "Create new board",
+                "summary": "Create a new board",
                 "parameters": [
                     {
-                        "description": "Create board request",
+                        "type": "string",
+                        "description": "Workspace ID (optional)",
+                        "name": "workspaceId",
+                        "in": "path"
+                    },
+                    {
+                        "description": "Board creation data",
                         "name": "data",
                         "in": "body",
                         "required": true,
                         "schema": {
                             "$ref": "#/definitions/main.CreateBoard"
                         }
-                    },
-                    {
-                        "type": "string",
-                        "description": "Workspace ID",
-                        "name": "workspaceId",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Bearer Token",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK"
+                        "description": "The created board",
+                        "schema": {
+                            "$ref": "#/definitions/main.Board"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request - no name given",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
+                        }
                     }
                 }
             }
         },
         "/workspaces/{workspaceId}/boards/{boardId}": {
             "get": {
-                "consumes": [
-                    "application/json"
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
                 ],
+                "description": "Retrieves a specific board by its ID.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "Boards"
                 ],
-                "summary": "Get board by id",
+                "summary": "Get a board by ID",
                 "parameters": [
                     {
                         "type": "string",
@@ -791,62 +1219,104 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "Workspace ID",
+                        "description": "Workspace ID (optional, for authorization context)",
                         "name": "workspaceId",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Bearer Token",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
+                        "in": "path"
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "The requested board",
                         "schema": {
                             "$ref": "#/definitions/main.Board"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request - invalid board ID",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden - you do not have access to this board",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found - board not found",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
                         }
                     }
                 }
             },
             "delete": {
-                "consumes": [
-                    "application/json"
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
                 ],
+                "description": "Deletes a specific board.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "Boards"
                 ],
-                "summary": "Delete board",
+                "summary": "Delete a board",
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Workspace ID",
-                        "name": "workspaceId",
+                        "description": "Board ID",
+                        "name": "boardId",
                         "in": "path",
                         "required": true
                     },
                     {
                         "type": "string",
-                        "description": "Bearer Token",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
+                        "description": "Workspace ID (optional)",
+                        "name": "workspaceId",
+                        "in": "path"
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK"
+                        "description": "Board deleted successfully"
+                    },
+                    "403": {
+                        "description": "Forbidden - you do not own this board",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found - board not found",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
+                        }
                     }
                 }
             },
             "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Edits the details of a specific board.",
                 "consumes": [
                     "application/json"
                 ],
@@ -856,44 +1326,81 @@ const docTemplate = `{
                 "tags": [
                     "Boards"
                 ],
-                "summary": "Edit board",
+                "summary": "Edit a board",
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Workspace ID",
-                        "name": "workspaceId",
+                        "description": "Board ID",
+                        "name": "boardId",
                         "in": "path",
                         "required": true
                     },
                     {
                         "type": "string",
-                        "description": "Bearer Token",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
+                        "description": "Workspace ID (optional)",
+                        "name": "workspaceId",
+                        "in": "path"
+                    },
+                    {
+                        "description": "Fields to edit in the board",
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/main.CreateBoard"
+                        }
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK"
+                        "description": "The updated board",
+                        "schema": {
+                            "$ref": "#/definitions/main.Board"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request - invalid input",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden - you do not own this board",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found - board not found",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
+                        }
                     }
                 }
             }
         },
         "/workspaces/{workspaceId}/info": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Retrieves detailed information about a workspace, including members and boards.",
+                "produces": [
+                    "application/json"
+                ],
                 "tags": [
                     "Workspaces"
                 ],
-                "summary": "Get workspace info (basic, members, boards)",
+                "summary": "Get workspace info",
                 "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer Token",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
                     {
                         "type": "string",
                         "description": "Workspace ID",
@@ -904,10 +1411,33 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Detailed workspace information",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": true
+                            "$ref": "#/definitions/main.WorkspaceInfo"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request - invalid workspace ID",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden - you are not a member of this workspace",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found - workspace not found",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
                         }
                     }
                 }
@@ -915,47 +1445,84 @@ const docTemplate = `{
         },
         "/workspaces/{workspaceId}/kick": {
             "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Removes a member from a specific workspace.",
+                "consumes": [
+                    "application/json"
+                ],
                 "tags": [
                     "Workspaces"
                 ],
-                "summary": "Kick member",
+                "summary": "Kick a member from a workspace",
                 "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer Token",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
                     {
                         "type": "string",
                         "description": "Workspace ID",
                         "name": "workspaceId",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "description": "User ID to kick",
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/main.KickUser"
+                        }
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK"
+                        "description": "Member kicked successfully"
+                    },
+                    "400": {
+                        "description": "Bad request - workspace ID not specified",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden - you are not the owner of this workspace",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found - workspace or user not found",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
+                        }
                     }
                 }
             }
         },
         "/workspaces/{workspaceId}/members": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns a list of all members in a specific workspace.",
+                "produces": [
+                    "application/json"
+                ],
                 "tags": [
                     "Workspaces"
                 ],
-                "summary": "Get all members info",
+                "summary": "Get all members of a workspace",
                 "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer Token",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
                     {
                         "type": "string",
                         "description": "Workspace ID",
@@ -966,25 +1533,54 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK"
+                        "description": "A list of members",
+                        "schema": {
+                            "$ref": "#/definitions/main.AllMembersResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request - invalid workspace ID",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden - you are not a member of this workspace",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found - workspace not found",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
+                        }
                     }
                 }
             }
         },
         "/workspaces/{workspaceId}/new_invite": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Generates a new invite token for a workspace.",
+                "produces": [
+                    "application/json"
+                ],
                 "tags": [
                     "Workspaces"
                 ],
-                "summary": "Create invite to the workspace",
+                "summary": "Create a workspace invite",
                 "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer Token",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
                     {
                         "type": "string",
                         "description": "Workspace ID",
@@ -995,25 +1591,45 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK"
+                        "description": "The invite token",
+                        "schema": {
+                            "$ref": "#/definitions/main.TokenSwagger"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request - workspace ID not specified",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden - you are not the owner of this workspace",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found - workspace not found",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
+                        }
                     }
                 }
             }
         },
         "/workspaces/{workspaceId}/promote/{userId}": {
             "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Promotes a member of a workspace to be the new owner.",
                 "tags": [
                     "Workspaces"
                 ],
-                "summary": "Promote member",
+                "summary": "Promote a member to owner",
                 "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer Token",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    },
                     {
                         "type": "string",
                         "description": "Workspace ID",
@@ -1023,7 +1639,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "User ID",
+                        "description": "User ID to promote",
                         "name": "userId",
                         "in": "path",
                         "required": true
@@ -1031,14 +1647,43 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK"
+                        "description": "Member promoted successfully"
+                    },
+                    "400": {
+                        "description": "Bad request - user is not part of this workspace",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden - you are not the owner of this workspace",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found - workspace or user not found",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
+                        }
                     }
                 }
             }
         },
         "/workspaces/{workspaceId}/tasks": {
             "get": {
-                "description": "Return all tasks that current user owns",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns all tasks owned by the current user, or all tasks for a given workspace.",
                 "produces": [
                     "application/json"
                 ],
@@ -1049,32 +1694,33 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Workspace ID",
+                        "description": "Workspace ID (optional)",
                         "name": "workspaceId",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Bearer Token",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
+                        "in": "path"
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "A list of tasks",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/main.Task"
-                            }
+                            "$ref": "#/definitions/main.AllTasksResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
                         }
                     }
                 }
             },
             "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Creates a new task for the current user or a workspace.",
                 "consumes": [
                     "application/json"
                 ],
@@ -1084,40 +1730,41 @@ const docTemplate = `{
                 "tags": [
                     "Tasks"
                 ],
-                "summary": "Create new task",
+                "summary": "Create a new task",
                 "parameters": [
                     {
-                        "description": "Create task request",
+                        "type": "string",
+                        "description": "Workspace ID (optional)",
+                        "name": "workspaceId",
+                        "in": "path"
+                    },
+                    {
+                        "description": "Task creation data",
                         "name": "data",
                         "in": "body",
                         "required": true,
                         "schema": {
                             "$ref": "#/definitions/main.CreateTask"
                         }
-                    },
-                    {
-                        "type": "string",
-                        "description": "Workspace ID",
-                        "name": "workspaceId",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Bearer Token",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "The created task",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/main.Task"
-                            }
+                            "$ref": "#/definitions/main.Task"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request - check your input",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
                         }
                     }
                 }
@@ -1125,116 +1772,228 @@ const docTemplate = `{
         },
         "/workspaces/{workspaceId}/tasks/{taskId}": {
             "delete": {
-                "produces": [
-                    "application/json"
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
                 ],
+                "description": "Deletes a specific task.",
                 "tags": [
                     "Tasks"
                 ],
-                "summary": "Delete existing task",
+                "summary": "Delete an existing task",
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Workspace ID",
-                        "name": "workspaceId",
+                        "description": "Task ID",
+                        "name": "taskId",
                         "in": "path",
                         "required": true
                     },
                     {
                         "type": "string",
-                        "description": "Bearer Token",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
+                        "description": "Workspace ID (optional)",
+                        "name": "workspaceId",
+                        "in": "path"
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK"
+                        "description": "Task deleted successfully"
+                    },
+                    "403": {
+                        "description": "Forbidden - you do not have access to this task",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found - task or workspace not found",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
+                        }
                     }
                 }
             },
             "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Edits the details of a specific task.",
                 "consumes": [
                     "application/json"
                 ],
                 "tags": [
                     "Tasks"
                 ],
-                "summary": "Edit existing task",
+                "summary": "Edit an existing task",
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Workspace ID",
-                        "name": "workspaceId",
+                        "description": "Task ID",
+                        "name": "taskId",
                         "in": "path",
                         "required": true
                     },
                     {
-                        "description": "Edit task request",
+                        "type": "string",
+                        "description": "Workspace ID (optional)",
+                        "name": "workspaceId",
+                        "in": "path"
+                    },
+                    {
+                        "description": "Fields to edit in the task",
                         "name": "data",
                         "in": "body",
                         "required": true,
                         "schema": {
                             "$ref": "#/definitions/main.EditTask"
                         }
-                    },
-                    {
-                        "type": "string",
-                        "description": "Bearer Token",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK"
+                        "description": "Task updated successfully"
+                    },
+                    "400": {
+                        "description": "Bad request - invalid input or deadline in the past",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden - you do not have access to this task",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found - task or workspace not found",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
+                        }
                     }
                 }
             }
         },
         "/workspaces/{workspaceId}/upload_avatar": {
             "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Uploads an avatar image for the current user or a specified workspace.",
                 "consumes": [
                     "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
                 ],
                 "tags": [
                     "Users"
                 ],
-                "summary": "Upload avatar for user",
+                "summary": "Upload avatar for user or workspace",
                 "parameters": [
                     {
                         "type": "file",
-                        "description": "Avatar",
-                        "name": "data",
+                        "description": "Avatar image file (jpg or png)",
+                        "name": "img",
                         "in": "formData",
                         "required": true
                     },
                     {
                         "type": "string",
-                        "description": "Workspace ID",
+                        "description": "Workspace ID (if uploading for a workspace)",
                         "name": "workspaceId",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Bearer Token",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
+                        "in": "path"
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK"
+                        "description": "Avatar uploaded successfully"
+                    },
+                    "400": {
+                        "description": "Bad request - no file or wrong format",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
+                        }
+                    },
+                    "404": {
+                        "description": "Workspace not found",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorSwagger"
+                        }
                     }
                 }
             }
         }
     },
     "definitions": {
+        "main.AllBoardsResponse": {
+            "type": "object",
+            "properties": {
+                "boards": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/main.Board"
+                    }
+                }
+            }
+        },
+        "main.AllMembersResponse": {
+            "type": "object",
+            "properties": {
+                "members": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/main.Member"
+                    }
+                }
+            }
+        },
+        "main.AllTasksResponse": {
+            "type": "object",
+            "properties": {
+                "tasks": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/main.Task"
+                    }
+                }
+            }
+        },
+        "main.AllWorkspacesResponse": {
+            "type": "object",
+            "properties": {
+                "workspaces": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/main.Workspace"
+                    }
+                }
+            }
+        },
         "main.AssignTask": {
             "type": "object",
             "properties": {
@@ -1296,6 +2055,14 @@ const docTemplate = `{
                 }
             }
         },
+        "main.CreateWorkspace": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
         "main.EditTask": {
             "type": "object",
             "properties": {
@@ -1316,6 +2083,33 @@ const docTemplate = `{
                 }
             }
         },
+        "main.EditWorkspace": {
+            "type": "object",
+            "properties": {
+                "avatar": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "main.ErrorSwagger": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "type": "string"
+                }
+            }
+        },
+        "main.KickUser": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
+                }
+            }
+        },
         "main.LoginUser": {
             "type": "object",
             "properties": {
@@ -1323,6 +2117,20 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "password": {
+                    "type": "string"
+                }
+            }
+        },
+        "main.Member": {
+            "type": "object",
+            "properties": {
+                "_id": {
+                    "type": "string"
+                },
+                "avatar": {
+                    "type": "string"
+                },
+                "name": {
                     "type": "string"
                 }
             }
@@ -1376,13 +2184,7 @@ const docTemplate = `{
                 "email": {
                     "type": "string"
                 },
-                "hashed_password": {
-                    "type": "string"
-                },
                 "name": {
-                    "type": "string"
-                },
-                "salt": {
                     "type": "string"
                 }
             }
@@ -1409,6 +2211,42 @@ const docTemplate = `{
                     "type": "string"
                 }
             }
+        },
+        "main.WorkspaceInfo": {
+            "type": "object",
+            "properties": {
+                "_id": {
+                    "type": "string"
+                },
+                "avatar": {
+                    "type": "string"
+                },
+                "boards": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/main.Board"
+                    }
+                },
+                "memberDetails": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/main.Member"
+                    }
+                },
+                "name": {
+                    "type": "string"
+                },
+                "owned_by": {
+                    "type": "string"
+                }
+            }
+        }
+    },
+    "securityDefinitions": {
+        "BearerAuth": {
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header"
         }
     }
 }`

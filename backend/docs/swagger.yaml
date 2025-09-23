@@ -1,5 +1,33 @@
 basePath: /api/v1
 definitions:
+  main.AllBoardsResponse:
+    properties:
+      boards:
+        items:
+          $ref: '#/definitions/main.Board'
+        type: array
+    type: object
+  main.AllMembersResponse:
+    properties:
+      members:
+        items:
+          $ref: '#/definitions/main.Member'
+        type: array
+    type: object
+  main.AllTasksResponse:
+    properties:
+      tasks:
+        items:
+          $ref: '#/definitions/main.Task'
+        type: array
+    type: object
+  main.AllWorkspacesResponse:
+    properties:
+      workspaces:
+        items:
+          $ref: '#/definitions/main.Workspace'
+        type: array
+    type: object
   main.AssignTask:
     properties:
       taskId:
@@ -39,6 +67,11 @@ definitions:
       password:
         type: string
     type: object
+  main.CreateWorkspace:
+    properties:
+      name:
+        type: string
+    type: object
   main.EditTask:
     properties:
       board:
@@ -52,11 +85,37 @@ definitions:
       name:
         type: string
     type: object
+  main.EditWorkspace:
+    properties:
+      avatar:
+        type: string
+      name:
+        type: string
+    type: object
+  main.ErrorSwagger:
+    properties:
+      error:
+        type: string
+    type: object
+  main.KickUser:
+    properties:
+      id:
+        type: string
+    type: object
   main.LoginUser:
     properties:
       email:
         type: string
       password:
+        type: string
+    type: object
+  main.Member:
+    properties:
+      _id:
+        type: string
+      avatar:
+        type: string
+      name:
         type: string
     type: object
   main.Task:
@@ -91,11 +150,7 @@ definitions:
         type: string
       email:
         type: string
-      hashed_password:
-        type: string
       name:
-        type: string
-      salt:
         type: string
     type: object
   main.Workspace:
@@ -113,6 +168,25 @@ definitions:
       owned_by:
         type: string
     type: object
+  main.WorkspaceInfo:
+    properties:
+      _id:
+        type: string
+      avatar:
+        type: string
+      boards:
+        items:
+          $ref: '#/definitions/main.Board'
+        type: array
+      memberDetails:
+        items:
+          $ref: '#/definitions/main.Member'
+        type: array
+      name:
+        type: string
+      owned_by:
+        type: string
+    type: object
 info:
   contact: {}
   description: Simple WIP task tracker that can be self-hosted
@@ -121,199 +195,293 @@ info:
 paths:
   /boards:
     get:
-      consumes:
-      - application/json
-      parameters:
-      - description: Bearer Token
-        in: header
-        name: Authorization
-        required: true
-        type: string
+      description: Returns all boards owned by the current user, or all boards for
+        a given workspace.
       produces:
       - application/json
       responses:
         "200":
-          description: OK
+          description: A list of boards
           schema:
-            items:
-              $ref: '#/definitions/main.Board'
-            type: array
+            $ref: '#/definitions/main.AllBoardsResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+      security:
+      - BearerAuth: []
       summary: Get all boards
       tags:
       - Boards
     post:
       consumes:
       - application/json
+      description: Creates a new board for the current user or a workspace.
       parameters:
-      - description: Create board request
+      - description: Board creation data
         in: body
         name: data
         required: true
         schema:
           $ref: '#/definitions/main.CreateBoard'
-      - description: Bearer Token
-        in: header
-        name: Authorization
-        required: true
-        type: string
       produces:
       - application/json
       responses:
         "200":
-          description: OK
-      summary: Create new board
+          description: The created board
+          schema:
+            $ref: '#/definitions/main.Board'
+        "400":
+          description: Bad request - no name given
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+      security:
+      - BearerAuth: []
+      summary: Create a new board
       tags:
       - Boards
   /boards/{boardId}:
     delete:
-      consumes:
-      - application/json
-      parameters:
-      - description: Bearer Token
-        in: header
-        name: Authorization
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-      summary: Delete board
-      tags:
-      - Boards
-    get:
-      consumes:
-      - application/json
+      description: Deletes a specific board.
       parameters:
       - description: Board ID
         in: path
         name: boardId
         required: true
         type: string
-      - description: Bearer Token
-        in: header
-        name: Authorization
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Board deleted successfully
+        "403":
+          description: Forbidden - you do not own this board
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+        "404":
+          description: Not Found - board not found
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+      security:
+      - BearerAuth: []
+      summary: Delete a board
+      tags:
+      - Boards
+    get:
+      description: Retrieves a specific board by its ID.
+      parameters:
+      - description: Board ID
+        in: path
+        name: boardId
         required: true
         type: string
       produces:
       - application/json
       responses:
         "200":
-          description: OK
+          description: The requested board
           schema:
             $ref: '#/definitions/main.Board'
-      summary: Get board by id
+        "400":
+          description: Bad request - invalid board ID
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+        "403":
+          description: Forbidden - you do not have access to this board
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+        "404":
+          description: Not Found - board not found
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+      security:
+      - BearerAuth: []
+      summary: Get a board by ID
       tags:
       - Boards
     patch:
       consumes:
       - application/json
+      description: Edits the details of a specific board.
       parameters:
-      - description: Bearer Token
-        in: header
-        name: Authorization
+      - description: Board ID
+        in: path
+        name: boardId
         required: true
         type: string
+      - description: Fields to edit in the board
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/main.CreateBoard'
       produces:
       - application/json
       responses:
         "200":
-          description: OK
-      summary: Edit board
+          description: The updated board
+          schema:
+            $ref: '#/definitions/main.Board'
+        "400":
+          description: Bad request - invalid input
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+        "403":
+          description: Forbidden - you do not own this board
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+        "404":
+          description: Not Found - board not found
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+      security:
+      - BearerAuth: []
+      summary: Edit a board
       tags:
       - Boards
   /tasks:
     get:
-      description: Return all tasks that current user owns
-      parameters:
-      - description: Bearer Token
-        in: header
-        name: Authorization
-        required: true
-        type: string
+      description: Returns all tasks owned by the current user, or all tasks for a
+        given workspace.
       produces:
       - application/json
       responses:
         "200":
-          description: OK
+          description: A list of tasks
           schema:
-            items:
-              $ref: '#/definitions/main.Task'
-            type: array
+            $ref: '#/definitions/main.AllTasksResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+      security:
+      - BearerAuth: []
       summary: Get all tasks
       tags:
       - Tasks
     post:
       consumes:
       - application/json
+      description: Creates a new task for the current user or a workspace.
       parameters:
-      - description: Create task request
+      - description: Task creation data
         in: body
         name: data
         required: true
         schema:
           $ref: '#/definitions/main.CreateTask'
-      - description: Bearer Token
-        in: header
-        name: Authorization
-        required: true
-        type: string
       produces:
       - application/json
       responses:
         "200":
-          description: OK
+          description: The created task
           schema:
-            items:
-              $ref: '#/definitions/main.Task'
-            type: array
-      summary: Create new task
+            $ref: '#/definitions/main.Task'
+        "400":
+          description: Bad request - check your input
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+      security:
+      - BearerAuth: []
+      summary: Create a new task
       tags:
       - Tasks
   /tasks/{taskId}:
     delete:
+      description: Deletes a specific task.
       parameters:
-      - description: Bearer Token
-        in: header
-        name: Authorization
+      - description: Task ID
+        in: path
+        name: taskId
         required: true
         type: string
-      produces:
-      - application/json
       responses:
         "200":
-          description: OK
-      summary: Delete existing task
+          description: Task deleted successfully
+        "403":
+          description: Forbidden - you do not have access to this task
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+        "404":
+          description: Not Found - task or workspace not found
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+      security:
+      - BearerAuth: []
+      summary: Delete an existing task
       tags:
       - Tasks
     patch:
       consumes:
       - application/json
+      description: Edits the details of a specific task.
       parameters:
-      - description: Edit task request
+      - description: Task ID
+        in: path
+        name: taskId
+        required: true
+        type: string
+      - description: Fields to edit in the task
         in: body
         name: data
         required: true
         schema:
           $ref: '#/definitions/main.EditTask'
-      - description: Bearer Token
-        in: header
-        name: Authorization
-        required: true
-        type: string
       responses:
         "200":
-          description: OK
-      summary: Edit existing task
+          description: Task updated successfully
+        "400":
+          description: Bad request - invalid input or deadline in the past
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+        "403":
+          description: Forbidden - you do not have access to this task
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+        "404":
+          description: Not Found - task or workspace not found
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+      security:
+      - BearerAuth: []
+      summary: Edit an existing task
       tags:
       - Tasks
   /users/create:
     post:
       consumes:
       - application/json
+      description: Creates a new user and returns an access token.
       parameters:
-      - description: Create user request
+      - description: User creation data
         in: body
         name: data
         required: true
@@ -323,11 +491,21 @@ paths:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Access token
           schema:
-            items:
-              $ref: '#/definitions/main.TokenSwagger'
-            type: array
+            $ref: '#/definitions/main.TokenSwagger'
+        "400":
+          description: Bad request - check your input
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+        "409":
+          description: User with that email already exists
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
       summary: Create new user
       tags:
       - Users
@@ -335,42 +513,54 @@ paths:
     delete:
       consumes:
       - application/json
+      description: Deletes the currently authenticated user.
       parameters:
-      - description: Delete user request
+      - description: User password for confirmation
         in: body
         name: data
         required: true
         schema:
           $ref: '#/definitions/main.LoginUser'
-      - description: Bearer Token
-        in: header
-        name: Authorization
-        required: true
-        type: string
       responses:
         "200":
-          description: OK
+          description: User deleted successfully
+        "400":
+          description: Bad request - password mismatch
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+      security:
+      - BearerAuth: []
       summary: Delete user
       tags:
       - Users
   /users/get_info:
     get:
-      description: For this route, you must have bearer token
-      parameters:
-      - description: Bearer Token
-        in: header
-        name: Authorization
-        required: true
-        type: string
+      description: Retrieves details for the currently authenticated user.
       produces:
       - application/json
       responses:
         "200":
-          description: OK
+          description: User details
           schema:
-            items:
-              $ref: '#/definitions/main.User'
-            type: array
+            $ref: '#/definitions/main.User'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+      security:
+      - BearerAuth: []
       summary: Get user info
       tags:
       - Users
@@ -378,8 +568,9 @@ paths:
     post:
       consumes:
       - application/json
+      description: Logs in a user and returns an access token.
       parameters:
-      - description: Login user request
+      - description: User login data
         in: body
         name: data
         required: true
@@ -389,535 +580,860 @@ paths:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Access token
           schema:
-            items:
-              $ref: '#/definitions/main.TokenSwagger'
-            type: array
+            $ref: '#/definitions/main.TokenSwagger'
+        "404":
+          description: User not found
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
       summary: Login user
+      tags:
+      - Users
+  /users/refresh:
+    get:
+      description: Generates a new access token using the refresh token stored in
+        an http-only cookie.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: New access token
+          schema:
+            $ref: '#/definitions/main.TokenSwagger'
+        "400":
+          description: Invalid token
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+        "403":
+          description: Authorization required
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+      summary: Refresh bearer token
       tags:
       - Users
   /users/upload_avatar:
     post:
       consumes:
       - multipart/form-data
+      description: Uploads an avatar image for the current user or a specified workspace.
       parameters:
-      - description: Avatar
+      - description: Avatar image file (jpg or png)
         in: formData
-        name: data
+        name: img
         required: true
         type: file
-      - description: Bearer Token
-        in: header
-        name: Authorization
-        required: true
-        type: string
+      produces:
+      - application/json
       responses:
         "200":
-          description: OK
-      summary: Upload avatar for user
+          description: Avatar uploaded successfully
+        "400":
+          description: Bad request - no file or wrong format
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+        "404":
+          description: Workspace not found
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+      security:
+      - BearerAuth: []
+      summary: Upload avatar for user or workspace
       tags:
       - Users
   /users/workspaces:
     get:
-      parameters:
-      - description: Bearer Token
-        in: header
-        name: Authorization
-        required: true
-        type: string
+      description: Returns a list of all workspaces the current user is a member of.
+      produces:
+      - application/json
       responses:
         "200":
-          description: OK
+          description: A list of workspaces
+          schema:
+            $ref: '#/definitions/main.AllWorkspacesResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+      security:
+      - BearerAuth: []
       summary: Get all workspaces for the current user
       tags:
       - Workspaces
-  /workspaces/{workspaceId}/:
+  /workspaces/{workspaceId}:
     delete:
+      description: Deletes a specific workspace.
       parameters:
-      - description: Bearer Token
-        in: header
-        name: Authorization
-        required: true
-        type: string
       - description: Workspace ID
         in: path
         name: workspaceId
         required: true
         type: string
+      produces:
+      - application/json
       responses:
         "200":
-          description: OK
-      summary: Delete workspace
+          description: Workspace deleted successfully
+        "403":
+          description: Forbidden - you are not the owner of this workspace
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+        "404":
+          description: Not Found - workspace not found
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+      security:
+      - BearerAuth: []
+      summary: Delete a workspace
       tags:
       - Workspaces
     get:
+      description: Retrieves a specific workspace by its ID.
       parameters:
-      - description: Bearer Token
-        in: header
-        name: Authorization
-        required: true
-        type: string
       - description: Workspace ID
         in: path
         name: workspaceId
         required: true
         type: string
+      produces:
+      - application/json
       responses:
         "200":
-          description: OK
+          description: The requested workspace
           schema:
             $ref: '#/definitions/main.Workspace'
-      summary: Get workspace by id
+        "400":
+          description: Bad request - invalid workspace ID
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+        "403":
+          description: Forbidden - you are not a member of this workspace
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+        "404":
+          description: Not Found - workspace not found
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+      security:
+      - BearerAuth: []
+      summary: Get a workspace by ID
       tags:
       - Workspaces
     patch:
+      consumes:
+      - application/json
+      description: Edits the details of a specific workspace.
       parameters:
-      - description: Bearer Token
-        in: header
-        name: Authorization
-        required: true
-        type: string
       - description: Workspace ID
         in: path
         name: workspaceId
         required: true
         type: string
+      - description: Fields to edit in the workspace
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/main.EditWorkspace'
+      produces:
+      - application/json
       responses:
         "200":
-          description: OK
-      summary: Edit workspace
+          description: The updated workspace
+          schema:
+            $ref: '#/definitions/main.Workspace'
+        "400":
+          description: Bad request - invalid input
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+        "403":
+          description: Forbidden - you are not the owner of this workspace
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+        "404":
+          description: Not Found - workspace not found
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+      security:
+      - BearerAuth: []
+      summary: Edit a workspace
       tags:
       - Workspaces
   /workspaces/{workspaceId}/assign:
     post:
       consumes:
       - application/json
+      description: Assigns a task within a workspace to a specific user.
       parameters:
-      - description: Assign Task
+      - description: Workspace ID
+        in: path
+        name: workspaceId
+        required: true
+        type: string
+      - description: Task and User IDs
         in: body
         name: data
         required: true
         schema:
           $ref: '#/definitions/main.AssignTask'
-      - description: Bearer Token
-        in: header
-        name: Authorization
-        required: true
-        type: string
-      - description: Workspace ID
-        in: path
-        name: workspaceId
-        required: true
-        type: string
+      produces:
+      - application/json
       responses:
         "200":
-          description: OK
-      summary: Assign task to someone
+          description: The updated task
+          schema:
+            $ref: '#/definitions/main.Task'
+        "403":
+          description: Forbidden - you are not the owner or the user to be assigned
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+        "404":
+          description: Not Found - workspace or task not found
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+      security:
+      - BearerAuth: []
+      summary: Assign a task to a user
       tags:
       - Tasks
   /workspaces/{workspaceId}/boards:
     get:
-      consumes:
-      - application/json
+      description: Returns all boards owned by the current user, or all boards for
+        a given workspace.
       parameters:
-      - description: Workspace ID
+      - description: Workspace ID (optional)
         in: path
         name: workspaceId
-        required: true
-        type: string
-      - description: Bearer Token
-        in: header
-        name: Authorization
-        required: true
         type: string
       produces:
       - application/json
       responses:
         "200":
-          description: OK
+          description: A list of boards
           schema:
-            items:
-              $ref: '#/definitions/main.Board'
-            type: array
+            $ref: '#/definitions/main.AllBoardsResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+      security:
+      - BearerAuth: []
       summary: Get all boards
       tags:
       - Boards
     post:
       consumes:
       - application/json
+      description: Creates a new board for the current user or a workspace.
       parameters:
-      - description: Create board request
+      - description: Workspace ID (optional)
+        in: path
+        name: workspaceId
+        type: string
+      - description: Board creation data
         in: body
         name: data
         required: true
         schema:
           $ref: '#/definitions/main.CreateBoard'
-      - description: Workspace ID
-        in: path
-        name: workspaceId
-        required: true
-        type: string
-      - description: Bearer Token
-        in: header
-        name: Authorization
-        required: true
-        type: string
       produces:
       - application/json
       responses:
         "200":
-          description: OK
-      summary: Create new board
+          description: The created board
+          schema:
+            $ref: '#/definitions/main.Board'
+        "400":
+          description: Bad request - no name given
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+      security:
+      - BearerAuth: []
+      summary: Create a new board
       tags:
       - Boards
   /workspaces/{workspaceId}/boards/{boardId}:
     delete:
-      consumes:
-      - application/json
-      parameters:
-      - description: Workspace ID
-        in: path
-        name: workspaceId
-        required: true
-        type: string
-      - description: Bearer Token
-        in: header
-        name: Authorization
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-      summary: Delete board
-      tags:
-      - Boards
-    get:
-      consumes:
-      - application/json
+      description: Deletes a specific board.
       parameters:
       - description: Board ID
         in: path
         name: boardId
         required: true
         type: string
-      - description: Workspace ID
+      - description: Workspace ID (optional)
         in: path
         name: workspaceId
-        required: true
-        type: string
-      - description: Bearer Token
-        in: header
-        name: Authorization
-        required: true
         type: string
       produces:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Board deleted successfully
+        "403":
+          description: Forbidden - you do not own this board
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+        "404":
+          description: Not Found - board not found
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+      security:
+      - BearerAuth: []
+      summary: Delete a board
+      tags:
+      - Boards
+    get:
+      description: Retrieves a specific board by its ID.
+      parameters:
+      - description: Board ID
+        in: path
+        name: boardId
+        required: true
+        type: string
+      - description: Workspace ID (optional, for authorization context)
+        in: path
+        name: workspaceId
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: The requested board
           schema:
             $ref: '#/definitions/main.Board'
-      summary: Get board by id
+        "400":
+          description: Bad request - invalid board ID
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+        "403":
+          description: Forbidden - you do not have access to this board
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+        "404":
+          description: Not Found - board not found
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+      security:
+      - BearerAuth: []
+      summary: Get a board by ID
       tags:
       - Boards
     patch:
       consumes:
       - application/json
+      description: Edits the details of a specific board.
+      parameters:
+      - description: Board ID
+        in: path
+        name: boardId
+        required: true
+        type: string
+      - description: Workspace ID (optional)
+        in: path
+        name: workspaceId
+        type: string
+      - description: Fields to edit in the board
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/main.CreateBoard'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: The updated board
+          schema:
+            $ref: '#/definitions/main.Board'
+        "400":
+          description: Bad request - invalid input
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+        "403":
+          description: Forbidden - you do not own this board
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+        "404":
+          description: Not Found - board not found
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+      security:
+      - BearerAuth: []
+      summary: Edit a board
+      tags:
+      - Boards
+  /workspaces/{workspaceId}/info:
+    get:
+      description: Retrieves detailed information about a workspace, including members
+        and boards.
       parameters:
       - description: Workspace ID
         in: path
         name: workspaceId
-        required: true
-        type: string
-      - description: Bearer Token
-        in: header
-        name: Authorization
         required: true
         type: string
       produces:
       - application/json
       responses:
         "200":
-          description: OK
-      summary: Edit board
-      tags:
-      - Boards
-  /workspaces/{workspaceId}/info:
-    get:
-      parameters:
-      - description: Bearer Token
-        in: header
-        name: Authorization
-        required: true
-        type: string
-      - description: Workspace ID
-        in: path
-        name: workspaceId
-        required: true
-        type: string
-      responses:
-        "200":
-          description: OK
+          description: Detailed workspace information
           schema:
-            additionalProperties: true
-            type: object
-      summary: Get workspace info (basic, members, boards)
+            $ref: '#/definitions/main.WorkspaceInfo'
+        "400":
+          description: Bad request - invalid workspace ID
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+        "403":
+          description: Forbidden - you are not a member of this workspace
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+        "404":
+          description: Not Found - workspace not found
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+      security:
+      - BearerAuth: []
+      summary: Get workspace info
       tags:
       - Workspaces
   /workspaces/{workspaceId}/kick:
     delete:
+      consumes:
+      - application/json
+      description: Removes a member from a specific workspace.
       parameters:
-      - description: Bearer Token
-        in: header
-        name: Authorization
-        required: true
-        type: string
       - description: Workspace ID
         in: path
         name: workspaceId
         required: true
         type: string
+      - description: User ID to kick
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/main.KickUser'
       responses:
         "200":
-          description: OK
-      summary: Kick member
+          description: Member kicked successfully
+        "400":
+          description: Bad request - workspace ID not specified
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+        "403":
+          description: Forbidden - you are not the owner of this workspace
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+        "404":
+          description: Not Found - workspace or user not found
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+      security:
+      - BearerAuth: []
+      summary: Kick a member from a workspace
       tags:
       - Workspaces
   /workspaces/{workspaceId}/members:
     get:
+      description: Returns a list of all members in a specific workspace.
       parameters:
-      - description: Bearer Token
-        in: header
-        name: Authorization
-        required: true
-        type: string
       - description: Workspace ID
         in: path
         name: workspaceId
         required: true
         type: string
+      produces:
+      - application/json
       responses:
         "200":
-          description: OK
-      summary: Get all members info
+          description: A list of members
+          schema:
+            $ref: '#/definitions/main.AllMembersResponse'
+        "400":
+          description: Bad request - invalid workspace ID
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+        "403":
+          description: Forbidden - you are not a member of this workspace
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+        "404":
+          description: Not Found - workspace not found
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+      security:
+      - BearerAuth: []
+      summary: Get all members of a workspace
       tags:
       - Workspaces
   /workspaces/{workspaceId}/new_invite:
     get:
+      description: Generates a new invite token for a workspace.
       parameters:
-      - description: Bearer Token
-        in: header
-        name: Authorization
-        required: true
-        type: string
       - description: Workspace ID
         in: path
         name: workspaceId
         required: true
         type: string
+      produces:
+      - application/json
       responses:
         "200":
-          description: OK
-      summary: Create invite to the workspace
+          description: The invite token
+          schema:
+            $ref: '#/definitions/main.TokenSwagger'
+        "400":
+          description: Bad request - workspace ID not specified
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+        "403":
+          description: Forbidden - you are not the owner of this workspace
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+        "404":
+          description: Not Found - workspace not found
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+      security:
+      - BearerAuth: []
+      summary: Create a workspace invite
       tags:
       - Workspaces
   /workspaces/{workspaceId}/promote/{userId}:
     patch:
+      description: Promotes a member of a workspace to be the new owner.
       parameters:
-      - description: Bearer Token
-        in: header
-        name: Authorization
-        required: true
-        type: string
       - description: Workspace ID
         in: path
         name: workspaceId
         required: true
         type: string
-      - description: User ID
+      - description: User ID to promote
         in: path
         name: userId
         required: true
         type: string
       responses:
         "200":
-          description: OK
-      summary: Promote member
+          description: Member promoted successfully
+        "400":
+          description: Bad request - user is not part of this workspace
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+        "403":
+          description: Forbidden - you are not the owner of this workspace
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+        "404":
+          description: Not Found - workspace or user not found
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+      security:
+      - BearerAuth: []
+      summary: Promote a member to owner
       tags:
       - Workspaces
   /workspaces/{workspaceId}/tasks:
     get:
-      description: Return all tasks that current user owns
+      description: Returns all tasks owned by the current user, or all tasks for a
+        given workspace.
       parameters:
-      - description: Workspace ID
+      - description: Workspace ID (optional)
         in: path
         name: workspaceId
-        required: true
-        type: string
-      - description: Bearer Token
-        in: header
-        name: Authorization
-        required: true
         type: string
       produces:
       - application/json
       responses:
         "200":
-          description: OK
+          description: A list of tasks
           schema:
-            items:
-              $ref: '#/definitions/main.Task'
-            type: array
+            $ref: '#/definitions/main.AllTasksResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+      security:
+      - BearerAuth: []
       summary: Get all tasks
       tags:
       - Tasks
     post:
       consumes:
       - application/json
+      description: Creates a new task for the current user or a workspace.
       parameters:
-      - description: Create task request
+      - description: Workspace ID (optional)
+        in: path
+        name: workspaceId
+        type: string
+      - description: Task creation data
         in: body
         name: data
         required: true
         schema:
           $ref: '#/definitions/main.CreateTask'
-      - description: Workspace ID
-        in: path
-        name: workspaceId
-        required: true
-        type: string
-      - description: Bearer Token
-        in: header
-        name: Authorization
-        required: true
-        type: string
       produces:
       - application/json
       responses:
         "200":
-          description: OK
+          description: The created task
           schema:
-            items:
-              $ref: '#/definitions/main.Task'
-            type: array
-      summary: Create new task
+            $ref: '#/definitions/main.Task'
+        "400":
+          description: Bad request - check your input
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+      security:
+      - BearerAuth: []
+      summary: Create a new task
       tags:
       - Tasks
   /workspaces/{workspaceId}/tasks/{taskId}:
     delete:
+      description: Deletes a specific task.
       parameters:
-      - description: Workspace ID
+      - description: Task ID
+        in: path
+        name: taskId
+        required: true
+        type: string
+      - description: Workspace ID (optional)
         in: path
         name: workspaceId
-        required: true
         type: string
-      - description: Bearer Token
-        in: header
-        name: Authorization
-        required: true
-        type: string
-      produces:
-      - application/json
       responses:
         "200":
-          description: OK
-      summary: Delete existing task
+          description: Task deleted successfully
+        "403":
+          description: Forbidden - you do not have access to this task
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+        "404":
+          description: Not Found - task or workspace not found
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+      security:
+      - BearerAuth: []
+      summary: Delete an existing task
       tags:
       - Tasks
     patch:
       consumes:
       - application/json
+      description: Edits the details of a specific task.
       parameters:
-      - description: Workspace ID
+      - description: Task ID
         in: path
-        name: workspaceId
+        name: taskId
         required: true
         type: string
-      - description: Edit task request
+      - description: Workspace ID (optional)
+        in: path
+        name: workspaceId
+        type: string
+      - description: Fields to edit in the task
         in: body
         name: data
         required: true
         schema:
           $ref: '#/definitions/main.EditTask'
-      - description: Bearer Token
-        in: header
-        name: Authorization
-        required: true
-        type: string
       responses:
         "200":
-          description: OK
-      summary: Edit existing task
+          description: Task updated successfully
+        "400":
+          description: Bad request - invalid input or deadline in the past
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+        "403":
+          description: Forbidden - you do not have access to this task
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+        "404":
+          description: Not Found - task or workspace not found
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+      security:
+      - BearerAuth: []
+      summary: Edit an existing task
       tags:
       - Tasks
   /workspaces/{workspaceId}/upload_avatar:
     post:
       consumes:
       - multipart/form-data
+      description: Uploads an avatar image for the current user or a specified workspace.
       parameters:
-      - description: Avatar
+      - description: Avatar image file (jpg or png)
         in: formData
-        name: data
+        name: img
         required: true
         type: file
-      - description: Workspace ID
+      - description: Workspace ID (if uploading for a workspace)
         in: path
         name: workspaceId
-        required: true
         type: string
-      - description: Bearer Token
-        in: header
-        name: Authorization
-        required: true
-        type: string
+      produces:
+      - application/json
       responses:
         "200":
-          description: OK
-      summary: Upload avatar for user
+          description: Avatar uploaded successfully
+        "400":
+          description: Bad request - no file or wrong format
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+        "404":
+          description: Workspace not found
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+      security:
+      - BearerAuth: []
+      summary: Upload avatar for user or workspace
       tags:
       - Users
   /workspaces/add/{joinToken}:
     post:
+      description: Adds the current user to a workspace using an invite token.
       parameters:
-      - description: Bearer Token
-        in: header
-        name: Authorization
-        required: true
-        type: string
       - description: Join Token
         in: path
         name: joinToken
         required: true
         type: string
+      produces:
+      - application/json
       responses:
         "200":
-          description: OK
-      summary: Accept invite
+          description: Successfully joined the workspace
+        "400":
+          description: Bad request - invalid token
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+        "404":
+          description: Not Found - workspace not found
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+      security:
+      - BearerAuth: []
+      summary: Join a workspace
       tags:
       - Workspaces
   /workspaces/create:
     post:
       consumes:
       - application/json
+      description: Creates a new workspace for the current user.
       parameters:
-      - description: Create new workspace
+      - description: Workspace creation data
         in: body
         name: data
         required: true
         schema:
-          $ref: '#/definitions/main.CreateBoard'
-      - description: Bearer Token
-        in: header
-        name: Authorization
-        required: true
-        type: string
+          $ref: '#/definitions/main.CreateWorkspace'
+      produces:
+      - application/json
       responses:
         "200":
-          description: OK
-      summary: Create new workspace
+          description: The created workspace
+          schema:
+            $ref: '#/definitions/main.Workspace'
+        "400":
+          description: Bad request - no name specified
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/main.ErrorSwagger'
+      security:
+      - BearerAuth: []
+      summary: Create a new workspace
       tags:
       - Workspaces
+securityDefinitions:
+  BearerAuth:
+    in: header
+    name: Authorization
+    type: apiKey
 swagger: "2.0"

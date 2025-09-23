@@ -19,13 +19,17 @@ import (
 	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
-// @Summary Create new user
-// @Router /users/create [post]
-// @Accept json
-// @Success 200 {array} TokenSwagger
-// @Produce json
-// @Tags Users
-// @Param data body CreateUser true "Create user request"
+// @Summary 		Create new user
+// @Description 	Creates a new user and returns an access token.
+// @Router 			/users/create [post]
+// @Tags 			Users
+// @Accept 			json
+// @Produce 		json
+// @Param 			data body CreateUser true "User creation data"
+// @Success 		200 {object} TokenSwagger "Access token"
+// @Failure 		400 {object} ErrorSwagger "Bad request - check your input"
+// @Failure 		409 {object} ErrorSwagger "User with that email already exists"
+// @Failure 		500 {object} ErrorSwagger "Internal server error"
 func createUser(c *gin.Context) {
 	randomBytes := make([]byte, 32)
 	_, err := rand.Read(randomBytes)
@@ -111,13 +115,16 @@ func createUser(c *gin.Context) {
 	}
 }
 
-// @Summary Login user
-// @Router /users/login [post]
-// @Accept json
-// @Success 200 {array} TokenSwagger
-// @Produce json
-// @Tags Users
-// @Param data body LoginUser true "Login user request"
+// @Summary 		Login user
+// @Description 	Logs in a user and returns an access token.
+// @Router 			/users/login [post]
+// @Tags 			Users
+// @Accept 			json
+// @Produce 		json
+// @Param 			data body LoginUser true "User login data"
+// @Success 		200 {object} TokenSwagger "Access token"
+// @Failure 		404 {object} ErrorSwagger "User not found"
+// @Failure 		500 {object} ErrorSwagger "Internal server error"
 func loginUser(c *gin.Context) {
 	middlewareInput, _ := c.Get("input")
 	input := middlewareInput.(LoginUser)
@@ -153,13 +160,17 @@ func loginUser(c *gin.Context) {
 	}
 }
 
-// @Summary Delete user
-// @Router /users/delete [delete]
-// @Accept json
-// @Success 200
-// @Tags Users
-// @Param data body LoginUser true "Delete user request"
-// @Param Authorization header string true "Bearer Token"
+// @Summary 		Delete user
+// @Description 	Deletes the currently authenticated user.
+// @Router 			/users/delete [delete]
+// @Tags 			Users
+// @Security 		BearerAuth
+// @Accept 			json
+// @Param 			data body LoginUser true "User password for confirmation"
+// @Success 		200 "User deleted successfully"
+// @Failure 		400 {object} ErrorSwagger "Bad request - password mismatch"
+// @Failure 		403 {object} ErrorSwagger "Forbidden"
+// @Failure 		500 {object} ErrorSwagger "Internal server error"
 func deleteUser(c *gin.Context) {
 	userId, _ := c.Get("id")
 	middlewareInput, _ := c.Get("input")
@@ -188,15 +199,20 @@ func deleteUser(c *gin.Context) {
 	}
 }
 
-// @Summary Upload avatar for user
-// @Router /users/upload_avatar [post]
-// @Router /workspaces/{workspaceId}/upload_avatar [post]
-// @Accept mpfd
-// @Success 200
-// @Tags Users
-// @Param data formData file true "Avatar"
-// @Param workspaceId path string true "Workspace ID"
-// @Param Authorization header string true "Bearer Token"
+// @Summary 		Upload avatar for user or workspace
+// @Description 	Uploads an avatar image for the current user or a specified workspace.
+// @Router 			/users/upload_avatar [post]
+// @Router 			/workspaces/{workspaceId}/upload_avatar [post]
+// @Tags 			Users
+// @Security 		BearerAuth
+// @Accept 			multipart/form-data
+// @Produce 		json
+// @Param 			img formData file true "Avatar image file (jpg or png)"
+// @Param 			workspaceId path string false "Workspace ID (if uploading for a workspace)"
+// @Success 		200 "Avatar uploaded successfully"
+// @Failure 		400 {object} ErrorSwagger "Bad request - no file or wrong format"
+// @Failure 		404 {object} ErrorSwagger "Workspace not found"
+// @Failure 		500 {object} ErrorSwagger "Internal server error"
 func uploadAvatar(c *gin.Context) {
 	if _, err := os.Stat("./img/"); err != nil {
 		if os.IsNotExist(err) {
@@ -266,13 +282,15 @@ func uploadAvatar(c *gin.Context) {
 
 }
 
-// @Summary Refresh bearer token
-// @Description For this route, you must have refresh token, that is sent to your browser when you log into user account as an http-only cookie
-// @Router /users/refresh [get]
-// @Success 200 {array} TokenSwagger
-// @Produce json
-// @Tags Users
-
+// @Summary 		Refresh bearer token
+// @Description 	Generates a new access token using the refresh token stored in an http-only cookie.
+// @Router 			/users/refresh [get]
+// @Tags 			Users
+// @Produce 		json
+// @Success 		200 {object} TokenSwagger "New access token"
+// @Failure 		400 {object} ErrorSwagger "Invalid token"
+// @Failure 		403 {object} ErrorSwagger "Authorization required"
+// @Failure 		500 {object} ErrorSwagger "Internal server error"
 func refreshAccessToken(c *gin.Context) {
 	refreshToken, _ := c.Cookie("refreshToken")
 	token, err := jwt.ParseWithClaims(refreshToken, &Token{}, func(token *jwt.Token) (any, error) {
@@ -300,13 +318,15 @@ func refreshAccessToken(c *gin.Context) {
 	c.AbortWithStatusJSON(200, gin.H{"token": bearerToken})
 }
 
-// @Summary Get user info
-// @Description For this route, you must have bearer token
-// @Router /users/get_info [get]
-// @Success 200 {array} User
-// @Produce json
-// @Tags Users
-// @Param Authorization header string true "Bearer Token"
+// @Summary 		Get user info
+// @Description 	Retrieves details for the currently authenticated user.
+// @Router 			/users/get_info [get]
+// @Tags 			Users
+// @Security 		BearerAuth
+// @Produce 		json
+// @Success 		200 {object} User "User details"
+// @Failure 		403 {object} ErrorSwagger "Forbidden"
+// @Failure 		500 {object} ErrorSwagger "Internal server error"
 func getUserDetails(c *gin.Context) {
 	userId, _ := c.Get("id")
 	var user User

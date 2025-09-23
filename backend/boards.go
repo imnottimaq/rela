@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"errors"
-	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/goccy/go-json"
 	"go.mongodb.org/mongo-driver/v2/bson"
@@ -11,16 +10,19 @@ import (
 	"slices"
 )
 
-// @Summary Create new board
-// @Router /boards [post]
-// @Router /workspaces/{workspaceId}/boards [post]
-// @Accept json
-// @Success 200
-// @Produce json
-// @Tags Boards
-// @Param data body CreateBoard true "Create board request"
-// @Param workspaceId path string true "Workspace ID"
-// @Param Authorization header string true "Bearer Token"
+// @Summary 		Create a new board
+// @Description 	Creates a new board for the current user or a workspace.
+// @Router 			/boards [post]
+// @Router 			/workspaces/{workspaceId}/boards [post]
+// @Tags 			Boards
+// @Security 		BearerAuth
+// @Accept 			json
+// @Produce 		json
+// @Param 			workspaceId path string false "Workspace ID (optional)"
+// @Param 			data body CreateBoard true "Board creation data"
+// @Success 		200 {object} Board "The created board"
+// @Failure 		400 {object} ErrorSwagger "Bad request - no name given"
+// @Failure 		500 {object} ErrorSwagger "Internal server error"
 func addBoard(c *gin.Context) {
 	id, _ := c.Get("id")
 	workspaceId := c.Param("workspaceId")
@@ -34,113 +36,131 @@ func addBoard(c *gin.Context) {
 		c.AbortWithStatusJSON(400, gin.H{"error": "No name given"})
 		return
 	}
-	print(fmt.Sprintf("%v", id))
 	input.OwnedBy = id.(bson.ObjectID)
 	if workspaceId != "" {
 		i, _ := bson.ObjectIDFromHex(workspaceId)
 		input.OwnedBy = i
 	}
-	if _, err = boardsDb.InsertOne(context.TODO(), input); err != nil {
+	result, err := boardsDb.InsertOne(context.TODO(), input)
+	if err != nil {
 		c.AbortWithStatusJSON(500, gin.H{"error": "Failed to create board"})
+		return
+	}
+	input.Id = result.InsertedID.(bson.ObjectID)
+	c.JSON(200, input)
+}
+
+// @Summary 		Delete a board
+// @Description 	Deletes a specific board.
+// @Router 			/boards/{boardId} [delete]
+// @Router 			/workspaces/{workspaceId}/boards/{boardId} [delete]
+// @Tags 			Boards
+// @Security 		BearerAuth
+// @Produce 		json
+// @Param 			boardId path string true "Board ID"
+// @Param 			workspaceId path string false "Workspace ID (optional)"
+// @Success 		200 "Board deleted successfully"
+// @Failure 		403 {object} ErrorSwagger "Forbidden - you do not own this board"
+// @Failure 		404 {object} ErrorSwagger "Not Found - board not found"
+// @Failure 		500 {object} ErrorSwagger "Internal server error"
+func deleteBoard(c *gin.Context) {
+	userId, _ := c.Get("id")
+	boardIdStr := c.Param("boardId")
+	boardId, err := bson.ObjectIDFromHex(boardIdStr)
+	if err != nil {
+		c.AbortWithStatusJSON(400, gin.H{"error": "invalid boardId"})
+		return
+	}
+
+	var board Board
+	if err := boardsDb.FindOne(context.TODO(), bson.M{"_id": boardId}).Decode(&board); err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			c.AbortWithStatusJSON(404, gin.H{"error": "Board does not exist"})
+		} else {
+			c.AbortWithStatusJSON(500, gin.H{"error": "Failed to retrieve board"})
+		}
+		return
+	}
+
+	if board.OwnedBy != userId.(bson.ObjectID) {
+		c.AbortWithStatusJSON(403, gin.H{"error": "You dont own this board"})
+		return
+	}
+
+	if _, err := boardsDb.DeleteOne(context.TODO(), bson.D{{"_id", boardId}}); err != nil {
+		c.AbortWithStatusJSON(500, gin.H{"error": "Failed to remove board"})
 		return
 	}
 	c.AbortWithStatus(200)
 }
 
-// @Summary Delete board
-// @Router /boards/{boardId} [delete]
-// @Router /workspaces/{workspaceId}/boards/{boardId} [delete]
-// @Accept json
-// @Success 200
-// @Produce json
-// @Tags Boards
-// @Param boardId path bson.ObjectID true "Board ID"
-// @Param workspaceId path string true "Workspace ID"
-// @Param Authorization header string true "Bearer Token"
-func deleteBoard(c *gin.Context) {
-	id, _ := c.Get("id")
-	boardId := c.Param("boardId")
-	workspaceId := c.Param("workspaceId")
-	i, _ := bson.ObjectIDFromHex(workspaceId)
-	var board Board
-	if err := boardsDb.FindOne(context.TODO(), bson.D{{"_id", boardId}}).Decode(&board); err != nil {
-		if errors.Is(err, mongo.ErrNoDocuments) {
-			c.AbortWithStatusJSON(404, gin.H{"error": "Board does not exist"})
-			return
-		} else {
-			c.AbortWithStatusJSON(500, gin.H{"error": "Failed to execute search"})
-			return
-		}
-	}
-	if board.OwnedBy == id || board.OwnedBy == i {
-		if _, err := boardsDb.DeleteOne(context.TODO(), bson.D{{"_id", boardId}}); err != nil {
-			c.AbortWithStatusJSON(500, gin.H{"error": "Failed to remove board"})
-		}
-		c.AbortWithStatus(200)
-		return
-	} else {
-		c.AbortWithStatusJSON(400, gin.H{"error": "You dont own this board"})
-	}
-}
-
-// @Summary Edit board
-// @Router /boards/{boardId} [patch]
-// @Router /workspaces/{workspaceId}/boards/{boardId} [patch]
-// @Accept json
-// @Success 200
-// @Produce json
-// @Tags Boards
-// @Param boardId path bson.ObjectID true "Board ID"
-// @Param workspaceId path string true "Workspace ID"
-// @Param body path CreateBoard true "Edit board request"
-// @Param Authorization header string true "Bearer Token"
+// @Summary 		Edit a board
+// @Description 	Edits the details of a specific board.
+// @Router 			/boards/{boardId} [patch]
+// @Router 			/workspaces/{workspaceId}/boards/{boardId} [patch]
+// @Tags 			Boards
+// @Security 		BearerAuth
+// @Accept 			json
+// @Produce 		json
+// @Param 			boardId path string true "Board ID"
+// @Param 			workspaceId path string false "Workspace ID (optional)"
+// @Param 			data body CreateBoard true "Fields to edit in the board"
+// @Success 		200 {object} Board "The updated board"
+// @Failure 		400 {object} ErrorSwagger "Bad request - invalid input"
+// @Failure 		403 {object} ErrorSwagger "Forbidden - you do not own this board"
+// @Failure 		404 {object} ErrorSwagger "Not Found - board not found"
+// @Failure 		500 {object} ErrorSwagger "Internal server error"
 func editBoard(c *gin.Context) {
-	id, _ := c.Get("id")
-	boardId := c.Param("boardId")
-	workspaceId := c.Param("workspaceId")
-	i, _ := bson.ObjectIDFromHex(workspaceId)
-	var valuesToEdit Board
-	var a Board
-	err := json.NewDecoder(c.Request.Body).Decode(&valuesToEdit)
+	userId, _ := c.Get("id")
+	boardIdStr := c.Param("boardId")
+	boardId, err := bson.ObjectIDFromHex(boardIdStr)
 	if err != nil {
+		c.AbortWithStatusJSON(400, gin.H{"error": "invalid boardId"})
+		return
+	}
+
+	var valuesToEdit CreateBoard
+	if err := json.NewDecoder(c.Request.Body).Decode(&valuesToEdit); err != nil {
 		c.AbortWithStatusJSON(500, gin.H{"error": "Something went wrong when parsing request"})
 		return
-	} else if valuesToEdit.OwnedBy != id || valuesToEdit.OwnedBy != i {
-		c.AbortWithStatusJSON(400, gin.H{"error": "You dont own this board"})
-		return
-	} else if valuesToEdit.OwnedBy.IsZero() {
-		if err := boardsDb.FindOne(context.TODO(), bson.D{{"_id", boardId}}).Decode(i); err != nil {
-			if boardId == "" {
-				c.AbortWithStatusJSON(400, gin.H{"error": "Board id cannot be empty"})
-				return
-			} else if errors.Is(err, mongo.ErrNoDocuments) {
-				c.AbortWithStatusJSON(404, gin.H{"error": "Board does not exist"})
-				return
-			} else {
-				c.AbortWithStatusJSON(500, gin.H{"error": "Failed to execute search"})
-				return
-			}
-		}
-		if valuesToEdit.Name == "" {
-			c.AbortWithStatusJSON(400, gin.H{"error": "You cant change board name to nothing"})
-			return
-		}
-		a.Name = valuesToEdit.Name
-		if _, err := boardsDb.InsertOne(context.TODO(), i); err != nil {
-			c.AbortWithStatusJSON(500, gin.H{"error": "Failed to insert board"})
-		}
 	}
+
+	var board Board
+	if err := boardsDb.FindOne(context.TODO(), bson.M{"_id": boardId}).Decode(&board); err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			c.AbortWithStatusJSON(404, gin.H{"error": "Board does not exist"})
+		} else {
+			c.AbortWithStatusJSON(500, gin.H{"error": "Failed to retrieve board"})
+		}
+		return
+	}
+
+	if board.OwnedBy != userId.(bson.ObjectID) {
+		c.AbortWithStatusJSON(403, gin.H{"error": "You dont own this board"})
+		return
+	}
+
+	if valuesToEdit.Name != "" {
+		board.Name = valuesToEdit.Name
+	}
+
+	if _, err := boardsDb.ReplaceOne(context.TODO(), bson.D{{"_id", boardId}}, board); err != nil {
+		c.AbortWithStatusJSON(500, gin.H{"error": "Failed to update board"})
+		return
+	}
+	c.JSON(200, board)
 }
 
-// @Summary Get all boards
-// @Router /boards [get]
-// @Router /workspaces/{workspaceId}/boards [get]
-// @Accept json
-// @Success 200 {array} Board
-// @Produce json
-// @Tags Boards
-// @Param workspaceId path string true "Workspace ID"
-// @Param Authorization header string true "Bearer Token"
+// @Summary 		Get all boards
+// @Description 	Returns all boards owned by the current user, or all boards for a given workspace.
+// @Router 			/boards [get]
+// @Router 			/workspaces/{workspaceId}/boards [get]
+// @Tags 			Boards
+// @Security 		BearerAuth
+// @Produce 		json
+// @Param 			workspaceId path string false "Workspace ID (optional)"
+// @Success 		200 {object} AllBoardsResponse "A list of boards"
+// @Failure 		500 {object} ErrorSwagger "Internal Server Error"
 func getAllBoards(c *gin.Context) {
 	var cursor *mongo.Cursor
 	userId, _ := c.Get("id")
@@ -155,21 +175,25 @@ func getAllBoards(c *gin.Context) {
 	_ = cursor.All(context.TODO(), &boards)
 	c.IndentedJSON(200, gin.H{"boards": boards})
 	if err := cursor.Close(context.TODO()); err != nil {
-		print("Failed to close cursor")
+		// Log the error but don't abort, as the response has already been sent.
+		println("Failed to close cursor")
 	}
-	return
 }
 
-// @Summary Get board by id
-// @Router /boards/{boardId} [get]
-// @Router /workspaces/{workspaceId}/boards/{boardId} [get]
-// @Accept json
-// @Success 200 {object} Board
-// @Produce json
-// @Tags Boards
-// @Param boardId path string true "Board ID"
-// @Param workspaceId path string true "Workspace ID"
-// @Param Authorization header string true "Bearer Token"
+// @Summary 		Get a board by ID
+// @Description 	Retrieves a specific board by its ID.
+// @Router 			/boards/{boardId} [get]
+// @Router 			/workspaces/{workspaceId}/boards/{boardId} [get]
+// @Tags 			Boards
+// @Security 		BearerAuth
+// @Produce 		json
+// @Param 			boardId path string true "Board ID"
+// @Param 			workspaceId path string false "Workspace ID (optional, for authorization context)"
+// @Success 		200 {object} Board "The requested board"
+// @Failure 		400 {object} ErrorSwagger "Bad request - invalid board ID"
+// @Failure 		403 {object} ErrorSwagger "Forbidden - you do not have access to this board"
+// @Failure 		404 {object} ErrorSwagger "Not Found - board not found"
+// @Failure 		500 {object} ErrorSwagger "Internal server error"
 func getBoard(c *gin.Context) {
 	userId, _ := c.Get("id")
 	boardIdStr := c.Param("boardId")

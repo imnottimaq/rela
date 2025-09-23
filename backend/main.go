@@ -47,6 +47,9 @@ func getAllowedOrigins() []string {
 // @Description	Simple WIP task tracker that can be self-hosted
 // @Version		1.0
 // @BasePath		/api/v1
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
 func main() {
 	r := gin.Default()
 	corsConfig := cors.DefaultConfig()
@@ -74,7 +77,6 @@ func main() {
 	protected.Use(authMiddleware())
 	boards.Use(authMiddleware())
 	tasks.Use(authMiddleware())
-	tasks.Use(taskMiddleware())
 	users.Use(userMiddleware())
 	workspaces.Use(authMiddleware())
 	{
@@ -82,8 +84,8 @@ func main() {
 		//Tasks
 		tasks.GET("/", getAllTasks)
 		tasks.POST("/", createNewTask)
-		tasks.PATCH("/:taskId", editExistingTask)
-		tasks.DELETE("/:taskId", deleteExistingTask)
+		tasks.PATCH("/:taskId", taskMiddleware(), editExistingTask)
+		tasks.DELETE("/:taskId", taskMiddleware(), deleteExistingTask)
 
 		//Boards
 		boards.GET("/", getAllBoards)
@@ -117,8 +119,8 @@ func main() {
 		//Workspace tasks
 		workspaces.GET("/tasks/", getAllTasks)
 		workspaces.POST("/tasks/", createNewTask)
-		workspaces.PATCH("/tasks/:taskId", editExistingTask)
-		workspaces.DELETE("/delete/:taskId", deleteExistingTask)
+		workspaces.PATCH("/tasks/:taskId", taskMiddleware(), editExistingTask)
+		workspaces.DELETE("/delete/:taskId", taskMiddleware(), deleteExistingTask)
 		workspaces.POST("/assign", assignTask)
 
 		//Workspace boards
