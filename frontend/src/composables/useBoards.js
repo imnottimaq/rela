@@ -1,5 +1,5 @@
-import { ref } from "vue";
-import { onAuthStateChange } from "../utils/http";
+import { ref, watch } from "vue";
+import { onAuthStateChange, workspaceApi } from "../utils/http";
 import { workspaces } from "./useWorkspaces";
 
 // Global registry of open board windows
@@ -41,9 +41,9 @@ export const openBoardWindow = (workspace, board) => {
 };
 
 export const closeBoardWindow = (id) => {
-  const idx = openBoardWindows.value.findIndex((w) => w.id === id);
-  if (idx !== -1) {
-    openBoardWindows.value.splice(idx, 1);
+  const win = openBoardWindows.value.find((w) => w.id === id);
+  if (win) {
+    win.visible = false;
   }
 };
 
@@ -71,10 +71,11 @@ export function restoreBoardWindowsFromStorage() {
         const raw = window.localStorage.getItem(key);
         if (!raw) continue;
         const parsed = JSON.parse(raw);
-        const visible = Boolean(parsed?.visible);
-        if (!visible) continue;
+        // Restore persisted visibility state. Default to true if not set.
+        const visible = parsed?.visible !== false;
 
         const id = `${wsId}:${boardId}`;
+        // Avoid duplicating windows if they are already open
         if (openBoardWindows.value.some((w) => w.id === id)) continue;
 
         const ws = (workspaces?.value || []).find(
@@ -87,7 +88,7 @@ export function restoreBoardWindowsFromStorage() {
           name: String(boardId),
           workspaceId: wsId,
           workspaceName,
-          visible: true,
+          visible, // Use the stored visibility
         });
       } catch (_) {
         // ignore parse errors
@@ -107,3 +108,49 @@ onAuthStateChange((hasToken) => {
     openBoardWindows.value = [];
   }
 });
+
+// New composable for fetching tasks for a specific board
+export function useBoardTasks(workspaceIdRef, boardIdRef) {
+  const tasks = ref([]);
+  const isLoading = ref(false);
+  const error = ref(null);
+  const isNotFound = ref(false);
+
+  const fetchTasks = async () => {
+    const boardId = boardIdRef.value;
+    const workspaceId = workspaceIdRef.value;
+    if (!boardId || !workspaceId) {
+      tasks.value = [];
+      return;
+    }
+    isLoading.value = true;
+    error.value = null;
+    isNotFound.value = false;
+    try {
+      const { data } = await workspaceApi.getTasks(workspaceId, boardId);
+      tasks.value = data || [];
+      if (tasks.value.length === 0) {
+        isNotFound.value = true;
+      }
+    } catch (err) {
+      console.error(`Failed to fetch tasks for board ${boardId} in workspace ${workspaceId}:`, err);
+      error.value = err;
+      tasks.value = [];
+      if (err.response?.status === 404) {
+        isNotFound.value = true;
+      }
+    } finally {
+      isLoading.value = false;
+    }
+  };
+
+  watch([workspaceIdRef, boardIdRef], fetchTasks, { immediate: true });
+
+  return {
+    tasks,
+    isLoading,
+    error,
+    isNotFound,
+    fetchTasks,
+  };
+}

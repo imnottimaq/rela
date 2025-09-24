@@ -82,7 +82,7 @@ func main() {
 	{
 		r.Static("/img", "./img")
 		//Tasks
-		tasks.GET("/", getAllTasks)
+		tasks.GET("/:boardId", getAllTasks)
 		tasks.POST("/", createNewTask)
 		tasks.PATCH("/:taskId", taskMiddleware(), editExistingTask)
 		tasks.DELETE("/:taskId", taskMiddleware(), deleteExistingTask)
@@ -98,6 +98,7 @@ func main() {
 		users.POST("/login", loginUser)
 		users.GET("/refresh", refreshAccessToken)
 
+		protected.POST("/users/logout", logoutUser)
 		protected.GET("/users/workspaces", getAllWorkspaces)
 		protected.DELETE("/users/delete", deleteUser)
 		protected.POST("/users/upload_avatar", uploadAvatar)
@@ -117,7 +118,7 @@ func main() {
 		workspaces.POST("/upload_avatar", uploadAvatar)
 
 		//Workspace tasks
-		workspaces.GET("/tasks/", getAllTasks)
+		workspaces.GET("/tasks/:boardId", getAllTasks)
 		workspaces.POST("/tasks/", createNewTask)
 		workspaces.PATCH("/tasks/:taskId", taskMiddleware(), editExistingTask)
 		workspaces.DELETE("/delete/:taskId", taskMiddleware(), deleteExistingTask)

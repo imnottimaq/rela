@@ -365,7 +365,7 @@ const attachListeners = () => {
   document.addEventListener("pointermove", handlePointerMove);
   document.addEventListener("pointerup", stopInteractions);
   document.addEventListener("pointercancel", stopInteractions);
-  listenersAttached = true;
+listenersAttached = true;
   setBodySelection("none");
 };
 

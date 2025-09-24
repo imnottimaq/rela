@@ -14,19 +14,24 @@ import (
 // @Summary 		Get all tasks
 // @Description 	Returns all tasks owned by the current user, or all tasks for a given workspace.
 // @Router 			/tasks [get]
-// @Router 			/workspaces/{workspaceId}/tasks [get]
+// @Router 			/workspaces/{workspaceId}/tasks/{boardId} [get]
 // @Tags 			Tasks
 // @Security 		BearerAuth
 // @Produce 		json
 // @Param 			workspaceId path string false "Workspace ID (optional)"
+// @Param 			boardId path string true "Board ID"
 // @Success 		200 {object} AllTasksResponse "A list of tasks"
 // @Failure 		500 {object} ErrorSwagger "Internal Server Error"
 func getAllTasks(c *gin.Context) {
 	id, _ := c.Get("id")
+	bId := c.Param("boardId")
+	boardId, _ := bson.ObjectIDFromHex(bId)
 	tasks := make([]Task, 0)
 	if wId := c.Param("workspaceId"); wId == "" {
-		cursor, _ := tasksDb.Find(context.TODO(), bson.D{{"created_by", id.(bson.ObjectID)}})
-
+		cursor, _ := tasksDb.Find(context.TODO(), bson.D{
+			{"created_by", id.(bson.ObjectID)},
+			{"board", boardId},
+		})
 		_ = cursor.All(context.TODO(), &tasks)
 		c.IndentedJSON(200, gin.H{"tasks": tasks})
 		if err := cursor.Close(context.TODO()); err != nil {
@@ -36,7 +41,10 @@ func getAllTasks(c *gin.Context) {
 		return
 	} else {
 		workspaceId, _ := bson.ObjectIDFromHex(wId)
-		cursor, _ := tasksDb.Find(context.TODO(), bson.D{{"created_by", workspaceId}})
+		cursor, _ := tasksDb.Find(context.TODO(), bson.D{
+			{"created_by", workspaceId},
+			{"board", boardId},
+		})
 		_ = cursor.All(context.TODO(), &tasks)
 		c.IndentedJSON(200, gin.H{"tasks": tasks})
 		if err := cursor.Close(context.TODO()); err != nil {

@@ -198,34 +198,34 @@ export const authApi = {
 
 export const boardsApi = {
   getBoards(workspaceId) {
-    return apiClient.get("/boards", { params: { workspaceId } });
+    return apiClient.get("/boards", );
   },
   getBoard(boardId) {
     return apiClient.get(`/boards/${boardId}`);
   },
-  createBoard(workspaceId, payload) {
-    return apiClient.post("/boards", payload, { params: { workspaceId } });
+  createBoard( payload) {
+    return apiClient.post("/boards", payload );
   },
   updateBoard(boardId, workspaceId, payload) {
-    return apiClient.patch(`/boards/${boardId}`, payload, { params: { workspaceId } });
+    return apiClient.patch(`/boards/${boardId}`, payload );
   },
   deleteBoard(boardId, workspaceId) {
-    return apiClient.delete(`/boards/${boardId}`, { params: { workspaceId } });
+    return apiClient.delete(`/boards/${boardId}` );
   },
 };
 
 export const tasksApi = {
-  getTasks(workspaceId) {
-    return apiClient.get("/tasks", { params: { workspaceId } });
+  getTasksForBoard(boardId) {
+    return apiClient.get(`/tasks/${boardId}`);
   },
-  createTask(workspaceId, payload) {
-    return apiClient.post("/tasks", payload, { params: { workspaceId } });
+  createTask(payload) {
+    return apiClient.post("/tasks", payload, );
   },
-  updateTask(taskId, workspaceId, payload) {
-    return apiClient.patch(`/tasks/${taskId}`, payload, { params: { workspaceId } });
+  updateTask(taskId, payload) {
+    return apiClient.patch(`/tasks/${taskId}`, payload, );
   },
-  deleteTask(taskId, workspaceId) {
-    return apiClient.delete(`/tasks/${taskId}`, { params: { workspaceId } });
+  deleteTask(taskId) {
+    return apiClient.delete(`/tasks/${taskId}`, );
   },
 };
 
@@ -240,10 +240,10 @@ export const workspaceApi = {
     return apiClient.patch(`/workspaces/${workspaceId}/`, payload);
   },
   getBoards(workspaceId) {
-    return apiClient.get(`/workspaces/${workspaceId}/boards`, { params: { workspaceId } });
+    return apiClient.get(`/workspaces/${workspaceId}/boards`  );
   },
   createBoard(workspaceId, payload) {
-    return apiClient.post(`/workspaces/${workspaceId}/boards`, payload, { params: { workspaceId } });
+    return apiClient.post(`/workspaces/${workspaceId}/boards`, payload,  );
   },
   updateBoard(workspaceId, boardId, payload) {
     return apiClient.patch(`/workspaces/${workspaceId}/boards/${boardId}`, payload, {
@@ -255,11 +255,11 @@ export const workspaceApi = {
       params: { workspaceId },
     });
   },
-  getTasks(workspaceId) {
-    return apiClient.get(`/workspaces/${workspaceId}/tasks`, { params: { workspaceId } });
+  getTasks(workspaceId,boardId) {
+    return apiClient.get(`/workspaces/${workspaceId}/tasks/${boardId}`, );
   },
   createTask(workspaceId, payload) {
-    return apiClient.post(`/workspaces/${workspaceId}/tasks`, payload, { params: { workspaceId } });
+    return apiClient.post(`/workspaces/${workspaceId}/tasks`, payload,  );
   },
   updateTask(workspaceId, taskId, payload) {
     return apiClient.patch(`/workspaces/${workspaceId}/tasks/${taskId}`, payload, {
@@ -272,10 +272,10 @@ export const workspaceApi = {
     });
   },
   assignTask(workspaceId, payload) {
-    return apiClient.post(`/workspaces/${workspaceId}/assign`, payload, { params: { workspaceId } });
+    return apiClient.post(`/workspaces/${workspaceId}/assign`, payload, );
   },
   getMembers(workspaceId) {
-    return apiClient.get(`/workspaces/${workspaceId}/members`, { params: { workspaceId } });
+    return apiClient.get(`/workspaces/${workspaceId}/members`, );
   },
   kickMember(workspaceId) {
     return apiClient.delete(`/workspaces/${workspaceId}/kick`, {
@@ -283,7 +283,7 @@ export const workspaceApi = {
     });
   },
   getInvite(workspaceId) {
-    return apiClient.get(`/workspaces/${workspaceId}/new_invite`, { params: { workspaceId } });
+    return apiClient.get(`/workspaces/${workspaceId}/new_invite`, );
   },
   promoteMember(workspaceId, userId, payload) {
     return apiClient.patch(`/workspaces/${workspaceId}/promote/${userId}`, payload, {

@@ -1,12 +1,12 @@
 <template>
     <WindowComponent
       title="Register"
-      :buttons="[{ label: 'Close', onClick: closeAndReset }]"
+      :buttons="[{ label: 'Close', onClick: hideRegisterWindow }]"
       v-model:visible="registerVisible"
       storage-key="rela-window-register"
       footer-buttons-align="right"
       :footer-buttons="[
-        { label: 'Cancel', onClick: closeAndReset },
+        { label: 'Cancel', onClick: hideRegisterWindow },
         { label: 'Register', onClick: registerUser, primary: true, loading: isSubmitting, disabled: isSubmitting }
       ]"
       :initialSize="{ width: 320, height: 460 }"
@@ -42,7 +42,7 @@
     </WindowComponent>
 </template>
 <script setup>
-import { ref } from 'vue';
+import { ref, watch } from 'vue';
 import WindowComponent from './WindowComponent.vue';
 import { useRegisterWindow } from '../composables/useRegisterWindow';
 import { hideLoginWindow, showLoginWindow } from '../composables/useLoginWindow';
@@ -75,6 +75,12 @@ const resetState = () => {
   confirmPasswordError.value = '';
   registerError.value = '';
 };
+
+watch(registerVisible, (newValue) => {
+  if (newValue === false) {
+    resetState();
+  }
+});
 
 const validateEmail = (value) => {
   if (!value) {
@@ -128,7 +134,7 @@ const registerUser = async () => {
     }
 
     if (password.value !== confirmPassword.value) {
-      confirmPasswordError.value = 'Passwords do not match.';
+      confirmPasswordError.value = 'Passwords do not matter.';
     }
 
     if (nameError.value || emailError.value || passwordError.value || confirmPasswordError.value) {
@@ -144,7 +150,7 @@ const registerUser = async () => {
       registerError.value = 'Registration succeeded without an access token. Please try logging in.';
       return;
     }
-    closeAndReset();
+    hideRegisterWindow();
     hideLoginWindow();
   } catch (error) {
     console.error('Registration failed:', error);
@@ -152,13 +158,6 @@ const registerUser = async () => {
   } finally {
     isSubmitting.value = false;
   }
-};
-
-
-
-const closeAndReset = () => {
-  hideRegisterWindow();
-  resetState();
 };
 </script>
 <style scoped>

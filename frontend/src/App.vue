@@ -4,6 +4,7 @@
 
     <LoginWindow />
     <RegisterWindow />
+    <ForgotPasswordWindow/>
     <ProfileWindow />
     <ConfirmLogoutWindow />
     <CreateWorkspaceWindow />
@@ -41,6 +42,7 @@ import { useWorkspaces } from './composables/useWorkspaces';
 import { useBoards, restoreBoardWindowsFromStorage } from './composables/useBoards';
 import { useAuth } from './composables/useAuth';
 import background from './assets/windows7.jpg';
+import ForgotPasswordWindow from "./components/ForgotPasswordWindow.vue";
 
 const mainStyle = `background-image: url(${background})`;
 

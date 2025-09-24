@@ -12,6 +12,7 @@
       <section class="ws-info">
         <p>ID: <code>{{ wsId }}</code></p>
         <p>Name: <strong>{{ workspace?.name }}</strong></p>
+        <button class="inline-link" type="button" @click="createWorkspaceInviteLink(wsId)">Get Invite Link</button>
       </section>
 
       <section class="boards">
@@ -45,6 +46,7 @@ import WindowComponent from './WindowComponent.vue';
 import CreateBoardWindow from './CreateBoardWindow.vue';
 import { workspaceApi } from '../utils/http';
 import { openBoardWindow } from '../composables/useBoards';
+import { createWorkspaceInviteLink } from '../composables/useWorkspaces';
 
 const props = defineProps({
   workspace: { type: Object, required: true },

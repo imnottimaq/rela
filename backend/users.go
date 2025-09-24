@@ -160,6 +160,16 @@ func loginUser(c *gin.Context) {
 	}
 }
 
+// @Summary 		Logout user
+// @Description 	Logs out the current user by clearing the refresh token cookie.
+// @Router 			/users/logout [post]
+// @Tags 			Users
+// @Success 		200 "Successfully logged out"
+func logoutUser(c *gin.Context) {
+	c.SetCookie("refreshToken", "", -1, "/", "", false, true)
+	c.AbortWithStatus(200)
+}
+
 // @Summary 		Delete user
 // @Description 	Deletes the currently authenticated user.
 // @Router 			/users/delete [delete]

@@ -1,5 +1,6 @@
 import { ref } from "vue";
-import { authApi, onAuthStateChange } from "../utils/http";
+import {authApi, onAuthStateChange, workspaceApi} from "../utils/http";
+import { useClipboard } from '@vueuse/core'
 
 // Reactive state with global lifetime (one instance across app)
 export const workspaces = ref([]);
@@ -60,6 +61,15 @@ export const closeWorkspaceWindow = (id) => {
     openWorkspaceWindows.value.splice(idx, 1);
   }
 };
+
+const { copy } = useClipboard()
+export const createWorkspaceInviteLink = async (workspaceId) => {
+  if (!workspaceId) return;
+  const {data} = await workspaceApi.getInvite(workspaceId)
+  const token = data?.token;
+  const invite_url = import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, "") + "/workspaces/add/" + token;
+  copy(invite_url)
+}
 
 // React to auth state changes so list stays in sync
 onAuthStateChange((hasToken) => {
