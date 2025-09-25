@@ -52,6 +52,7 @@ func getAllowedOrigins() []string {
 // @name Authorization
 func main() {
 	r := gin.Default()
+	r.RedirectTrailingSlash = false // Explicitly disable automatic redirects
 	corsConfig := cors.DefaultConfig()
 	corsConfig.AllowOrigins = getAllowedOrigins()
 	corsConfig.AllowMethods = []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"}
@@ -97,8 +98,8 @@ func main() {
 		users.POST("/create", createUser)
 		users.POST("/login", loginUser)
 		users.GET("/refresh", refreshAccessToken)
+		users.POST("/logout", logoutUser)
 
-		protected.POST("/users/logout", logoutUser)
 		protected.GET("/users/workspaces", getAllWorkspaces)
 		protected.DELETE("/users/delete", deleteUser)
 		protected.POST("/users/upload_avatar", uploadAvatar)
@@ -119,7 +120,7 @@ func main() {
 
 		//Workspace tasks
 		workspaces.GET("/tasks/:boardId", getAllTasks)
-		workspaces.POST("/tasks/", createNewTask)
+		workspaces.POST("/tasks", createNewTask)
 		workspaces.PATCH("/tasks/:taskId", taskMiddleware(), editExistingTask)
 		workspaces.DELETE("/delete/:taskId", taskMiddleware(), deleteExistingTask)
 		workspaces.POST("/assign", assignTask)

@@ -6,6 +6,7 @@ import {
   setAuthTokens,
   clearAuthTokens,
   onAuthStateChange,
+  authApi,
 } from "../utils/http";
 
 const isAuthenticated = ref(Boolean(getAccessToken()));
@@ -44,46 +45,53 @@ const handleAuthSuccess = ({ token, refreshToken }) => {
   return true;
 };
 
-const logout = () => {
-  console.log("Logout placeholder: send HTTP request later");
-  // Clear auth headers/tokens and notify listeners
+const logout = async () => {
+  // 1. Call the backend to invalidate the http-only cookie.
+  try {
+    await authApi.logoutUser();
+  } catch (error) {
+    // Log the error but proceed with client-side cleanup anyway,
+    // as the user's intent is to log out.
+    console.error("Logout API call failed:", error);
+  }
+
+  // 2. Disable window persistence to prevent race conditions on cleanup
   try { if (typeof window !== "undefined") window.__relaDisableWindowPersistence = true; } catch (_) {}
+
+  // 3. Clear auth tokens from storage and API client instance
   clearAuthTokens();
-  // Proactively reset in-memory state for UI
+
+  // 4. Reset any in-memory state
   try {
     workspaces.value = [];
     openWorkspaceWindows.value = [];
     openBoardWindows.value = [];
   } catch (_) {}
-  // Then clear the entire localStorage as requested
+
+  // 5. Clean up localStorage, preserving essential windows
   try {
     if (typeof window !== "undefined" && window.localStorage) {
-      let windowsToPreserve = ["rela-window-login", "rela-window-register", "rela-window-main"];
-      let preservedStates = {};
-      for (let w of windowsToPreserve) {
-        try {
-          let state = window.localStorage.getItem(w);
-          if (state) {
-            preservedStates[w] = state;
-          }
-        } catch (_) {}
-      }
-      // Clear everything
-      window.localStorage.clear();
-      // Restore main window state if it existed before
-      for (let w of windowsToPreserve) {
-        try {
-          if (preservedStates[w]) {
-            window.localStorage.setItem(w, preservedStates[w]);
-          }
-        } catch (_) {}
+      const keys = Object.keys(window.localStorage);
+      const windowsToPreserve = new Set(["rela-window-login", "rela-window-register", "rela-window-main"]);
+      for (const k of keys) {
+        // Remove all persisted window states except for the ones we want to keep
+        if (k && k.startsWith("rela-window-") && !windowsToPreserve.has(k)) {
+          try {
+            window.localStorage.removeItem(k);
+          } catch (_) {}
+        }
       }
     }
   } catch (e) {
     // ignore storage errors
   }
-  // Re-enable persistence after the UI settles
-  try { setTimeout(() => { if (typeof window !== "undefined") window.__relaDisableWindowPersistence = false; }, 0); } catch (_) {}
+
+  // 6. Re-enable persistence after the UI settles
+  try {
+    setTimeout(() => {
+      if (typeof window !== "undefined") window.__relaDisableWindowPersistence = false;
+    }, 50); // A small delay
+  } catch (_) {}
 };
 
 export function useAuth() {

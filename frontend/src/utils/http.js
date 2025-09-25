@@ -194,6 +194,9 @@ export const authApi = {
       headers: { "Content-Type": "multipart/form-data" },
     });
   },
+  logoutUser(){
+    return apiClient.post("/users/logout");
+  }
 };
 
 export const boardsApi = {

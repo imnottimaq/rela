@@ -9,8 +9,8 @@
   >
     <div class="form-content">
       <div class="field-row-stacked">
-        <label for="task-title-input">Task Title</label>
-        <input id="task-title-input" type="text" v-model="taskTitle" @keydown.enter="submit" />
+        <input id="task-title-input" type="text" v-model="taskName" @keydown.enter="submit"  placeholder="Name"/>
+        <input id="task-desc-input" type="text" v-model="taskDesc" @keydown.enter="submit"  placeholder="Description"/>
       </div>
       <div v-if="error" class="error-message">{{ error }}</div>
     </div>
@@ -30,7 +30,8 @@ const props = defineProps({
 
 const emit = defineEmits(['update:visible', 'created']);
 
-const taskTitle = ref('');
+const taskName = ref('');
+const taskDesc = ref('');
 const isLoading = ref(false);
 const error = ref('');
 
@@ -41,7 +42,8 @@ const modelVisible = computed({
 
 watch(() => props.visible, (isVisible) => {
   if (isVisible) {
-    taskTitle.value = '';
+    taskName.value = '';
+    taskDesc.value = '';
     error.value = '';
     isLoading.value = false;
   }
@@ -52,7 +54,7 @@ const close = () => {
 };
 
 const submit = async () => {
-  if (!taskTitle.value.trim()) {
+  if (!taskName.value.trim()) {
     error.value = 'Task title is required.';
     return;
   }
@@ -63,8 +65,9 @@ const submit = async () => {
 
   try {
     const payload = {
-      title: taskTitle.value,
-      boardId: props.boardId,
+      name: taskName.value,
+      description: taskDesc.value,
+      board: props.boardId,
     };
     const { data } = await workspaceApi.createTask(props.workspaceId, payload);
     emit('created', data);
@@ -86,7 +89,7 @@ const footerButtons = computed(() => [
   {
     label: 'Create',
     onClick: submit,
-    disabled: !taskTitle.value.trim(),
+    disabled: !taskName.value.trim(),
     loading: isLoading.value,
   },
 ]);

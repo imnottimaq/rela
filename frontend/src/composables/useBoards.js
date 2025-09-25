@@ -58,7 +58,11 @@ export function useBoards() {
 
 // Restore board windows based on WindowComponent's persisted state
 export function restoreBoardWindowsFromStorage() {
-  if (typeof window === "undefined") return;
+  if (typeof window === "undefined" || !workspaces.value || workspaces.value.length === 0) {
+    return false;
+  }
+
+  let restoredSomething = false;
   try {
     const keys = Object.keys(window.localStorage || {});
     for (const key of keys) {
@@ -71,11 +75,9 @@ export function restoreBoardWindowsFromStorage() {
         const raw = window.localStorage.getItem(key);
         if (!raw) continue;
         const parsed = JSON.parse(raw);
-        // Restore persisted visibility state. Default to true if not set.
         const visible = parsed?.visible !== false;
 
         const id = `${wsId}:${boardId}`;
-        // Avoid duplicating windows if they are already open
         if (openBoardWindows.value.some((w) => w.id === id)) continue;
 
         const ws = (workspaces?.value || []).find(
@@ -83,13 +85,19 @@ export function restoreBoardWindowsFromStorage() {
         );
         const workspaceName = ws?.name || String(wsId);
 
+        const board = (ws?.boards || []).find(
+          (b) => (b._id || b.id || b.Id || b.name) == boardId
+        );
+        const boardName = board?.name || String(boardId);
+
         openBoardWindows.value.push({
           id,
-          name: String(boardId),
+          name: boardName,
           workspaceId: wsId,
           workspaceName,
-          visible, // Use the stored visibility
+          visible,
         });
+        restoredSomething = true;
       } catch (_) {
         // ignore parse errors
       }
@@ -97,14 +105,28 @@ export function restoreBoardWindowsFromStorage() {
   } catch (_) {
     // ignore
   }
+  return restoredSomething;
 }
 
-// React to auth changes similar to workspaces
+// React to auth changes. This is complex because we must wait for workspaces to be
+// loaded before we can restore board windows (as we need the names).
 onAuthStateChange((hasToken) => {
   if (hasToken) {
-    // Defer to allow workspaces to refresh first
-    setTimeout(() => restoreBoardWindowsFromStorage(), 0);
+    // Attempt to restore immediately. If workspaces aren't loaded, this will fail gracefully.
+    const restored = restoreBoardWindowsFromStorage();
+
+    // If restoration didn't happen, it means workspaces were not ready. We set up a watcher.
+    if (!restored) {
+      const unwatch = watch(workspaces, () => {
+        // When workspaces are populated, try restoring again.
+        if (restoreBoardWindowsFromStorage()) {
+          // If we succeed, we can stop watching.
+          unwatch();
+        }
+      }, { deep: true });
+    }
   } else {
+    // If the user logs out, clear all open board windows.
     openBoardWindows.value = [];
   }
 });
@@ -128,7 +150,7 @@ export function useBoardTasks(workspaceIdRef, boardIdRef) {
     isNotFound.value = false;
     try {
       const { data } = await workspaceApi.getTasks(workspaceId, boardId);
-      tasks.value = data || [];
+      tasks.value = Array.isArray(data) ? data : [];
       if (tasks.value.length === 0) {
         isNotFound.value = true;
       }

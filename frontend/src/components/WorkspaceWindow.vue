@@ -12,7 +12,6 @@
       <section class="ws-info">
         <p>ID: <code>{{ wsId }}</code></p>
         <p>Name: <strong>{{ workspace?.name }}</strong></p>
-        <button class="inline-link" type="button" @click="createWorkspaceInviteLink(wsId)">Get Invite Link</button>
       </section>
 
       <section class="boards">
@@ -144,6 +143,7 @@ const windowMenu = computed(() => {
   }
   return [
     { label: 'Boards', items },
+    { label: 'Get Invite Link', createWorkspaceInviteLink},
   ];
 });
 </script>

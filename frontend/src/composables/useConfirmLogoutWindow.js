@@ -1,4 +1,5 @@
 import { ref } from "vue";
+import {authApi} from "../utils/http.js";
 
 // Visibility state for the logout confirmation window
 export const logoutConfirmVisible = ref(false);
