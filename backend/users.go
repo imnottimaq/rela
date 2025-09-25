@@ -138,7 +138,7 @@ func loginUser(c *gin.Context) {
 			return
 		}
 	}
-	if base64.RawStdEncoding.EncodeToString(argon2.IDKey([]byte(input.Password+pepper), []byte(i.Salt), uint32(1), uint32(32*1024), uint8(4), uint32(32))) == i.HashedPassword {
+    if base64.RawStdEncoding.EncodeToString(argon2.IDKey([]byte(input.Password+pepper), []byte(i.Salt), uint32(1), uint32(32*1024), uint8(4), uint32(32))) == i.HashedPassword {
 		refreshToken := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 			"id":  i.Id,
 			"exp": time.Now().UTC().Unix() + 604800, // Current expire time is 7 days, this is subject to change
@@ -154,10 +154,12 @@ func loginUser(c *gin.Context) {
 				c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
 				return
 			}
-			c.JSON(200, gin.H{"token": bearerToken})
-			return
-		}
-	}
+            c.JSON(200, gin.H{"token": bearerToken})
+            return
+        }
+    }
+    // Wrong password path: explicitly respond with an error
+    c.AbortWithStatusJSON(400, gin.H{"error": "Wrong email or password"})
 }
 
 // @Summary 		Logout user
