@@ -11,15 +11,29 @@
     <div class="content">
       <p>Workspace: <strong>{{ workspaceName }}</strong></p>
       <p>Board Name: <strong>{{ boardName }}</strong></p>
-      <hr />
-      <h4>Tasks</h4>
       <div v-if="isLoading" class="loading">Loading tasks...</div>
       <div v-else-if="error && !isNotFound" class="error">Failed to load tasks.</div>
-      <ul v-else-if="tasks.length" class="task-list">
-        <li v-for="task in tasks" :key="task._id || task.id">
-          {{ task.title || 'Unnamed Task' }}
-        </li>
-      </ul>
+      <div v-else-if="tasks.length" class="table-wrap">
+        <table class="task-table has-shadow">
+          <thead>
+            <tr>
+              <th>Tasks</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="task in tasks"
+              :key="task._id || task.id || task.Id"
+              class="task-row"
+            >
+              <td>
+                <div class="task-title">{{ task.name || task.title || 'Unnamed Task' }}</div>
+                <div v-if="task.description" class="task-desc">{{ task.description }}</div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
       <div v-else class="no-tasks">No tasks found for this board.</div>
     </div>
 
@@ -81,25 +95,20 @@ const handleTaskCreated = (newTask) => {
 const windowMenu = computed(() => {
   const taskItems = (tasks.value || []).map(task => ({
     type: 'button',
-    label: task.title || 'Unnamed Task',
+    label: task.name || task.title || 'Unnamed Task',
     // placeholder onClick
-    onClick: () => alert(`Selected task: ${task.title}`),
+    onClick: () => alert(`Selected task: ${task.name || task.title || 'Unnamed Task'}`),
   }));
 
   return [
     {
-      label: 'File',
+      label: 'Tasks',
       items: [
         {
           type: 'button',
           label: 'New Task',
           onClick: () => { createTaskVisible.value = true; },
         },
-      ],
-    },
-    {
-      label: 'Tasks',
-      items: [
         {
           type: 'button',
           label: 'Refresh Tasks',
@@ -135,12 +144,21 @@ const windowMenu = computed(() => {
 .error {
   color: #d9534f;
 }
-.task-list {
-  list-style: disc;
-  padding-left: 20px;
-  margin: 0;
+/*
+.table-wrap { overflow: auto; }
+
+.task-table thead th {
+  text-align: left;
+  background: #f1f1f1;
+  border-bottom: 1px solid #ddd;
+  padding: 8px;
+  font-weight: 600;
 }
-.task-list li {
-  margin-bottom: 4px;
-}
+.task-table tbody td { padding: 10px 8px; border-bottom: 1px solid #eee; }
+.task-row:hover td { background: #fafafa; }
+*/
+.task-table { width: 100%}
+.task-title { font-weight: 600; color: #222; }
+.task-desc { font-size: 12px; color: #666; margin-top: 2px; }
+
 </style>

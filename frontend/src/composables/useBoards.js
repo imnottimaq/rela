@@ -150,7 +150,8 @@ export function useBoardTasks(workspaceIdRef, boardIdRef) {
     isNotFound.value = false;
     try {
       const { data } = await workspaceApi.getTasks(workspaceId, boardId);
-      tasks.value = Array.isArray(data) ? data : [];
+      const list = Array.isArray(data?.tasks) ? data.tasks : (Array.isArray(data) ? data : []);
+      tasks.value = list;
       if (tasks.value.length === 0) {
         isNotFound.value = true;
       }
