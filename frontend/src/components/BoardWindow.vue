@@ -8,7 +8,7 @@
     :storage-key="`rela-window-board-${workspaceId}-${boardId}`"
     :menu="windowMenu"
   >
-    <div class="content">
+    <div class="content" @dragover="onDragOver" @drop="onDrop">
       <p>Workspace: <strong>{{ workspaceName }}</strong></p>
       <p>Board Name: <strong>{{ boardName }}</strong></p>
       <div v-if="isLoading" class="loading">Loading tasks...</div>
@@ -25,6 +25,8 @@
               v-for="task in tasks"
               :key="task._id || task.id || task.Id"
               class="task-row"
+              draggable="true"
+              @dragstart="onDragStart(task, $event)"
             >
               <td>
                 <div class="task-title">{{ task.name || task.title || 'Unnamed Task' }}</div>
@@ -51,6 +53,8 @@ import { computed, ref } from 'vue';
 import WindowComponent from './WindowComponent.vue';
 import CreateTaskWindow from './CreateTaskWindow.vue';
 import { useBoardTasks } from '../composables/useBoards';
+import { workspaceApi } from '../utils/http';
+import { onMounted, onUnmounted } from 'vue';
 
 const props = defineProps({
   workspaceId: { type: [String, Number], required: true },
@@ -91,6 +95,87 @@ const handleTaskCreated = (newTask) => {
     isNotFound.value = false;
   }
 };
+
+const getTaskId = (task) => task?._id || task?.id || task?.Id;
+
+const onDragStart = (task, ev) => {
+  try {
+    const payload = {
+      taskId: getTaskId(task),
+      fromBoardId: boardId.value,
+      workspaceId: workspaceIdRef.value,
+    };
+    ev.dataTransfer?.setData('application/x-rela-task', JSON.stringify(payload));
+    // Fallback for some UAs
+    ev.dataTransfer?.setData('text/plain', JSON.stringify(payload));
+    if (ev.dataTransfer) ev.dataTransfer.effectAllowed = 'move';
+  } catch (_) {}
+};
+
+const onDragOver = (ev) => {
+  try {
+    const types = Array.from(ev.dataTransfer?.types || []);
+    if (types.includes('application/x-rela-task') || types.includes('text/plain')) {
+      ev.preventDefault();
+      if (ev.dataTransfer) ev.dataTransfer.dropEffect = 'move';
+    }
+  } catch (_) {}
+};
+
+const onDrop = async (ev) => {
+  let raw = '';
+  try {
+    raw = ev.dataTransfer?.getData('application/x-rela-task') || ev.dataTransfer?.getData('text/plain') || '';
+  } catch (_) {}
+  if (!raw) return;
+  let data;
+  try { data = JSON.parse(raw); } catch (_) { return; }
+  const { taskId, fromBoardId, workspaceId } = data || {};
+  const targetBoardId = boardId.value;
+  if (!taskId || !workspaceId || !targetBoardId) return;
+  if (String(workspaceId) !== String(workspaceIdRef.value)) return;
+  if (String(fromBoardId) === String(targetBoardId)) return;
+  try {
+    await workspaceApi.updateTask(taskId, { board: targetBoardId });
+    // Notify all BoardWindow instances to update their local task lists
+    if (typeof window !== 'undefined') {
+      try {
+        window.dispatchEvent(new CustomEvent('rela:task-moved', { detail: { taskId, fromBoardId, toBoardId: targetBoardId, workspaceId } }));
+      } catch (_) {}
+    }
+    // Refresh our list as target window
+    fetchTasks();
+  } catch (err) {
+    console.error('Failed to move task to another board', err);
+  }
+};
+
+const onTaskMoved = (e) => {
+  try {
+    const d = e?.detail || {};
+    if (String(d.workspaceId) !== String(workspaceIdRef.value)) return;
+    // If this window is the source board, remove the task optimistically
+    if (String(d.fromBoardId) === String(boardId.value)) {
+      tasks.value = (tasks.value || []).filter((t) => String(getTaskId(t)) !== String(d.taskId));
+    }
+    // If this window is the destination board, ensure list is in sync
+    if (String(d.toBoardId) === String(boardId.value)) {
+      fetchTasks();
+    }
+  } catch (_) {}
+};
+
+onMounted(() => {
+  if (typeof window !== 'undefined') {
+    window.addEventListener('rela:task-moved', onTaskMoved);
+  }
+});
+
+onUnmounted(() => {
+  if (typeof window !== 'undefined') {
+    window.removeEventListener('rela:task-moved', onTaskMoved);
+  }
+});
 
 const windowMenu = computed(() => {
   const taskItems = (tasks.value || []).map(task => ({

@@ -264,10 +264,8 @@ export const workspaceApi = {
   createTask(workspaceId, payload) {
     return apiClient.post(`/workspaces/${workspaceId}/tasks`, payload,  );
   },
-  updateTask(workspaceId, taskId, payload) {
-    return apiClient.patch(`/workspaces/${workspaceId}/tasks/${taskId}`, payload, {
-      params: { workspaceId },
-    });
+  updateTask(taskId, payload) {
+    return apiClient.patch(`/tasks/${taskId}`, payload);
   },
   deleteTask(workspaceId, taskId) {
     return apiClient.delete(`/workspaces/${workspaceId}/tasks/${taskId}`, {

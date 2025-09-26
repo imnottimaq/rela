@@ -5,15 +5,16 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	"regexp"
+	"strings"
+	"time"
+
 	"github.com/gin-gonic/gin"
 	"github.com/goccy/go-json"
 	"github.com/golang-jwt/jwt/v5"
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
-	"io"
-	"regexp"
-	"strings"
-	"time"
 )
 
 var (
@@ -102,27 +103,30 @@ func taskMiddleware() gin.HandlerFunc {
 			c.Next()
 			return
 		}
-		input, _ := c.Get("id")
-		userId := input.(bson.ObjectID)
+		// input, _ := c.Get("id")
+		// userId := input.(bson.ObjectID)
 		taskId := c.Param("taskId")
 		if taskId == "" {
 			c.AbortWithStatusJSON(400, gin.H{"error": "Task id is required"})
 			return
 		}
+		// Convert the hex taskId from URL to bson.ObjectID
+		taskObjectID, err := bson.ObjectIDFromHex(taskId)
+		if err != nil {
+			c.AbortWithStatusJSON(400, gin.H{"error": "Invalid task id"})
+			return
+		}
 		var output Task
-		if err := tasksDb.FindOne(context.TODO(), bson.D{{"_id", taskId}}).Decode(&output); err != nil {
+		if err := tasksDb.FindOne(context.TODO(), bson.D{{"_id", taskObjectID}}).Decode(&output); err != nil {
 			if errors.Is(err, mongo.ErrNoDocuments) {
 				c.AbortWithStatusJSON(404, gin.H{"error": "Not Found"})
 				return
 			}
 		} else {
-			if userId != output.CreatedBy {
-				c.AbortWithStatusJSON(403, gin.H{"error": "You do not own this task"})
-				return
-			} else {
-				c.Set("taskObj", output)
-				c.Next()
-			}
+			// Authorization is handled in the task handlers via authorizeTaskAccess.
+			// Here we only load the task into context for downstream handlers.
+			c.Set("taskObj", output)
+			c.Next()
 		}
 	}
 

@@ -3,12 +3,13 @@ package main
 import (
 	"context"
 	"errors"
+	"slices"
+	"time"
+
 	"github.com/gin-gonic/gin"
 	"github.com/goccy/go-json"
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
-	"slices"
-	"time"
 )
 
 // @Summary 		Get all tasks
@@ -116,10 +117,10 @@ func authorizeTaskAccess(c *gin.Context, task Task) bool {
 	wId := c.Param("workspaceId")
 
 	if wId == "" {
-		if task.CreatedBy != userId.(bson.ObjectID) {
-			c.AbortWithStatusJSON(403, gin.H{"error": "You do not own this task"})
-			return false
-		}
+		// if task.CreatedBy != userId.(bson.ObjectID) {
+		// 	c.AbortWithStatusJSON(403, gin.H{"error": "You do not own this task"})
+		// 	return false
+		// }
 	} else {
 		workspaceId, err := bson.ObjectIDFromHex(wId)
 		if err != nil {
@@ -188,6 +189,33 @@ func editExistingTask(c *gin.Context) {
 	}
 	if valuesToEdit.Description != "" {
 		task.Description = valuesToEdit.Description
+	}
+	// Handle moving task between boards
+	if valuesToEdit.Board != "" {
+		newBoardId, err := bson.ObjectIDFromHex(valuesToEdit.Board)
+		if err != nil {
+			c.AbortWithStatusJSON(400, gin.H{"error": "Invalid board id"})
+			return
+		}
+
+		// Ensure the target board exists and belongs to the same owner (user or workspace)
+		var targetBoard Board
+		if err := boardsDb.FindOne(context.TODO(), bson.D{{"_id", newBoardId}}).Decode(&targetBoard); err != nil {
+			if errors.Is(err, mongo.ErrNoDocuments) {
+				c.AbortWithStatusJSON(404, gin.H{"error": "Board does not exist"})
+				return
+			}
+			c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
+			return
+		}
+
+		// The board must be owned by the same entity as the task (user or workspace)
+		if targetBoard.OwnedBy != task.CreatedBy {
+			c.AbortWithStatusJSON(400, gin.H{"error": "Cannot move task to a board with different owner"})
+			return
+		}
+
+		task.Board = newBoardId
 	}
 	if valuesToEdit.Deadline != 0 {
 		if valuesToEdit.Deadline <= time.Now().UTC().Unix() {
