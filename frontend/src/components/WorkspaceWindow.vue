@@ -9,6 +9,9 @@
     :menu="windowMenu"
   >
     <div class="content">
+      <div v-if="loading" class="hint">Working...</div>
+      <div v-if="error" class="error">{{ error }}</div>
+
       <section class="ws-info">
         <p>ID: <code>{{ wsId }}</code></p>
         <p>Name: <strong>{{ workspace?.name }}</strong></p>
@@ -36,6 +39,18 @@
       v-model:visible="createBoardVisible"
       @created="handleBoardCreated"
     />
+
+    <EditWorkspaceWindow
+      :workspace="workspace"
+      v-model:visible="editWorkspaceVisible"
+      @save="handleEditWorkspace"
+    />
+
+    <DeleteWorkspaceWindow
+      :workspace="workspace"
+      v-model:visible="deleteWorkspaceVisible"
+      @confirm="handleDeleteWorkspace"
+    />
   </WindowComponent>
 </template>
 
@@ -43,6 +58,8 @@
 import { computed, onMounted, ref, watch } from 'vue';
 import WindowComponent from './WindowComponent.vue';
 import CreateBoardWindow from './CreateBoardWindow.vue';
+import EditWorkspaceWindow from './EditWorkspaceWindow.vue';
+import DeleteWorkspaceWindow from './DeleteWorkspaceWindow.vue';
 import { workspaceApi } from '../utils/http';
 import { openBoardWindow } from '../composables/useBoards';
 import { createWorkspaceInviteLink } from '../composables/useWorkspaces';
@@ -52,7 +69,7 @@ const props = defineProps({
   visible: { type: Boolean, default: true },
 });
 
-const emit = defineEmits(['update:visible', 'close']);
+const emit = defineEmits(['update:visible', 'close', 'workspace-updated', 'workspace-deleted']);
 
 const modelVisible = computed({
   get: () => props.visible,
@@ -70,7 +87,12 @@ const boards = ref([]);
 const loadingBoards = ref(false);
 const boardsError = ref('');
 const createBoardVisible = ref(false);
+const editWorkspaceVisible = ref(false);
+const deleteWorkspaceVisible = ref(false);
 const selectedBoardId = ref(null);
+
+const loading = ref(false);
+const error = ref('');
 
 const loadBoards = async () => {
   if (!wsId.value) return;
@@ -89,23 +111,20 @@ const loadBoards = async () => {
 };
 
 const handleBoardCreated = async (board) => {
-  // Optimistically add to list; fallback to reloading
-  if (board && (board._id || board.id || board.name)) {
-    // If no id returned, refresh to resolve its id
-    if (!board._id && !board.id) {
-      await loadBoards();
-      const byName = (boards.value || []).find((b) => (b.name || '').trim() === (board.name || '').trim());
-      const toOpen = byName || board;
-      if (byName && !boards.value.some((b) => (b._id || b.id) === (byName._id || byName.id))) {
-        boards.value = [byName, ...boards.value];
-      }
-      openBoardWindow(props.workspace, toOpen);
-    } else {
-      boards.value = [board, ...boards.value];
-      openBoardWindow(props.workspace, board);
-    }
-  } else {
-    loadBoards();
+  await loadBoards();
+  if (!board) return;
+
+  const boardId = board._id || board.id;
+  let boardToOpen = null;
+
+  if (boardId) {
+    boardToOpen = boards.value.find(b => (b._id || b.id) === boardId);
+  } else if (board.name) {
+    boardToOpen = boards.value.find(b => b.name === board.name);
+  }
+
+  if (boardToOpen) {
+    openBoardWindow(props.workspace, boardToOpen);
   }
 };
 
@@ -121,19 +140,52 @@ const selectBoard = (board) => {
   openBoardWindow(props.workspace, board);
 };
 
+const handleEditWorkspace = async (newName) => {
+  loading.value = true;
+  error.value = '';
+  try {
+    await workspaceApi.updateWorkspace(wsId.value, { name: newName });
+    emit('workspace-updated', { id: wsId.value, name: newName });
+    editWorkspaceVisible.value = false;
+  } catch (e) {
+    console.error('Failed to update workspace', e);
+    error.value = 'Failed to update workspace name.';
+    window.alert(error.value); // Or use a more sophisticated notification
+  } finally {
+    loading.value = false;
+  }
+};
+
+const handleDeleteWorkspace = async () => {
+  loading.value = true;
+  error.value = '';
+  try {
+    await workspaceApi.deleteWorkspace(wsId.value);
+    deleteWorkspaceVisible.value = false;
+    emit('workspace-deleted', wsId.value);
+    close();
+  } catch (e) {
+    console.error('Failed to delete workspace', e);
+    error.value = 'Failed to delete workspace.';
+    window.alert(error.value); // Or use a more sophisticated notification
+  } finally {
+    loading.value = false;
+  }
+};
+
 const windowMenu = computed(() => {
   const list = Array.isArray(boards.value) ? boards.value : [];
-  const items = [
+  const boardItems = [
     {
       type: 'button',
       label: 'Create board',
       onClick: () => (createBoardVisible.value = true),
-      divider: list.length > 0,
     },
   ];
+
   if (list.length > 0) {
-    items.push({ type: 'separator' });
-    items.push(
+    boardItems.push({ type: 'separator' });
+    boardItems.push(
       ...list.map((b) => ({
         type: 'button',
         label: b.name || String(b._id || b.id),
@@ -141,9 +193,29 @@ const windowMenu = computed(() => {
       }))
     );
   }
+
+  const workspaceItems = [
+    {
+      label: 'Edit Name',
+      onClick: () => (editWorkspaceVisible.value = true),
+      type: 'button',
+    },
+    { type: 'separator' },
+    {
+      label: 'Delete Workspace',
+      onClick: () => (deleteWorkspaceVisible.value = true),
+      type: 'button',
+    },
+    {
+      label: 'Create and Copy Invite Link',
+      onClick: () => createWorkspaceInviteLink(wsId.value),
+      type: 'button',
+    },
+  ];
+
   return [
-    { label: 'Boards', items },
-    { label: 'Get Invite Link', createWorkspaceInviteLink},
+    { label: 'Workspace', items: workspaceItems },
+    { label: 'Boards', items: boardItems },
   ];
 });
 </script>

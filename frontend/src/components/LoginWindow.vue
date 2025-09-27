@@ -17,13 +17,13 @@
         <h1 style="text-align: center;">Sign in to Rela</h1>
         <br>
       <div class="group" style="width: 100%">
-        <input id="email" type="email" v-model="email" placeholder="E-mail" />
-        <p v-if="emailError" class="error">{{ emailError }}</p>
+        <input id="email" type="email" v-model="email" aria-describedby="email-error" placeholder="E-mail" />
+        <div v-if="emailError" class="error" id="email-error" role="tooltip">{{ emailError }}</div>
       </div>
       <div class="group" style="width: 100%">
         <br>
-        <input id="password" type="password" v-model="password" placeholder="Password"/>
-        <p v-if="passwordError" class="error">{{ passwordError }}</p>
+        <input id="password" type="password" v-model="password" aria-describedby="password-error" placeholder="Password"/>
+        <div v-if="passwordError" class="error" id="password-error" role="tooltip">{{ passwordError }}</div>
        </div>
       <button class="inline-link" type="button" @click="showForgotPasswordWindow">Forgot your password?</button>
       <br>
@@ -78,14 +78,7 @@ const validateEmail = (value) => {
 };
 
 const validatePassword = (value) => {
-  if (!value || value.length < 8) {
-    return false;
-  }
-  const hasLower = /[a-z]/.test(value);
-  const hasUpper = /[A-Z]/.test(value);
-  const hasDigit = /\d/.test(value);
-  const hasSpecial = /[!"#$%&'()*+,\-./:;<=>?@[\\\]^_{|}~]/.test(value);
-  return hasLower && hasUpper && hasDigit && hasSpecial;
+  return !!value;
 };
 
 const login = async () => {
@@ -101,7 +94,7 @@ const login = async () => {
     }
 
     if (!validatePassword(password.value)) {
-      passwordError.value = 'Password must be at least 8 characters and include upper, lower, digit, and special character.';
+      passwordError.value = 'Password is required.';
     }
 
     if (emailError.value || passwordError.value) {

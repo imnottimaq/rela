@@ -250,11 +250,14 @@ export const workspaceApi = {
   getInvite(workspaceId) {
     return apiClient.get(`/workspaces/${workspaceId}/new_invite`);
   },
+  getWorkspaceByInviteToken(joinToken) {
+    return apiClient.get(`/workspaces/invite/${joinToken}`);
+  },
   promoteMember(workspaceId, userId, payload) {
     return apiClient.patch(`/workspaces/${workspaceId}/promote/${userId}`, payload);
   },
   acceptInvite(joinToken) {
-    return apiClient.post(`/workspaces/add/${joinToken}`);
+    return apiClient.post(`/workspaces/invite/accept/${joinToken}`);
   },
 };
 

@@ -18,23 +18,23 @@
         <br>
       <div class="group" style="width: 100%">
         <label for="name">Name</label>
-        <input id="name" type="text" v-model="name" />
-        <p v-if="nameError" class="error">{{ nameError }}</p>
+        <input id="name" type="text" v-model="name" aria-describedby="name-error" />
+        <div v-if="nameError" class="error" id="name-error" role="tooltip">{{ nameError }}</div>
       </div>
       <div class="group" style="width: 100%">
         <label for="email">Email</label>
-        <input id="email" type="email" v-model="email" />
-        <p v-if="emailError" class="error">{{ emailError }}</p>
+        <input id="email" type="email" v-model="email" aria-describedby="email-error" />
+        <div v-if="emailError" class="error" id="email-error" role="tooltip">{{ emailError }}</div>
       </div>
       <div class="group" style="width: 100%">
         <label for="password">Password</label>
-        <input id="password" type="password" v-model="password" />
-        <p v-if="passwordError" class="error">{{ passwordError }}</p>
+        <input id="password" type="password" v-model="password" aria-describedby="password-error" />
+        <div v-if="passwordError" class="error" id="password-error" role="tooltip">{{ passwordError }}</div>
        </div>
       <div class="group" style="width: 100%">
         <label for="confirm-password">Confirm password</label>
-        <input id="confirm-password" type="password" v-model="confirmPassword" />
-        <p v-if="confirmPasswordError" class="error">{{ confirmPasswordError }}</p>
+        <input id="confirm-password" type="password" v-model="confirmPassword" aria-describedby="confirm-password-error" />
+        <div v-if="confirmPasswordError" class="error" id="confirm-password-error" role="tooltip">{{ confirmPasswordError }}</div>
        </div>
       <p v-if="registerError" class="error">{{ registerError }}</p>
     </div>
@@ -98,7 +98,7 @@ const validatePassword = (value) => {
   const hasLower = /[a-z]/.test(value);
   const hasUpper = /[A-Z]/.test(value);
   const hasDigit = /\d/.test(value);
-  const hasSpecial = /[!"#$%&'()*+,\-./:;<=>?@[\\\]^_{|}~]/.test(value);
+  const hasSpecial = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?~]/.test(value);
   return hasLower && hasUpper && hasDigit && hasSpecial;
 };
 

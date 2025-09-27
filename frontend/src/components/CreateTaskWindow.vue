@@ -2,17 +2,19 @@
   <WindowComponent
     title="Create New Task"
     v-model:visible="modelVisible"
-    :initial-size="{ width: 380, height: 220 }"
-    :min-size="{ width: 320, height: 200 }"
+    :initial-size="{ width: 380, height: 240 }"
+    :min-size="{ width: 320, height: 220 }"
     :footer-buttons="footerButtons"
     footer-buttons-align="right"
   >
     <div class="form-content">
       <div class="field-row-stacked">
-        <input id="task-title-input" type="text" v-model="taskName" @keydown.enter="submit"  placeholder="Name"/>
+        <div>
+          <input id="task-title-input" type="text" v-model="taskName" @keydown.enter="submit"  placeholder="Name" aria-describedby="task-title-error"/>
+          <div v-if="error" class="error-message" id="task-title-error" role="tooltip">{{ error }}</div>
+        </div>
         <input id="task-desc-input" type="text" v-model="taskDesc" @keydown.enter="submit"  placeholder="Description"/>
       </div>
-      <div v-if="error" class="error-message">{{ error }}</div>
     </div>
   </WindowComponent>
 </template>
@@ -102,14 +104,13 @@ const footerButtons = computed(() => [
 .field-row-stacked {
   display: flex;
   flex-direction: column;
-  margin-bottom: 1em;
+  gap: 0.5em;
 }
-.field-row-stacked label {
-  margin-bottom: 0.5em;
+.field-row-stacked input {
+    width: 100%;
 }
 .error-message {
   color: #d9534f;
-  margin-top: 1em;
-  text-align: center;
+  margin-top: 0.25em;
 }
 </style>

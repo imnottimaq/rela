@@ -16,8 +16,8 @@
       <h1>New workspace</h1>
       <div class="group" style="width: 100%">
         <label for="ws-name">Name</label>
-        <input id="ws-name" type="text" v-model="name" @keydown.enter.prevent="onCreate" />
-        <p v-if="error" class="error">{{ error }}</p>
+        <input id="ws-name" type="text" v-model="name" @keydown.enter.prevent="onCreate" aria-describedby="ws-name-error" />
+        <div v-if="error" class="error" id="ws-name-error" role="tooltip">{{ error }}</div>
       </div>
     </div>
   </WindowComponent>

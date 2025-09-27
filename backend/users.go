@@ -73,41 +73,39 @@ func createUser(c *gin.Context) {
 				HashedPassword: base64.RawStdEncoding.EncodeToString(argon2.IDKey([]byte(input.Password+pepper), []byte(generatedSalt), uint32(1), uint32(32*1024), uint8(4), uint32(32))),
 				Email:          input.Email,
 			}
-			type dbResult struct {
-				result *mongo.InsertOneResult
-				err    error
-			}
-			dbChan := make(chan dbResult, 1)
-			go func() {
-				result, err := usersDb.InsertOne(context.TODO(), newUser)
-				dbChan <- dbResult{result, err}
-			}()
-			dbRes := <-dbChan
-			if dbRes.err != nil {
+			result, err := usersDb.InsertOne(context.TODO(), newUser)
+			if err != nil {
 				c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
 				return
 			}
-			claims := jwt.MapClaims{
-				"exp": time.Now().UTC().Unix() + 604800, // Current expire time is 7 days, this is subject to change
+
+			insertedID := result.InsertedID.(bson.ObjectID)
+
+			refreshClaims := Token{
+				Id:   insertedID,
+				Type: "refresh",
+				RegisteredClaims: jwt.RegisteredClaims{
+					ExpiresAt: jwt.NewNumericDate(time.Now().UTC().Add(7 * 24 * time.Hour)), // 7 days
+				},
 			}
-			claims["id"] = dbRes.result.InsertedID.(bson.ObjectID)
-			refreshToken := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+			refreshToken := jwt.NewWithClaims(jwt.SigningMethodHS256, refreshClaims)
 			signedRefreshToken, err := refreshToken.SignedString([]byte(pepper))
 			if err != nil {
 				fmt.Println(err)
 				c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
 				return
-			} else {
-				c.SetCookie("refreshToken", signedRefreshToken, 604800, "/", "", false, true)
-				bearerToken, err := generateAccessToken(signedRefreshToken, "access")
-				if err != nil {
-					fmt.Println(err)
-					c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
-					return
-				}
-				c.AbortWithStatusJSON(200, gin.H{"token": bearerToken})
+			}
+
+			c.SetCookie("refreshToken", signedRefreshToken, 604800, "/", "", false, true)
+			bearerToken, err := generateAccessToken(insertedID.Hex(), "access")
+			if err != nil {
+				fmt.Println(err)
+				c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
 				return
 			}
+			c.AbortWithStatusJSON(200, gin.H{"token": bearerToken})
+			return
+
 		}
 	} else {
 		c.AbortWithStatusJSON(409, gin.H{"error": "User with that email already exists"})
@@ -138,28 +136,33 @@ func loginUser(c *gin.Context) {
 			return
 		}
 	}
-    if base64.RawStdEncoding.EncodeToString(argon2.IDKey([]byte(input.Password+pepper), []byte(i.Salt), uint32(1), uint32(32*1024), uint8(4), uint32(32))) == i.HashedPassword {
-		refreshToken := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-			"id":  i.Id,
-			"exp": time.Now().UTC().Unix() + 604800, // Current expire time is 7 days, this is subject to change
-		})
+	if base64.RawStdEncoding.EncodeToString(argon2.IDKey([]byte(input.Password+pepper), []byte(i.Salt), uint32(1), uint32(32*1024), uint8(4), uint32(32))) == i.HashedPassword {
+		refreshClaims := Token{
+			Id:   i.Id,
+			Type: "refresh",
+			RegisteredClaims: jwt.RegisteredClaims{
+				ExpiresAt: jwt.NewNumericDate(time.Now().UTC().Add(7 * 24 * time.Hour)), // 7 days
+			},
+		}
+		refreshToken := jwt.NewWithClaims(jwt.SigningMethodHS256, refreshClaims)
 		signedRefreshToken, err := refreshToken.SignedString([]byte(pepper))
 		if err != nil {
 			c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
 			return
-		} else {
-			c.SetCookie("refreshToken", signedRefreshToken, 604800, "/", "", false, true)
-			bearerToken, err := generateAccessToken(signedRefreshToken, "access")
-			if err != nil {
-				c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
-				return
-			}
-            c.JSON(200, gin.H{"token": bearerToken})
-            return
-        }
-    }
-    // Wrong password path: explicitly respond with an error
-    c.AbortWithStatusJSON(400, gin.H{"error": "Wrong email or password"})
+		}
+
+		c.SetCookie("refreshToken", signedRefreshToken, 604800, "/", "", false, true)
+		bearerToken, err := generateAccessToken(i.Id.Hex(), "access")
+		if err != nil {
+			c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
+			return
+		}
+		c.JSON(200, gin.H{"token": bearerToken})
+		return
+	}
+
+	// Wrong password path: explicitly respond with an error
+	c.AbortWithStatusJSON(400, gin.H{"error": "Wrong email or password"})
 }
 
 // @Summary 		Logout user
@@ -311,18 +314,17 @@ func refreshAccessToken(c *gin.Context) {
 		}
 		return []byte(pepper), nil
 	})
-	if err != nil {
-		c.AbortWithStatusJSON(500, "Internal Server Error")
+	if err != nil || !token.Valid {
+		c.AbortWithStatusJSON(400, gin.H{"error": "Invalid or expired token"})
 		return
 	}
 	claims := token.Claims.(*Token)
-	if claims.ExpiresAt < time.Now().UTC().Unix() {
-		c.AbortWithStatusJSON(403, "Authorization Required")
+	if claims.Type != "refresh" {
+		c.AbortWithStatusJSON(400, gin.H{"error": "Invalid token type"})
 		return
-	} else if claims.Type == "access" {
-		c.AbortWithStatusJSON(400, "Invalid Token")
 	}
-	bearerToken, err := generateAccessToken(refreshToken, "access")
+
+	bearerToken, err := generateAccessToken(claims.Id.Hex(), "access")
 	if err != nil {
 		c.AbortWithStatusJSON(500, gin.H{"error": "Something went wrong when generating access token"})
 		return

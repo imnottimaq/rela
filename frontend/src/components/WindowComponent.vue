@@ -24,7 +24,7 @@ const getLayerManager = () => {
 
   if (!target[layerManagerKey]) {
     target[layerManagerKey] = {
-      maxLayer: 0,
+      maxLayer: 9999,
       topWindowId: null,
       counter: 0,
     };
@@ -118,6 +118,10 @@ const props = defineProps({
     default: "right",
     validator: (value) =>
       ["left", "center", "right", "space-between"].includes(value),
+  },
+  noPadding: {
+    type: Boolean,
+    default: false,
   },
 });
 
@@ -822,7 +826,7 @@ const MenuList = defineComponent({
         </li>
       </ul>
 
-      <div class="window-body-content">
+      <div class="window-body-content" :class="{ 'no-padding': noPadding }">
         <slot></slot>
       </div>
     </div>
@@ -890,6 +894,10 @@ const MenuList = defineComponent({
   flex: 1;
   overflow: auto;
   padding: var(--w7-w-space);
+}
+
+.window-body-content.no-padding {
+  padding: 0;
 }
 
 .resize-handle {

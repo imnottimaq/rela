@@ -3,7 +3,7 @@
     title="Profile"
     v-model:visible="profileVisible"
     storage-key="rela-window-profile"
-    :initial-size="{ width: 350, height: 380 }"
+    :initial-size="{ width: 350, height: 420 }"
     :min-size="{ width: 300, height: 320 }"
     footer-buttons-align="right"
     :footer-buttons="footerButtons"
@@ -17,6 +17,11 @@
         <p class="error">{{ error }}</p>
       </template>
       <template v-else-if="profile">
+        <div class="avatar-container">
+          <img :src="profile.avatar" alt="User Avatar" class="avatar-image" />
+          <input type="file" @change="uploadAvatar" accept="image/png, image/jpeg" ref="fileInput" class="file-input"/>
+          <button @click="triggerFileInput" class="upload-button">Upload Avatar</button>
+        </div>
         <div class="field">
           <span class="label">Name:</span>
           <span class="value">{{ profile.name }}</span>
@@ -29,11 +34,6 @@
           <span class="label">Role:</span>
           <span class="value">{{ profile.role }}</span>
         </div>
-        <div class="field" v-if="profile.createdAt">
-          <span class="label">Created:</span>
-          <span class="value">{{ formatDate(profile.createdAt) }}</span>
-        </div>
-        <img src="https://cataas.com/cat?height=250&width=350" alt="Random Cat" class="cat-image" />
       </template>
       <template v-else>
         <p>No profile data available.</p>
@@ -56,15 +56,33 @@ const { isAuthenticated } = useAuth();
 const profile = ref(null);
 const loading = ref(false);
 const error = ref("");
+const fileInput = ref(null);
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, "");
 
 let requestToken = 0;
 
-const formatDate = (value) => {
-  if (!value) return "";
+const triggerFileInput = () => {
+  fileInput.value.click();
+};
+
+const uploadAvatar = async (event) => {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const formData = new FormData();
+  formData.append("img", file);
+
+  loading.value = true;
+  error.value = "";
+
   try {
-    return new Date(value).toLocaleString();
-  } catch (dateError) {
-    return String(value);
+    await authApi.uploadAvatar(formData);
+    await loadProfile(); 
+  } catch (uploadError) {
+    console.error("Failed to upload avatar", uploadError);
+    error.value = "Failed to upload avatar.";
+  } finally {
+    loading.value = false;
   }
 };
 
@@ -79,7 +97,11 @@ const loadProfile = async () => {
     if (currentToken !== requestToken) {
       return;
     }
-    profile.value = response?.data || null;
+    const userProfile = response?.data || null;
+    if (userProfile && userProfile.avatar) {
+      userProfile.avatar = `${API_BASE_URL}/${userProfile.avatar}`;
+    }
+    profile.value = userProfile;
   } catch (loadError) {
     if (currentToken !== requestToken) {
       return;
@@ -133,6 +155,34 @@ const footerButtons = computed(() => [
   padding: 0 12px 12px;
 }
 
+.avatar-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.avatar-image {
+  width: 128px;
+  height: 128px;
+  border-radius: 4px;
+  object-fit: cover;
+  border: 2px solid #ccc;
+  margin-bottom: 12px;
+}
+
+.file-input {
+  display: none;
+}
+
+.upload-button {
+  padding: 8px 12px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  cursor: pointer;
+  background-color: #f0f0f0;
+}
+
 .field {
   display: flex;
   margin-bottom: 8px;
@@ -152,15 +202,4 @@ const footerButtons = computed(() => [
 .error {
   color: #d00000;
 }
-
-.cat-image {
-  max-width: 100%;
-  max-height: 100%;
-  width: auto;
-  height: auto;
-  display: block;
-  object-fit: contain;
-  margin: 0 auto;
-}
-
 </style>

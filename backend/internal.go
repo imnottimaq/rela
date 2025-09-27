@@ -37,25 +37,24 @@ func validatePassword(password string) bool {
 	return hasLower && hasUpper && hasDigit && hasSpecial
 }
 
-func generateAccessToken(token string, tokenType string) (accessToken string, err error) {
-	parsedToken, _ := jwt.ParseWithClaims(token, &Token{}, func(token *jwt.Token) (any, error) {
-		if token.Method != jwt.SigningMethodHS256 {
-			return nil, fmt.Errorf("unknown signing method: %s", token.Method)
-		}
-		return []byte(pepper), nil
-	})
-	claims := parsedToken.Claims.(*Token)
-	if claims.ExpiresAt < time.Now().UTC().Unix() {
-		return "", fmt.Errorf("expired refresh token")
-	} else {
-		newToken := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-			"id":   claims.Id,
-			"exp":  time.Now().UTC().Unix() + 300,
-			"type": tokenType,
-		})
-		accessToken, _ = newToken.SignedString([]byte(pepper))
-		return accessToken, nil
+func generateAccessToken(id string, tokenType string) (accessToken string, err error) {
+	userId, err := bson.ObjectIDFromHex(id)
+	if err != nil {
+		return "", fmt.Errorf("invalid user ID format: %v", err)
 	}
+	claims := Token{
+		Id:   userId,
+		Type: tokenType,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().UTC().Add(5 * time.Minute)),
+		},
+	}
+	newToken := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	signedString, err := newToken.SignedString([]byte(pepper))
+	if err != nil {
+		return "", err
+	}
+	return signedString, nil
 }
 
 func authMiddleware() gin.HandlerFunc {
@@ -84,7 +83,7 @@ func authMiddleware() gin.HandlerFunc {
 				c.AbortWithStatusJSON(403, gin.H{"error": "invalid or malformed access token"})
 				return
 			}
-			if claims.ExpiresAt < time.Now().UTC().Unix() {
+			if claims.ExpiresAt.Time.Before(time.Now().UTC()) {
 				c.AbortWithStatusJSON(403, "Authorization Required")
 				return
 			} else if claims.Type == "refresh" || claims.Type == "invite" {

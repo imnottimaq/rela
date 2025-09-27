@@ -183,7 +183,15 @@ func addMember(c *gin.Context) {
 		c.AbortWithStatusJSON(400, gin.H{"error": "Invalid or expired token"})
 		return
 	}
-	claims := token.Claims.(*Token)
+	claims, ok := token.Claims.(*Token)
+	if !ok {
+		c.AbortWithStatusJSON(400, gin.H{"error": "Invalid token claims"})
+		return
+	}
+	if claims.Type != "invite" {
+		c.AbortWithStatusJSON(400, gin.H{"error": "Invalid token type"})
+		return
+	}
 	if err := workspacesDb.FindOne(context.TODO(), bson.D{{"_id", claims.Id}}).Decode(&workspace); err != nil {
 		if errors.Is(err, mongo.ErrNoDocuments) {
 			c.AbortWithStatusJSON(404, gin.H{"error": "Workspace does not exist"})
@@ -231,13 +239,70 @@ func createNewInvite(c *gin.Context) {
 		c.AbortWithStatusJSON(403, gin.H{"error": "You are not an owner of this workplace"})
 		return
 	}
-	newToken := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"id":   workspaceId,
-		"exp":  time.Now().UTC().Unix() + 1209600, // 2 weeks
-		"type": "invite",
-	})
+	claims := Token{
+		Id:   workspaceId,
+		Type: "invite",
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().UTC().Add(2 * 7 * 24 * time.Hour)), // 2 weeks
+		},
+	}
+	newToken := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	inviteToken, _ := newToken.SignedString([]byte(pepper))
 	c.JSON(200, gin.H{"token": inviteToken})
+}
+
+// @Summary 		Get workspace details from invite token
+// @Description 	Retrieves workspace details using an invite token.
+// @Router 			/workspaces/invite/{joinToken} [get]
+// @Tags 			Workspaces
+// @Produce 		json
+// @Param 			joinToken path string true "Join Token"
+// @Success 		200 {object} Workspace "The workspace details"
+// @Failure 		400 {object} ErrorSwagger "Bad request - invalid token"
+// @Failure 		404 {object} ErrorSwagger "Not Found - workspace not found"
+// @Failure 		500 {object} ErrorSwagger "Internal server error"
+func getWorkspaceByInviteToken(c *gin.Context) {
+	joinTokenStr := c.Param("joinToken")
+
+	// 1. Parse and validate the JWT
+	token, err := jwt.ParseWithClaims(joinTokenStr, &Token{}, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+		}
+		return []byte(pepper), nil
+	})
+
+	if err != nil || !token.Valid {
+		c.AbortWithStatusJSON(400, gin.H{"error": "Invalid or expired token"})
+		return
+	}
+
+	// 2. Extract claims
+	claims, ok := token.Claims.(*Token)
+	if !ok {
+		c.AbortWithStatusJSON(500, gin.H{"error": "Failed to process token claims"})
+		return
+	}
+
+	// 3. Check token type
+	if claims.Type != "invite" {
+		c.AbortWithStatusJSON(400, gin.H{"error": "Invalid token type"})
+		return
+	}
+
+	// 5. Fetch workspace from DB
+	var workspace Workspace
+	if err := workspacesDb.FindOne(context.TODO(), bson.D{{"_id", claims.Id}}).Decode(&workspace); err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			c.AbortWithStatusJSON(404, gin.H{"error": "Workspace does not exist"})
+		} else {
+			c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
+		}
+		return
+	}
+
+	// 6. Return workspace details
+	c.JSON(200, workspace)
 }
 
 // @Summary 		Kick a member from a workspace
