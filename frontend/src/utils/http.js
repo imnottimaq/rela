@@ -199,39 +199,6 @@ export const authApi = {
   }
 };
 
-export const boardsApi = {
-  getBoards(workspaceId) {
-    return apiClient.get("/boards", );
-  },
-  getBoard(boardId) {
-    return apiClient.get(`/boards/${boardId}`);
-  },
-  createBoard( payload) {
-    return apiClient.post("/boards", payload );
-  },
-  updateBoard(boardId, workspaceId, payload) {
-    return apiClient.patch(`/boards/${boardId}`, payload );
-  },
-  deleteBoard(boardId, workspaceId) {
-    return apiClient.delete(`/boards/${boardId}` );
-  },
-};
-
-export const tasksApi = {
-  getTasksForBoard(boardId) {
-    return apiClient.get(`/tasks/${boardId}`);
-  },
-  createTask(payload) {
-    return apiClient.post("/tasks", payload, );
-  },
-  updateTask(taskId, payload) {
-    return apiClient.patch(`/tasks/${taskId}`, payload, );
-  },
-  deleteTask(taskId) {
-    return apiClient.delete(`/tasks/${taskId}`, );
-  },
-};
-
 export const workspaceApi = {
   createWorkspace(payload) {
     return apiClient.post("/workspaces/create", payload);
@@ -243,53 +210,48 @@ export const workspaceApi = {
     return apiClient.patch(`/workspaces/${workspaceId}/`, payload);
   },
   getBoards(workspaceId) {
-    return apiClient.get(`/workspaces/${workspaceId}/boards`  );
+    return apiClient.get(`/workspaces/${workspaceId}/boards`);
+  },
+  getBoard(workspaceId, boardId) {
+    return apiClient.get(`/workspaces/${workspaceId}/boards/${boardId}`);
   },
   createBoard(workspaceId, payload) {
-    return apiClient.post(`/workspaces/${workspaceId}/boards`, payload,  );
+    return apiClient.post(`/workspaces/${workspaceId}/boards`, payload);
   },
   updateBoard(workspaceId, boardId, payload) {
-    return apiClient.patch(`/workspaces/${workspaceId}/boards/${boardId}`, payload, {
-      params: { workspaceId },
-    });
+    return apiClient.patch(`/workspaces/${workspaceId}/boards/${boardId}`, payload);
   },
   deleteBoard(workspaceId, boardId) {
-    return apiClient.delete(`/workspaces/${workspaceId}/boards/${boardId}`, {
-      params: { workspaceId },
-    });
+    return apiClient.delete(`/workspaces/${workspaceId}/boards/${boardId}`);
   },
-  getTasks(workspaceId,boardId) {
-    return apiClient.get(`/workspaces/${workspaceId}/tasks/${boardId}`, );
+  getTasks(workspaceId, boardId) {
+    return apiClient.get(`/workspaces/${workspaceId}/tasks/${boardId}`);
   },
   createTask(workspaceId, payload) {
-    return apiClient.post(`/workspaces/${workspaceId}/tasks`, payload,  );
+    return apiClient.post(`/workspaces/${workspaceId}/tasks`, payload);
   },
-  updateTask(taskId, payload) {
-    return apiClient.patch(`/tasks/${taskId}`, payload);
+  updateTask(workspaceId, taskId, payload) {
+    return apiClient.patch(`/workspaces/${workspaceId}/tasks/${taskId}`, payload);
   },
   deleteTask(workspaceId, taskId) {
-    return apiClient.delete(`/workspaces/${workspaceId}/tasks/${taskId}`, {
-      params: { workspaceId },
-    });
+    return apiClient.delete(`/workspaces/${workspaceId}/tasks/${taskId}`);
   },
   assignTask(workspaceId, payload) {
-    return apiClient.post(`/workspaces/${workspaceId}/assign`, payload, );
+    return apiClient.post(`/workspaces/${workspaceId}/assign`, payload);
   },
   getMembers(workspaceId) {
-    return apiClient.get(`/workspaces/${workspaceId}/members`, );
+    return apiClient.get(`/workspaces/${workspaceId}/members`);
   },
-  kickMember(workspaceId) {
+  kickMember(workspaceId, memberId) {
     return apiClient.delete(`/workspaces/${workspaceId}/kick`, {
-      params: { workspaceId },
+      data: { userId: memberId },
     });
   },
   getInvite(workspaceId) {
-    return apiClient.get(`/workspaces/${workspaceId}/new_invite`, );
+    return apiClient.get(`/workspaces/${workspaceId}/new_invite`);
   },
   promoteMember(workspaceId, userId, payload) {
-    return apiClient.patch(`/workspaces/${workspaceId}/promote/${userId}`, payload, {
-      params: { workspaceId, userId },
-    });
+    return apiClient.patch(`/workspaces/${workspaceId}/promote/${userId}`, payload);
   },
   acceptInvite(joinToken) {
     return apiClient.post(`/workspaces/add/${joinToken}`);

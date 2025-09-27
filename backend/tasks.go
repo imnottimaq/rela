@@ -13,63 +13,46 @@ import (
 )
 
 // @Summary 		Get all tasks
-// @Description 	Returns all tasks owned by the current user, or all tasks for a given workspace.
-// @Router 			/tasks [get]
+// @Description 	Returns all tasks for a given workspace.
 // @Router 			/workspaces/{workspaceId}/tasks/{boardId} [get]
 // @Tags 			Tasks
 // @Security 		BearerAuth
 // @Produce 		json
-// @Param 			workspaceId path string false "Workspace ID (optional)"
+// @Param 			workspaceId path string true "Workspace ID"
 // @Param 			boardId path string true "Board ID"
 // @Success 		200 {object} AllTasksResponse "A list of tasks"
 // @Failure 		500 {object} ErrorSwagger "Internal Server Error"
 func getAllTasks(c *gin.Context) {
-	id, _ := c.Get("id")
 	bId := c.Param("boardId")
 	boardId, _ := bson.ObjectIDFromHex(bId)
 	tasks := make([]Task, 0)
-	if wId := c.Param("workspaceId"); wId == "" {
-		cursor, _ := tasksDb.Find(context.TODO(), bson.D{
-			{"created_by", id.(bson.ObjectID)},
-			{"board", boardId},
-		})
-		_ = cursor.All(context.TODO(), &tasks)
-		c.IndentedJSON(200, gin.H{"tasks": tasks})
-		if err := cursor.Close(context.TODO()); err != nil {
-			c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
-			return
-		}
+	wId := c.Param("workspaceId")
+	workspaceId, _ := bson.ObjectIDFromHex(wId)
+	cursor, _ := tasksDb.Find(context.TODO(), bson.D{
+		{"created_by", workspaceId},
+		{"board", boardId},
+	})
+	_ = cursor.All(context.TODO(), &tasks)
+	c.IndentedJSON(200, gin.H{"tasks": tasks})
+	if err := cursor.Close(context.TODO()); err != nil {
+		c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
 		return
-	} else {
-		workspaceId, _ := bson.ObjectIDFromHex(wId)
-		cursor, _ := tasksDb.Find(context.TODO(), bson.D{
-			{"created_by", workspaceId},
-			{"board", boardId},
-		})
-		_ = cursor.All(context.TODO(), &tasks)
-		c.IndentedJSON(200, gin.H{"tasks": tasks})
-		if err := cursor.Close(context.TODO()); err != nil {
-			c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
-			return
-		}
 	}
 }
 
 // @Summary 		Create a new task
-// @Description 	Creates a new task for the current user or a workspace.
-// @Router 			/tasks [post]
+// @Description 	Creates a new task for a workspace.
 // @Router 			/workspaces/{workspaceId}/tasks [post]
 // @Tags 			Tasks
 // @Security 		BearerAuth
 // @Accept 			json
 // @Produce 		json
-// @Param 			workspaceId path string false "Workspace ID (optional)"
+// @Param 			workspaceId path string true "Workspace ID"
 // @Param 			data body CreateTask true "Task creation data"
 // @Success 		200 {object} Task "The created task"
 // @Failure 		400 {object} ErrorSwagger "Bad request - check your input"
 // @Failure 		500 {object} ErrorSwagger "Internal server error"
 func createNewTask(c *gin.Context) {
-	id, _ := c.Get("id")
 	var input CreateTask
 	var board Board
 	err := json.NewDecoder(c.Request.Body).Decode(&input)
@@ -91,16 +74,14 @@ func createNewTask(c *gin.Context) {
 		c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
 		return
 	}
+	workspaceId := c.Param("workspaceId")
+	transformedId, _ := bson.ObjectIDFromHex(workspaceId)
 	newTask := Task{
 		Name:        input.Name,
 		Description: input.Description,
 		CreatedAt:   time.Now().UTC().Unix(),
-		CreatedBy:   id.(bson.ObjectID),
+		CreatedBy:   transformedId,
 		Board:       input.Board,
-	}
-	if workspaceId := c.Param("workspaceId"); workspaceId != "" {
-		transformedId, _ := bson.ObjectIDFromHex(workspaceId)
-		newTask.CreatedBy = transformedId
 	}
 	task, err := tasksDb.InsertOne(context.TODO(), newTask)
 	if err != nil {
@@ -115,51 +96,42 @@ func createNewTask(c *gin.Context) {
 func authorizeTaskAccess(c *gin.Context, task Task) bool {
 	userId, _ := c.Get("id")
 	wId := c.Param("workspaceId")
+	workspaceId, err := bson.ObjectIDFromHex(wId)
+	if err != nil {
+		c.AbortWithStatusJSON(400, gin.H{"error": "Invalid workspaceId"})
+		return false
+	}
 
-	if wId == "" {
-		// if task.CreatedBy != userId.(bson.ObjectID) {
-		// 	c.AbortWithStatusJSON(403, gin.H{"error": "You do not own this task"})
-		// 	return false
-		// }
-	} else {
-		workspaceId, err := bson.ObjectIDFromHex(wId)
-		if err != nil {
-			c.AbortWithStatusJSON(400, gin.H{"error": "Invalid workspaceId"})
-			return false
+	var workspace Workspace
+	if err := workspacesDb.FindOne(context.TODO(), bson.D{{"_id", workspaceId}}).Decode(&workspace); err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			c.AbortWithStatusJSON(404, gin.H{"error": "Workspace not found"})
+		} else {
+			c.AbortWithStatusJSON(500, gin.H{"error": "Internal server error"})
 		}
+		return false
+	}
 
-		var workspace Workspace
-		if err := workspacesDb.FindOne(context.TODO(), bson.D{{"_id", workspaceId}}).Decode(&workspace); err != nil {
-			if errors.Is(err, mongo.ErrNoDocuments) {
-				c.AbortWithStatusJSON(404, gin.H{"error": "Workspace not found"})
-			} else {
-				c.AbortWithStatusJSON(500, gin.H{"error": "Internal server error"})
-			}
-			return false
-		}
+	if slices.Index(workspace.Members, userId.(bson.ObjectID)) == -1 {
+		c.AbortWithStatusJSON(403, gin.H{"error": "You are not a member of this workspace"})
+		return false
+	}
 
-		if slices.Index(workspace.Members, userId.(bson.ObjectID)) == -1 {
-			c.AbortWithStatusJSON(403, gin.H{"error": "You are not a member of this workspace"})
-			return false
-		}
-
-		if task.CreatedBy != workspaceId {
-			c.AbortWithStatusJSON(400, gin.H{"error": "This task does not belong to this workspace"})
-			return false
-		}
+	if task.CreatedBy != workspaceId {
+		c.AbortWithStatusJSON(400, gin.H{"error": "This task does not belong to this workspace"})
+		return false
 	}
 	return true
 }
 
 // @Summary 		Edit an existing task
 // @Description 	Edits the details of a specific task.
-// @Router 			/tasks/{taskId} [patch]
 // @Router 			/workspaces/{workspaceId}/tasks/{taskId} [patch]
 // @Tags 			Tasks
 // @Security 		BearerAuth
 // @Accept 			json
 // @Param 			taskId path string true "Task ID"
-// @Param 			workspaceId path string false "Workspace ID (optional)"
+// @Param 			workspaceId path string true "Workspace ID"
 // @Param 			data body EditTask true "Fields to edit in the task"
 // @Success 		200 "Task updated successfully"
 // @Failure 		400 {object} ErrorSwagger "Bad request - invalid input or deadline in the past"
@@ -234,12 +206,11 @@ func editExistingTask(c *gin.Context) {
 
 // @Summary 		Delete an existing task
 // @Description 	Deletes a specific task.
-// @Router 			/tasks/{taskId} [delete]
 // @Router 			/workspaces/{workspaceId}/tasks/{taskId} [delete]
 // @Tags 			Tasks
 // @Security 		BearerAuth
 // @Param 			taskId path string true "Task ID"
-// @Param 			workspaceId path string false "Workspace ID (optional)"
+// @Param 			workspaceId path string true "Workspace ID"
 // @Success 		200 "Task deleted successfully"
 // @Failure 		403 {object} ErrorSwagger "Forbidden - you do not have access to this task"
 // @Failure 		404 {object} ErrorSwagger "Not Found - task or workspace not found"
