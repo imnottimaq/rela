@@ -28,17 +28,28 @@
               class="task-row"
               draggable="true"
               @dragstart="onDragStart(task, $event)"
+              @contextmenu.prevent="onTaskRightClick(task, $event)"
             >
               <td>
                 <div class="task-title">{{ task.name || task.title || 'Unnamed Task' }}</div>
                 <div v-if="task.description" class="task-desc">{{ task.description }}</div>
               </td>
-              <td class="task-actions">
-                <button class="more-button">&hellip;</button>
-              </td>
             </tr>
           </tbody>
         </table>
+        <teleport to="body">
+          <ul
+              v-if="contextMenu.visible"
+              @click.stop
+              role="menu"
+              class="context-menu window"
+              style="position: fixed; width: 180px;"
+              :style="{ top: contextMenu.y + 'px', left: contextMenu.x + 'px', zIndex: contextMenu.zIndex }"
+          >
+            <li role="menuitem" @click="editTask(contextMenu.selectedTask)"><a>Edit</a></li>
+            <li role="menuitem" @click="deleteTask(contextMenu.selectedTask)"><a>Delete</a></li>
+          </ul>
+        </teleport>
       </div>
       <div v-else class="no-tasks">No tasks found for this board.</div>
     </div>
@@ -53,12 +64,11 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue';
+import { computed, ref, reactive, onMounted, onUnmounted } from 'vue';
 import WindowComponent from './WindowComponent.vue';
 import CreateTaskWindow from './CreateTaskWindow.vue';
 import { useBoardTasks } from '../composables/useBoards';
 import { workspaceApi } from '../utils/http';
-import { onMounted, onUnmounted } from 'vue';
 
 const props = defineProps({
   workspaceId: { type: [String, Number], required: true },
@@ -84,6 +94,44 @@ const workspaceIdRef = computed(() => props.workspaceId);
 const workspaceName = computed(() => props.workspaceName || String(workspaceIdRef.value));
 
 const { tasks, isLoading, error, isNotFound, fetchTasks } = useBoardTasks(workspaceIdRef, boardId);
+
+const contextMenu = reactive({
+  visible: false,
+  x: 0,
+  y: 0,
+  selectedTask: null,
+  zIndex: 10000,
+});
+
+const onTaskRightClick = (task, event) => {
+  contextMenu.visible = true;
+  contextMenu.x = event.clientX;
+  contextMenu.y = event.clientY;
+  contextMenu.selectedTask = task;
+  if (typeof window !== 'undefined' && window.__relaWindowLayerManager__) {
+    contextMenu.zIndex = window.__relaWindowLayerManager__.maxLayer + 1;
+  }
+};
+
+const hideContextMenu = () => {
+  contextMenu.visible = false;
+};
+
+const editTask = (task) => {
+  if (!task) return;
+  alert(`Editing task: ${task.name || 'Unnamed Task'}`);
+  hideContextMenu();
+};
+
+const deleteTask = (task) => {
+  if (!task) return;
+  if (confirm(`Are you sure you want to delete task: ${task.name || 'Unnamed Task'}?`)) {
+    alert(`Deleting task: ${task.name || 'Unnamed Task'}`);
+    // Here you would call an API to delete the task
+    // And then remove it from the local 'tasks' array
+  }
+  hideContextMenu();
+};
 
 const close = () => {
   emit('update:visible', false);
@@ -169,15 +217,18 @@ const onTaskMoved = (e) => {
   } catch (_) {}
 };
 
+
 onMounted(() => {
   if (typeof window !== 'undefined') {
     window.addEventListener('rela:task-moved', onTaskMoved);
+    document.addEventListener('click', hideContextMenu);
   }
 });
 
 onUnmounted(() => {
   if (typeof window !== 'undefined') {
     window.removeEventListener('rela:task-moved', onTaskMoved);
+    document.removeEventListener('click', hideContextMenu);
   }
 });
 
@@ -250,18 +301,9 @@ const windowMenu = computed(() => {
 .task-title { font-weight: 600; color: #222; }
 .task-desc { font-size: 12px; color: #666; margin-top: 2px; }
 .task-actions-header { width: 40px; }
-.task-actions { text-align: right; vertical-align: middle; }
-.more-button {
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-size: 1.2em;
-  padding: 0 8px;
-  color: #777;
-  line-height: 1;
-}
-.more-button:hover {
-  color: #000;
+.task-actions { text-align: left; vertical-align: middle; width: 50px; }
+.context-menu{
+  border-radius: 0;
 }
 
 </style>
