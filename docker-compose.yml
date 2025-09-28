@@ -11,10 +11,6 @@ services:
       - .env
     depends_on:
       - mongodb
-    dns:
-      - 8.8.8.8
-      - 1.1.1.1
-    network_mode: host
     restart: unless-stopped
 
   mongodb:
