@@ -3,8 +3,8 @@
     title="Profile"
     v-model:visible="profileVisible"
     storage-key="rela-window-profile"
-    :initial-size="{ width: 350, height: 420 }"
-    :min-size="{ width: 300, height: 320 }"
+    :initial-size="{ width: 350, height: 550 }"
+    :min-size="{ width: 300, height: 450 }"
     footer-buttons-align="right"
     :footer-buttons="footerButtons"
     :buttons="[{ label: 'Close', onClick: hideProfileWindow }]"
@@ -24,16 +24,38 @@
         </div>
         <div class="field">
           <span class="label">Name:</span>
-          <span class="value">{{ profile.name }}</span>
+          <input type="text" v-model="editableProfile.name" class="value-input" />
         </div>
         <div class="field">
           <span class="label">Email:</span>
-          <span class="value">{{ profile.email }}</span>
+          <input type="email" v-model="editableProfile.email" class="value-input" />
         </div>
         <div class="field" v-if="profile.role">
           <span class="label">Role:</span>
           <span class="value">{{ profile.role }}</span>
         </div>
+        <div class="field">
+          <span class="label">New Password:</span>
+          <input type="password" v-model="newPassword" class="value-input" placeholder="Leave blank to keep current" />
+        </div>
+        <div class="field">
+          <span class="label">Confirm Password:</span>
+          <input type="password" v-model="confirmPassword" class="value-input" />
+        </div>
+
+        <p v-if="saveError" class="error">{{ saveError }}</p>
+        <p v-if="saveSuccess" class="success">Profile updated successfully!</p>
+
+        <div class="button-group">
+          <button @click="saveProfile" :disabled="saveLoading" class="action-button primary">
+            {{ saveLoading ? 'Saving...' : 'Save Changes' }}
+          </button>
+          <button @click="confirmDeleteAccount" :disabled="deleteLoading" class="action-button delete">
+            {{ deleteLoading ? 'Deleting...' : 'Delete Account' }}
+          </button>
+          <button @click="showConfirmLogoutWindow" class="action-button">Logout</button>
+        </div>
+        <p v-if="deleteError" class="error">{{ deleteError }}</p>
       </template>
       <template v-else>
         <p>No profile data available.</p>
@@ -48,14 +70,22 @@ import WindowComponent from "./WindowComponent.vue";
 import { useProfileWindow } from "../composables/useProfileWindow";
 import { useAuth } from "../composables/useAuth";
 import { showConfirmLogoutWindow } from "../composables/useConfirmLogoutWindow";
-import { authApi } from "../utils/http";
+import { authApi, clearAuthTokens } from "../utils/http";
 
 const { profileVisible, hideProfileWindow } = useProfileWindow();
-const { isAuthenticated } = useAuth();
+const { isAuthenticated, logout } = useAuth();
 
 const profile = ref(null);
+const editableProfile = ref({ name: '', email: '' });
+const newPassword = ref('');
+const confirmPassword = ref('');
 const loading = ref(false);
+const saveLoading = ref(false);
+const deleteLoading = ref(false);
 const error = ref("");
+const saveError = ref("");
+const deleteError = ref("");
+const saveSuccess = ref(false);
 const fileInput = ref(null);
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, "");
 
@@ -91,6 +121,9 @@ const loadProfile = async () => {
   const currentToken = requestToken;
   loading.value = true;
   error.value = "";
+  saveError.value = "";
+  deleteError.value = "";
+  saveSuccess.value = false;
 
   try {
     const response = await authApi.getUserInfo();
@@ -102,6 +135,10 @@ const loadProfile = async () => {
       userProfile.avatar = `${API_BASE_URL}/${userProfile.avatar}`;
     }
     profile.value = userProfile;
+    if (userProfile) {
+      editableProfile.value.name = userProfile.name;
+      editableProfile.value.email = userProfile.email;
+    }
   } catch (loadError) {
     if (currentToken !== requestToken) {
       return;
@@ -116,6 +153,75 @@ const loadProfile = async () => {
   }
 };
 
+const saveProfile = async () => {
+  saveLoading.value = true;
+  saveError.value = "";
+  saveSuccess.value = false;
+
+  if (newPassword.value && newPassword.value !== confirmPassword.value) {
+    saveError.value = "New password and confirm password do not match.";
+    saveLoading.value = false;
+    return;
+  }
+
+  const payload = {
+    name: editableProfile.value.name,
+    email: editableProfile.value.email,
+  };
+
+  if (newPassword.value) {
+    payload.password = newPassword.value;
+  }
+
+  try {
+    await authApi.updateUserInfo(payload);
+    saveSuccess.value = true;
+    newPassword.value = '';
+    confirmPassword.value = '';
+    await loadProfile(); // Reload profile to reflect changes
+  } catch (err) {
+    console.error("Failed to update profile", err);
+    saveError.value = err.response?.data?.message || "Failed to update profile.";
+  } finally {
+    saveLoading.value = false;
+  }
+};
+
+const confirmDeleteAccount = () => {
+  showConfirmDialog({
+    title: "Delete Account",
+    message: "Are you sure you want to delete your account? This action cannot be undone. Please enter your password to confirm.",
+    confirmText: "Delete",
+    confirmButtonClass: "delete",
+    showInput: true,
+    inputType: "password",
+    onConfirm: (password) => deleteAccount(password),
+  });
+};
+
+const deleteAccount = async (password) => {
+  deleteLoading.value = true;
+  deleteError.value = "";
+
+  if (!password) {
+    deleteError.value = "Password is required to delete your account.";
+    deleteLoading.value = false;
+    return;
+  }
+
+  try {
+    await authApi.deleteUser({ password });
+    clearAuthTokens();
+    logout();
+    hideProfileWindow();
+  } catch (err) {
+    console.error("Failed to delete account", err);
+    deleteError.value = err.response?.data?.message || "Failed to delete account.";
+  } finally {
+    deleteLoading.value = false;
+  }
+};
+
 watch(
   () => profileVisible.value,
   (visible) => {
@@ -124,6 +230,11 @@ watch(
     } else {
       profile.value = null;
       error.value = "";
+      saveError.value = "";
+      deleteError.value = "";
+      saveSuccess.value = false;
+      newPassword.value = '';
+      confirmPassword.value = '';
       requestToken += 1;
     }
   }
@@ -143,8 +254,7 @@ const handleLogout = () => {
 };
 
 const footerButtons = computed(() => [
-  { label: "Cancel", onClick: hideProfileWindow },
-  { label: "Logout", onClick: handleLogout, primary: true },
+  { label: "Close", onClick: hideProfileWindow },
 ]);
 
 </script>
@@ -185,13 +295,22 @@ const footerButtons = computed(() => [
 
 .field {
   display: flex;
+  align-items: center;
   margin-bottom: 8px;
   gap: 8px;
 }
 
 .label {
   font-weight: 600;
-  min-width: 80px;
+  min-width: 120px; /* Adjusted for better alignment */
+}
+
+.value-input {
+  flex: 1;
+  padding: 6px 10px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 1em;
 }
 
 .value {
@@ -201,5 +320,14 @@ const footerButtons = computed(() => [
 
 .error {
   color: #d00000;
+  margin-top: 8px;
+  text-align: center;
 }
+
+.success {
+  color: #28a745;
+  margin-top: 8px;
+  text-align: center;
+}
+
 </style>

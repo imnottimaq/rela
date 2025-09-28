@@ -123,7 +123,6 @@ func main() {
 
 			// Workspace Boards
 			workspaceByIdGroup.GET("/boards", getAllBoards)
-			workspaceByIdGroup.GET("/boards/:boardId", getBoard)
 			workspaceByIdGroup.POST("/boards", addBoard)
 			workspaceByIdGroup.DELETE("/boards/:boardId", deleteBoard)
 			workspaceByIdGroup.PATCH("/boards/:boardId", editBoard)

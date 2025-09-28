@@ -82,8 +82,6 @@ const authenticatedMenu = computed(() => {
       label: "Account",
       items: [
         { type: "button", label: "Profile", onClick: openProfile },
-        { type: "separator" },
-        { type: "button", label: "Logout", onClick: () => showConfirmLogoutWindow() },
       ],
     },
     {

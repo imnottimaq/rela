@@ -186,6 +186,9 @@ export const authApi = {
   getUserInfo() {
     return apiClient.get("/users/get_info");
   },
+  updateUserInfo(payload) {
+    return apiClient.patch("/users/update_info", payload);
+  },
   getUserWorkspaces() {
     return apiClient.get("/users/workspaces");
   },
@@ -260,7 +263,7 @@ export const workspaceApi = {
     return apiClient.post(`/workspaces/invite/accept/${joinToken}`);
   },
   uploadAvatar(workspaceId,formData) {
-    return apiClient.post("/workspaces/${workspaceId}/upload_avatar", formData);
+    return apiClient.post(`/workspaces/${workspaceId}/upload_avatar`, formData);
   }
 };
 
