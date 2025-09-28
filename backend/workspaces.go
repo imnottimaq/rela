@@ -68,13 +68,15 @@ func editWorkspace(c *gin.Context) {
 	userId, _ := c.Get("id")
 	wId := c.Param("workspaceId")
 	workspaceId, _ := bson.ObjectIDFromHex(wId)
-	var previousVersion Workspace
-	var input EditWorkspace
-	if err := json.NewDecoder(c.Request.Body).Decode(&input); err != nil {
-		c.AbortWithStatusJSON(500, gin.H{"error": "Failed to parse request"})
+
+	var input map[string]interface{}
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.AbortWithStatusJSON(400, gin.H{"error": "Failed to parse request"})
 		return
 	}
-	if err := workspacesDb.FindOne(context.TODO(), bson.D{{"_id", workspaceId}}).Decode(&previousVersion); err != nil {
+
+	var workspace Workspace
+	if err := workspacesDb.FindOne(context.TODO(), bson.M{"_id": workspaceId}).Decode(&workspace); err != nil {
 		if errors.Is(err, mongo.ErrNoDocuments) {
 			c.AbortWithStatusJSON(404, gin.H{"error": "Not Found"})
 		} else {
@@ -82,21 +84,44 @@ func editWorkspace(c *gin.Context) {
 		}
 		return
 	}
-	if previousVersion.OwnedBy != userId.(bson.ObjectID) {
+
+	if workspace.OwnedBy != userId.(bson.ObjectID) {
 		c.AbortWithStatusJSON(403, gin.H{"error": "You are not an owner of this workplace"})
 		return
 	}
-	if input.Name != "" {
-		previousVersion.Name = input.Name
-	}
-	// Avatar can be empty string to remove it
-	previousVersion.Avatar = input.Avatar
 
-	if _, err := workspacesDb.ReplaceOne(context.TODO(), bson.D{{"_id", workspaceId}}, previousVersion); err != nil {
-		c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
-		return
+	updateFields := bson.M{}
+	if name, ok := input["name"].(string); ok {
+		if name == "" {
+			c.AbortWithStatusJSON(400, gin.H{"error": "Field 'name' can not be empty"})
+			return
+		}
+		updateFields["name"] = name
+		workspace.Name = name
 	}
-	c.JSON(200, previousVersion)
+
+	if avatar, ok := input["avatar"]; ok {
+		updateFields["avatar"] = avatar
+		if av, ok := avatar.(string); ok {
+			workspace.Avatar = av
+		} else {
+			workspace.Avatar = "" // if avatar is null
+		}
+	}
+
+	if len(updateFields) > 0 {
+		_, err := workspacesDb.UpdateOne(
+			context.TODO(),
+			bson.M{"_id": workspaceId},
+			bson.M{"$set": updateFields},
+		)
+		if err != nil {
+			c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
+			return
+		}
+	}
+
+	c.JSON(200, workspace)
 }
 
 // @Summary 		Get all workspaces for the current user
@@ -415,58 +440,6 @@ func promoteMember(c *gin.Context) {
 	c.AbortWithStatus(200)
 }
 
-// @Summary 		Get all members of a workspace
-// @Description 	Returns a list of all members in a specific workspace.
-// @Router 			/workspaces/{workspaceId}/members [get]
-// @Tags 			Workspaces
-// @Security 		BearerAuth
-// @Produce 		json
-// @Param 			workspaceId path string true "Workspace ID"
-// @Success 		200 {object} AllMembersResponse "A list of members"
-// @Failure 		400 {object} ErrorSwagger "Bad request - invalid workspace ID"
-// @Failure 		403 {object} ErrorSwagger "Forbidden - you are not a member of this workspace"
-// @Failure 		404 {object} ErrorSwagger "Not Found - workspace not found"
-// @Failure 		500 {object} ErrorSwagger "Internal server error"
-func getAllMembers(c *gin.Context) {
-	userId, _ := c.Get("id")
-	workspaceIdStr := c.Param("workspaceId")
-	workspaceId, err := bson.ObjectIDFromHex(workspaceIdStr)
-	if err != nil {
-		c.JSON(400, gin.H{"error": "invalid workspaceId"})
-		return
-	}
-
-	var workspace Workspace
-	if err := workspacesDb.FindOne(context.TODO(), bson.M{"_id": workspaceId}).Decode(&workspace); err != nil {
-		if errors.Is(err, mongo.ErrNoDocuments) {
-			c.JSON(404, gin.H{"error": "workspace not found"})
-		} else {
-			c.JSON(500, gin.H{"error": err.Error()})
-		}
-		return
-	}
-
-	if slices.Index(workspace.Members, userId.(bson.ObjectID)) == -1 {
-		c.JSON(403, gin.H{"error": "not a member of this workspace"})
-		return
-	}
-	cursor, err := usersDb.Find(context.TODO(), bson.M{
-		"_id": bson.M{"$in": workspace.Members},
-	})
-	if err != nil {
-		c.JSON(500, gin.H{"error": "failed to fetch users"})
-		return
-	}
-	defer cursor.Close(context.TODO())
-
-	members := make([]Member, 0)
-	if err := cursor.All(context.TODO(), &members); err != nil {
-		c.JSON(500, gin.H{"error": "failed to decode users"})
-		return
-	}
-	c.IndentedJSON(200, gin.H{"members": members})
-}
-
 // @Summary 		Get a workspace by ID
 // @Description 	Retrieves a specific workspace by its ID.
 // @Router 			/workspaces/{workspaceId} [get]
@@ -540,6 +513,7 @@ func getWorkspaceInfo(c *gin.Context) {
 			{"as", "memberDetails"},
 			{"pipeline", bson.A{
 				bson.D{{"$project", bson.D{
+					{"_id", 1},
 					{"name", 1},
 					{"avatar", 1},
 				}}},

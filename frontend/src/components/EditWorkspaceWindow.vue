@@ -29,31 +29,27 @@
       <!-- Members Tab -->
       <div v-if="activeTab === 'members'">
         <div class="members-section">
-          <div v-for="member in workspace.members" :key="member.id" class="member-item">
+          <div v-for="member in workspaceMembers" :key="member._id" class="member-item">
             <img :src="getMemberAvatar(member)" alt="Member Avatar" class="member-avatar" />
             <span class="member-name">{{ member.name }}</span>
             <div class="member-actions">
-              <button @click="handlePromote(member.id)" class="action-btn">Promote</button>
-              <button @click="handleKick(member.id)" class="action-btn kick-btn">Kick</button>
+              <button @click="handlePromote(member._id)" class="action-btn">Promote</button>
+              <button @click="handleKick(member._id)" class="action-btn kick-btn">Kick</button>
             </div>
+          </div>
+          <div class="invite-link">
+            <button @click="handleCreateInviteLink" class="action-btn">Create Invite Link</button>
           </div>
         </div>
       </div>
 
       <!-- Danger Zone Tab -->
       <div v-if="activeTab === 'danger'">
-        <div class="danger-zone">
-          <div class="danger-item">
-            <h4>Create and Copy Invite Link</h4>
-            <p>Share this link to invite others to your workspace.</p>
-            <button @click="handleCreateInviteLink" class="action-btn">Create Link</button>
-          </div>
           <div class="danger-item">
             <h4>Delete Workspace</h4>
             <p>Once you delete a workspace, there is no going back. Please be certain.</p>
             <button @click="confirmDelete" class="action-btn kick-btn">Delete this workspace</button>
           </div>
-        </div>
       </div>
     </div>
   </WindowComponent>
@@ -77,8 +73,10 @@ const modelVisible = computed({
   set: (v) => emit('update:visible', v),
 });
 
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, "");
 const wsId = computed(() => props.workspace?._id || props.workspace?.id);
 
+const detailedWorkspace = ref({});
 const activeTab = ref('general');
 const newName = ref('');
 const newAvatarFile = ref(null);
@@ -88,29 +86,49 @@ const nameInput = ref(null);
 const fileInput = ref(null);
 const loading = ref(false);
 
+const workspaceName = computed(() => detailedWorkspace.value?.name);
+const workspaceAvatar = computed(() => detailedWorkspace.value?.avatar);
+const workspaceMembers = computed(() => detailedWorkspace.value?.memberDetails || []);
+
 const avatarSrc = computed(() => {
   if (avatarPreviewUrl.value) {
     return avatarPreviewUrl.value;
   }
-  if (props.workspace.avatar) {
-    return `http://localhost:8080/${props.workspace.avatar}`;
+  if (workspaceAvatar.value) {
+    return `${API_BASE_URL}/${workspaceAvatar.value}`;
   }
   return 'https://via.placeholder.com/128';
 });
 
-watch(() => props.visible, (isVisible) => {
-  if (isVisible) {
+watch(() => props.visible, async (isVisible) => {
+  if (isVisible && wsId.value) {
     activeTab.value = 'general';
-    newName.value = props.workspace.name;
     newAvatarFile.value = null;
     avatarPreviewUrl.value = null;
     error.value = '';
+
+    loading.value = true;
+    try {
+      const { data } = await workspaceApi.getWorkspaceInfo(wsId.value);
+      detailedWorkspace.value = data;
+      newName.value = data.name;
+    } catch (e) {
+      console.error('Failed to fetch workspace info', e);
+      error.value = 'Failed to load workspace details.';
+      detailedWorkspace.value = {};
+    } finally {
+      loading.value = false;
+    }
+
     nextTick(() => {
-      if (activeTab.value === 'general') {
-        nameInput.value?.focus();
-        nameInput.value?.select();
+      if (activeTab.value === 'general' && nameInput.value) {
+        nameInput.value.focus();
+        nameInput.value.select();
       }
     });
+  } else {
+    detailedWorkspace.value = {};
+    newName.value = '';
   }
 });
 
@@ -132,21 +150,28 @@ const handleFileChange = (event) => {
 
 const getMemberAvatar = (member) => {
   if (member.avatar) {
-    return `http://localhost:8080/${member.avatar}`;
+    console.log(`${API_BASE_URL}/${member.avatar}`);
+    return `${API_BASE_URL}/${member.avatar}`;
   }
   return 'https://via.placeholder.com/40';
 };
 
 const handlePromote = (memberId) => {
   console.log('Promoting member:', memberId, 'in workspace', wsId.value);
-  // Here you would call workspaceApi.promoteMember(wsId.value, memberId)
-  // and then maybe emit('workspace-updated') or reload members
+  try{
+    workspaceApi.promoteMember(wsId.value, memberId);
+  } catch (error){
+    console.error('Failed to promote member', error);
+  }
 };
 
 const handleKick = (memberId) => {
   console.log('Kicking member:', memberId, 'in workspace', wsId.value);
-  // Here you would call workspaceApi.kickMember(wsId.value, memberId)
-  // and then maybe emit('workspace-updated') or reload members
+  try{
+    workspaceApi.kickMember(wsId.value, memberId)
+  }catch (error){
+    console.error('Failed to kick member', error);
+  }
 };
 
 const handleSave = async () => {
@@ -156,7 +181,7 @@ const handleSave = async () => {
     return;
   }
 
-  const hasNameChanged = trimmedName !== props.workspace.name;
+  const hasNameChanged = trimmedName !== workspaceName.value;
   const hasAvatarChanged = !!newAvatarFile.value;
 
   if (!hasNameChanged && !hasAvatarChanged) {
@@ -168,21 +193,25 @@ const handleSave = async () => {
   error.value = '';
 
   try {
-    const updatedFields = { id: wsId.value };
-
+    const payload = {};
     if (hasNameChanged) {
-      await workspaceApi.updateWorkspace(wsId.value, { name: trimmedName });
-      updatedFields.name = trimmedName;
+      payload.name = trimmedName;
     }
 
     if (hasAvatarChanged) {
       const formData = new FormData();
       formData.append('img', newAvatarFile.value);
       const { data } = await workspaceApi.uploadAvatar(wsId.value, formData);
-      updatedFields.avatar = data.avatar;
+      payload.avatar = data.avatar;
     }
 
-    emit('workspace-updated', updatedFields);
+    const { data: updatedWorkspace } = await workspaceApi.updateWorkspace(wsId.value, payload);
+
+    emit('workspace-updated', {
+      id: wsId.value,
+      name: updatedWorkspace.name,
+      avatar: updatedWorkspace.avatar,
+    });
     modelVisible.value = false;
   } catch (e) {
     console.error('Failed to update workspace', e);
@@ -261,7 +290,7 @@ const footerButtons = computed(() => {
 .avatar-preview {
   width: 128px;
   height: 128px;
-  border-radius: 50%;
+  border-radius: 4px;
   object-fit: cover;
   border: 2px solid #ccc;
   margin-bottom: 12px;
@@ -293,7 +322,7 @@ const footerButtons = computed(() => {
 .member-avatar {
   width: 40px;
   height: 40px;
-  border-radius: 50%;
+  border-radius: 4px;
   object-fit: cover;
   margin-right: 12px;
 }

@@ -107,7 +107,6 @@ func main() {
 			workspaceByIdGroup.GET("/new_invite", createNewInvite)
 			workspaceByIdGroup.DELETE("/kick", kickMember)
 			workspaceByIdGroup.PATCH("/promote/:userId", promoteMember)
-			workspaceByIdGroup.GET("/members", getAllMembers)
 			workspaceByIdGroup.GET("/", getWorkspace)
 			workspaceByIdGroup.GET("/info", getWorkspaceInfo)
 			workspaceByIdGroup.PATCH("/", editWorkspace)

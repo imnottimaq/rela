@@ -18,6 +18,7 @@
           <thead>
             <tr>
               <th>Tasks</th>
+              <th class="task-actions-header"></th>
             </tr>
           </thead>
           <tbody>
@@ -31,6 +32,9 @@
               <td>
                 <div class="task-title">{{ task.name || task.title || 'Unnamed Task' }}</div>
                 <div v-if="task.description" class="task-desc">{{ task.description }}</div>
+              </td>
+              <td class="task-actions">
+                <button class="more-button">&hellip;</button>
               </td>
             </tr>
           </tbody>
@@ -242,8 +246,22 @@ const windowMenu = computed(() => {
 .task-table tbody td { padding: 10px 8px; border-bottom: 1px solid #eee; }
 .task-row:hover td { background: #fafafa; }
 */
-.task-table { width: 100%}
+.task-table { width: 100%; border-collapse: collapse; }
 .task-title { font-weight: 600; color: #222; }
 .task-desc { font-size: 12px; color: #666; margin-top: 2px; }
+.task-actions-header { width: 40px; }
+.task-actions { text-align: right; vertical-align: middle; }
+.more-button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1.2em;
+  padding: 0 8px;
+  color: #777;
+  line-height: 1;
+}
+.more-button:hover {
+  color: #000;
+}
 
 </style>

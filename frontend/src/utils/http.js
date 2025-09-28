@@ -207,10 +207,13 @@ export const workspaceApi = {
     return apiClient.post("/workspaces/create", payload);
   },
   deleteWorkspace(workspaceId) {
-    return apiClient.delete(`/workspaces/${workspaceId}/`);
+    return apiClient.delete(`/workspaces/${workspaceId}`);
   },
   updateWorkspace(workspaceId, payload) {
-    return apiClient.patch(`/workspaces/${workspaceId}/`, payload);
+    return apiClient.patch(`/workspaces/${workspaceId}`, payload);
+  },
+  getWorkspaceInfo(workspaceId) {
+    return apiClient.get(`/workspaces/${workspaceId}/info`);
   },
   getBoards(workspaceId) {
     return apiClient.get(`/workspaces/${workspaceId}/boards`);
@@ -242,9 +245,6 @@ export const workspaceApi = {
   assignTask(workspaceId, payload) {
     return apiClient.post(`/workspaces/${workspaceId}/assign`, payload);
   },
-  getMembers(workspaceId) {
-    return apiClient.get(`/workspaces/${workspaceId}/members`);
-  },
   kickMember(workspaceId, memberId) {
     return apiClient.delete(`/workspaces/${workspaceId}/kick`, {
       data: { userId: memberId },
@@ -256,8 +256,8 @@ export const workspaceApi = {
   getWorkspaceByInviteToken(joinToken) {
     return apiClient.get(`/workspaces/invite/${joinToken}`);
   },
-  promoteMember(workspaceId, userId, payload) {
-    return apiClient.patch(`/workspaces/${workspaceId}/promote/${userId}`, payload);
+  promoteMember(workspaceId, userId) {
+    return apiClient.patch(`/workspaces/${workspaceId}/promote/${userId}`);
   },
   acceptInvite(joinToken) {
     return apiClient.post(`/workspaces/invite/accept/${joinToken}`);
