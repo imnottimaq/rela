@@ -5,15 +5,16 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	"regexp"
+	"strings"
+	"time"
+
 	"github.com/gin-gonic/gin"
 	"github.com/goccy/go-json"
 	"github.com/golang-jwt/jwt/v5"
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
-	"io"
-	"regexp"
-	"strings"
-	"time"
 )
 
 var (
@@ -36,25 +37,24 @@ func validatePassword(password string) bool {
 	return hasLower && hasUpper && hasDigit && hasSpecial
 }
 
-func generateAccessToken(token string, tokenType string) (accessToken string, err error) {
-	parsedToken, _ := jwt.ParseWithClaims(token, &Token{}, func(token *jwt.Token) (any, error) {
-		if token.Method != jwt.SigningMethodHS256 {
-			return nil, fmt.Errorf("unknown signing method: %s", token.Method)
-		}
-		return []byte(pepper), nil
-	})
-	claims := parsedToken.Claims.(*Token)
-	if claims.ExpiresAt < time.Now().UTC().Unix() {
-		return "", fmt.Errorf("expired refresh token")
-	} else {
-		newToken := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-			"id":   claims.Id,
-			"exp":  time.Now().UTC().Unix() + 300,
-			"type": tokenType,
-		})
-		accessToken, _ = newToken.SignedString([]byte(pepper))
-		return accessToken, nil
+func generateAccessToken(id string, tokenType string) (accessToken string, err error) {
+	userId, err := bson.ObjectIDFromHex(id)
+	if err != nil {
+		return "", fmt.Errorf("invalid user ID format: %v", err)
 	}
+	claims := Token{
+		Id:   userId,
+		Type: tokenType,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().UTC().Add(5 * time.Minute)),
+		},
+	}
+	newToken := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	signedString, err := newToken.SignedString([]byte(pepper))
+	if err != nil {
+		return "", err
+	}
+	return signedString, nil
 }
 
 func authMiddleware() gin.HandlerFunc {
@@ -83,7 +83,7 @@ func authMiddleware() gin.HandlerFunc {
 				c.AbortWithStatusJSON(403, gin.H{"error": "invalid or malformed access token"})
 				return
 			}
-			if claims.ExpiresAt < time.Now().UTC().Unix() {
+			if claims.ExpiresAt.Time.Before(time.Now().UTC()) {
 				c.AbortWithStatusJSON(403, "Authorization Required")
 				return
 			} else if claims.Type == "refresh" || claims.Type == "invite" {
@@ -102,27 +102,30 @@ func taskMiddleware() gin.HandlerFunc {
 			c.Next()
 			return
 		}
-		input, _ := c.Get("id")
-		userId := input.(bson.ObjectID)
+		// input, _ := c.Get("id")
+		// userId := input.(bson.ObjectID)
 		taskId := c.Param("taskId")
 		if taskId == "" {
 			c.AbortWithStatusJSON(400, gin.H{"error": "Task id is required"})
 			return
 		}
+		// Convert the hex taskId from URL to bson.ObjectID
+		taskObjectID, err := bson.ObjectIDFromHex(taskId)
+		if err != nil {
+			c.AbortWithStatusJSON(400, gin.H{"error": "Invalid task id"})
+			return
+		}
 		var output Task
-		if err := tasksDb.FindOne(context.TODO(), bson.D{{"_id", taskId}}).Decode(&output); err != nil {
+		if err := tasksDb.FindOne(context.TODO(), bson.D{{"_id", taskObjectID}}).Decode(&output); err != nil {
 			if errors.Is(err, mongo.ErrNoDocuments) {
 				c.AbortWithStatusJSON(404, gin.H{"error": "Not Found"})
 				return
 			}
 		} else {
-			if userId != output.CreatedBy {
-				c.AbortWithStatusJSON(403, gin.H{"error": "You do not own this task"})
-				return
-			} else {
-				c.Set("taskObj", output)
-				c.Next()
-			}
+			// Authorization is handled in the task handlers via authorizeTaskAccess.
+			// Here we only load the task into context for downstream handlers.
+			c.Set("taskObj", output)
+			c.Next()
 		}
 	}
 

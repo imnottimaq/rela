@@ -13,20 +13,23 @@
       :minSize="{ width: 300, height: 370 }"
     >
     <div style="text-align: left; padding: 0 10px;">
-        <h1>Login to your account</h1>
-        <p>If you don't have an account, please <button class="inline-link" type="button" @click="showRegisterWindow">register here</button></p>
+        <br>
+        <h1 style="text-align: center;">Sign in to Rela</h1>
         <br>
       <div class="group" style="width: 100%">
-        <label for="email">Email</label>
-        <input id="email" type="email" v-model="email" />
-        <p v-if="emailError" class="error">{{ emailError }}</p>
+        <input id="email" type="email" v-model="email" aria-describedby="email-error" placeholder="E-mail" />
+        <div v-if="emailError" class="error" id="email-error" role="tooltip">{{ emailError }}</div>
       </div>
       <div class="group" style="width: 100%">
-        <label for="password">Password</label>
-        <input id="password" type="password" v-model="password" />
-        <p v-if="passwordError" class="error">{{ passwordError }}</p>
+        <br>
+        <input id="password" type="password" v-model="password" aria-describedby="password-error" placeholder="Password"/>
+        <div v-if="passwordError" class="error" id="password-error" role="tooltip">{{ passwordError }}</div>
        </div>
+      <button class="inline-link" type="button" @click="showForgotPasswordWindow">Forgot your password?</button>
+      <br>
       <p v-if="loginError" class="error">{{ loginError }}</p>
+      <br>
+      <p style="">Don't have an account? <button class="inline-link" type="button" @click="showRegisterWindow">Register</button></p>
     </div>
       
     </WindowComponent>
@@ -34,8 +37,9 @@
 <script setup>
 import WindowComponent from './WindowComponent.vue';
 import { useLoginWindow } from '../composables/useLoginWindow';
+import { showForgotPasswordWindow } from '../composables/useForgotPasswordWindow';
 import { hideRegisterWindow, showRegisterWindow } from '../composables/useRegisterWindow';
-import { ref } from 'vue';
+import { ref, watch } from 'vue';
 import { authApi } from '../utils/http';
 import { useAuth } from '../composables/useAuth';
 
@@ -49,6 +53,21 @@ const passwordError = ref('');
 const loginError = ref('');
 const isSubmitting = ref(false);
 
+const clearForm = () => {
+  email.value = '';
+  password.value = '';
+  emailError.value = '';
+  passwordError.value = '';
+  loginError.value = '';
+  isSubmitting.value = false;
+};
+
+watch(loginVisible, (newValue) => {
+  if (newValue === false) {
+    clearForm();
+  }
+});
+
 const validateEmail = (value) => {
   if (!value) {
     return false;
@@ -59,14 +78,7 @@ const validateEmail = (value) => {
 };
 
 const validatePassword = (value) => {
-  if (!value || value.length < 8) {
-    return false;
-  }
-  const hasLower = /[a-z]/.test(value);
-  const hasUpper = /[A-Z]/.test(value);
-  const hasDigit = /\d/.test(value);
-  const hasSpecial = /[!"#$%&'()*+,\-./:;<=>?@[\\\]^_{|}~]/.test(value);
-  return hasLower && hasUpper && hasDigit && hasSpecial;
+  return !!value;
 };
 
 const login = async () => {
@@ -82,7 +94,7 @@ const login = async () => {
     }
 
     if (!validatePassword(password.value)) {
-      passwordError.value = 'Password must be at least 8 characters and include upper, lower, digit, and special character.';
+      passwordError.value = 'Password is required.';
     }
 
     if (emailError.value || passwordError.value) {

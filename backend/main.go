@@ -52,6 +52,7 @@ func getAllowedOrigins() []string {
 // @name Authorization
 func main() {
 	r := gin.Default()
+	r.RedirectTrailingSlash = false // Explicitly disable automatic redirects
 	corsConfig := cors.DefaultConfig()
 	corsConfig.AllowOrigins = getAllowedOrigins()
 	corsConfig.AllowMethods = []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"}
@@ -66,86 +67,86 @@ func main() {
 		Option:          ratelimit.RateLimiterOption{Limit: 5, Burst: 100, Len: 1 * time.Minute},
 	})
 	// Groups
-	protected := r.Group("/api/v1")
-	workspaces := protected.Group("/workspaces/:workspaceId")
-	tasks := protected.Group("/tasks")
-	users := r.Group("/api/v1/users")
-	boards := protected.Group("/boards")
-
-	//Middleware
-	r.Use(rateLimiter)
+	v1 := r.Group("/api/v1")
+	protected := v1.Group("/")
 	protected.Use(authMiddleware())
-	boards.Use(authMiddleware())
-	tasks.Use(authMiddleware())
-	users.Use(userMiddleware())
-	workspaces.Use(authMiddleware())
+
+	// Middleware
+	r.Use(rateLimiter)
+
 	{
-		r.Static("/img", "./img")
-		//Tasks
-		tasks.GET("/", getAllTasks)
-		tasks.POST("/", createNewTask)
-		tasks.PATCH("/:taskId", taskMiddleware(), editExistingTask)
-		tasks.DELETE("/:taskId", taskMiddleware(), deleteExistingTask)
+		v1.Static("/img", "./img")
 
-		//Boards
-		boards.GET("/", getAllBoards)
-		boards.POST("/", addBoard)
-		boards.DELETE("/:boardId", deleteBoard)
-		boards.PATCH("/:boardId", editBoard)
+		// Users
+		usersGroup := v1.Group("/users")
+		usersGroup.Use(userMiddleware())
+		{
+			usersGroup.POST("/create", createUser)
+			usersGroup.POST("/login", loginUser)
+			usersGroup.GET("/refresh", refreshAccessToken)
+			usersGroup.POST("/logout", logoutUser)
+		}
 
-		//Users
-		users.POST("/create", createUser)
-		users.POST("/login", loginUser)
-		users.GET("/refresh", refreshAccessToken)
+		// Protected User Routes
+		protectedUsersGroup := protected.Group("/users")
+		{
+			protectedUsersGroup.GET("/workspaces", getAllWorkspaces)
+			protectedUsersGroup.DELETE("/delete", deleteUser)
+			protectedUsersGroup.POST("/upload_avatar", uploadAvatar)
+			protectedUsersGroup.GET("/get_info", getUserDetails)
+		}
 
-		protected.GET("/users/workspaces", getAllWorkspaces)
-		protected.DELETE("/users/delete", deleteUser)
-		protected.POST("/users/upload_avatar", uploadAvatar)
-		protected.GET("/users/get_info", getUserDetails)
+		// Workspaces
+		workspacesGroup := protected.Group("/workspaces")
+		workspaceByIdGroup := workspacesGroup.Group("/:workspaceId")
+		{
+			workspacesGroup.POST("/create", createWorkspace)
+			workspacesGroup.POST("/invite/accept/:joinToken", addMember)
+			r.GET("/workspaces/invite/:joinToken", getWorkspaceByInviteToken)
 
-		//Workspace management
-		protected.POST("/workspaces/create", createWorkspace)
-		workspaces.POST("/add/:joinToken", addMember)
-		workspaces.GET("/new_invite", createNewInvite)
-		workspaces.DELETE("/kick", kickMember)
-		workspaces.PATCH("/promote/:userId", promoteMember)
-		workspaces.GET("/members", getAllMembers)
-		workspaces.GET("/", getWorkspace)
-		workspaces.GET("/info", getWorkspaceInfo)
-		workspaces.PATCH("/", editWorkspace)
-		workspaces.DELETE("/", deleteWorkspace)
-		workspaces.POST("/upload_avatar", uploadAvatar)
+			workspaceByIdGroup.GET("/new_invite", createNewInvite)
+			workspaceByIdGroup.DELETE("/kick", kickMember)
+			workspaceByIdGroup.PATCH("/promote/:userId", promoteMember)
+			workspaceByIdGroup.GET("/members", getAllMembers)
+			workspaceByIdGroup.GET("/", getWorkspace)
+			workspaceByIdGroup.GET("/info", getWorkspaceInfo)
+			workspaceByIdGroup.PATCH("/", editWorkspace)
+			workspaceByIdGroup.DELETE("/", deleteWorkspace)
+			workspaceByIdGroup.POST("/upload_avatar", uploadAvatar)
 
-		//Workspace tasks
-		workspaces.GET("/tasks/", getAllTasks)
-		workspaces.POST("/tasks/", createNewTask)
-		workspaces.PATCH("/tasks/:taskId", taskMiddleware(), editExistingTask)
-		workspaces.DELETE("/delete/:taskId", taskMiddleware(), deleteExistingTask)
-		workspaces.POST("/assign", assignTask)
+			// Workspace Tasks
+			workspaceByIdGroup.GET("/tasks/:boardId", getAllTasks)
+			workspaceByIdGroup.POST("/tasks", createNewTask)
+			workspaceByIdGroup.PATCH("/tasks/:taskId", taskMiddleware(), editExistingTask)
+			workspaceByIdGroup.DELETE("/delete/:taskId", taskMiddleware(), deleteExistingTask)
+			workspaceByIdGroup.POST("/assign", assignTask)
 
-		//Workspace boards
-		workspaces.GET("/boards", getAllBoards)
-		workspaces.GET("/boards/:boardId", getBoard)
-		workspaces.POST("/boards", addBoard)
-		workspaces.DELETE("/boards/:boardId", deleteBoard)
-		workspaces.PATCH("/boards/:boardId", editBoard)
+			// Workspace Boards
+			workspaceByIdGroup.GET("/boards", getAllBoards)
+			workspaceByIdGroup.GET("/boards/:boardId", getBoard)
+			workspaceByIdGroup.POST("/boards", addBoard)
+			workspaceByIdGroup.DELETE("/boards/:boardId", deleteBoard)
+			workspaceByIdGroup.PATCH("/boards/:boardId", editBoard)
+		}
 
-		//Single board by id
-		boards.GET("/:boardId", getBoard)
+		// Public invite route
+		v1.GET("/workspaces/invite/:joinToken", getWorkspaceByInviteToken)
 
-		//Docs
-		r.GET("/api/v1/docs/*any", ginSwagger.WrapHandler(swaggerfiles.Handler))
+		// Docs
+		v1.GET("/docs/*any", ginSwagger.WrapHandler(swaggerfiles.Handler))
 	}
+
 	if pepper == "" {
-		print("WARNING Server-side secret is not present, this is big security flaw")
+		print("WARNING Server-side secret is not present, this is a big security flaw")
 	} else if mongodbCredentials == "" {
-		panic("FATAL MongoDB credentials is not present")
+		panic("FATAL MongoDB credentials are not present")
 	} else if port == "" {
 		print("WARNING Port is not present, falling back to default")
 		if err := r.Run(":8080"); err != nil {
 			panic("Failed to start server")
 		}
 	}
+
 	if err := r.Run(port); err != nil {
 		panic("Failed to start server")
 	}

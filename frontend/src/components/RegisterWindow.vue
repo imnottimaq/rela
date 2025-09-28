@@ -1,12 +1,12 @@
 <template>
     <WindowComponent
       title="Register"
-      :buttons="[{ label: 'Close', onClick: closeAndReset }]"
+      :buttons="[{ label: 'Close', onClick: hideRegisterWindow }]"
       v-model:visible="registerVisible"
       storage-key="rela-window-register"
       footer-buttons-align="right"
       :footer-buttons="[
-        { label: 'Cancel', onClick: closeAndReset },
+        { label: 'Cancel', onClick: hideRegisterWindow },
         { label: 'Register', onClick: registerUser, primary: true, loading: isSubmitting, disabled: isSubmitting }
       ]"
       :initialSize="{ width: 320, height: 460 }"
@@ -18,23 +18,23 @@
         <br>
       <div class="group" style="width: 100%">
         <label for="name">Name</label>
-        <input id="name" type="text" v-model="name" />
-        <p v-if="nameError" class="error">{{ nameError }}</p>
+        <input id="name" type="text" v-model="name" aria-describedby="name-error" />
+        <div v-if="nameError" class="error" id="name-error" role="tooltip">{{ nameError }}</div>
       </div>
       <div class="group" style="width: 100%">
         <label for="email">Email</label>
-        <input id="email" type="email" v-model="email" />
-        <p v-if="emailError" class="error">{{ emailError }}</p>
+        <input id="email" type="email" v-model="email" aria-describedby="email-error" />
+        <div v-if="emailError" class="error" id="email-error" role="tooltip">{{ emailError }}</div>
       </div>
       <div class="group" style="width: 100%">
         <label for="password">Password</label>
-        <input id="password" type="password" v-model="password" />
-        <p v-if="passwordError" class="error">{{ passwordError }}</p>
+        <input id="password" type="password" v-model="password" aria-describedby="password-error" />
+        <div v-if="passwordError" class="error" id="password-error" role="tooltip">{{ passwordError }}</div>
        </div>
       <div class="group" style="width: 100%">
         <label for="confirm-password">Confirm password</label>
-        <input id="confirm-password" type="password" v-model="confirmPassword" />
-        <p v-if="confirmPasswordError" class="error">{{ confirmPasswordError }}</p>
+        <input id="confirm-password" type="password" v-model="confirmPassword" aria-describedby="confirm-password-error" />
+        <div v-if="confirmPasswordError" class="error" id="confirm-password-error" role="tooltip">{{ confirmPasswordError }}</div>
        </div>
       <p v-if="registerError" class="error">{{ registerError }}</p>
     </div>
@@ -42,7 +42,7 @@
     </WindowComponent>
 </template>
 <script setup>
-import { ref } from 'vue';
+import { ref, watch } from 'vue';
 import WindowComponent from './WindowComponent.vue';
 import { useRegisterWindow } from '../composables/useRegisterWindow';
 import { hideLoginWindow, showLoginWindow } from '../composables/useLoginWindow';
@@ -76,6 +76,12 @@ const resetState = () => {
   registerError.value = '';
 };
 
+watch(registerVisible, (newValue) => {
+  if (newValue === false) {
+    resetState();
+  }
+});
+
 const validateEmail = (value) => {
   if (!value) {
     return false;
@@ -92,7 +98,7 @@ const validatePassword = (value) => {
   const hasLower = /[a-z]/.test(value);
   const hasUpper = /[A-Z]/.test(value);
   const hasDigit = /\d/.test(value);
-  const hasSpecial = /[!"#$%&'()*+,\-./:;<=>?@[\\\]^_{|}~]/.test(value);
+  const hasSpecial = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?~]/.test(value);
   return hasLower && hasUpper && hasDigit && hasSpecial;
 };
 
@@ -128,7 +134,7 @@ const registerUser = async () => {
     }
 
     if (password.value !== confirmPassword.value) {
-      confirmPasswordError.value = 'Passwords do not match.';
+      confirmPasswordError.value = 'Passwords do not matter.';
     }
 
     if (nameError.value || emailError.value || passwordError.value || confirmPasswordError.value) {
@@ -144,7 +150,7 @@ const registerUser = async () => {
       registerError.value = 'Registration succeeded without an access token. Please try logging in.';
       return;
     }
-    closeAndReset();
+    hideRegisterWindow();
     hideLoginWindow();
   } catch (error) {
     console.error('Registration failed:', error);
@@ -152,13 +158,6 @@ const registerUser = async () => {
   } finally {
     isSubmitting.value = false;
   }
-};
-
-
-
-const closeAndReset = () => {
-  hideRegisterWindow();
-  resetState();
 };
 </script>
 <style scoped>

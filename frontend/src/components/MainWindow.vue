@@ -25,6 +25,7 @@ import { useAuth } from '../composables/useAuth';
 import { showConfirmLogoutWindow } from '../composables/useConfirmLogoutWindow';
 import { useWorkspaces, openWorkspaceWindow, refreshWorkspaces } from '../composables/useWorkspaces';
 import { showCreateWorkspaceWindow } from '../composables/useCreateWorkspaceWindow';
+import { showAboutRelaWindow } from '../composables/useAboutRelaWindow.js';
 
 const mainVisible = ref(true);
 const { isAuthenticated } = useAuth();
@@ -46,6 +47,12 @@ const unauthenticatedMenu = [
       { type: "button", label: "Login", onClick: showLoginWindow },
       { type: "button", label: "Register", onClick: showRegisterWindow },
     ],
+  },
+  {
+    label: "Help",
+    items: [
+      {type: "button",label:"About Rela",onClick: showAboutRelaWindow },
+    ]
   },
 ];
 
@@ -82,6 +89,12 @@ const authenticatedMenu = computed(() => {
     {
       label: "Workspace",
       items,
+    },
+    {
+      label: "Help",
+      items: [
+        {type: "button",label:"About Rela",onClick: showAboutRelaWindow },
+      ]
     },
   ];
 });

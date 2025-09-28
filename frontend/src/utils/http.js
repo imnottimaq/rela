@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, "");
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, "");
 const ACCESS_TOKEN_KEY = "rela.access_token";
 const REFRESH_TOKEN_KEY = "rela.refresh_token";
 const DEFAULT_REFRESH_PATH = "/users/refresh";
@@ -194,39 +194,9 @@ export const authApi = {
       headers: { "Content-Type": "multipart/form-data" },
     });
   },
-};
-
-export const boardsApi = {
-  getBoards(workspaceId) {
-    return apiClient.get("/boards", { params: { workspaceId } });
-  },
-  getBoard(boardId) {
-    return apiClient.get(`/boards/${boardId}`);
-  },
-  createBoard(workspaceId, payload) {
-    return apiClient.post("/boards", payload, { params: { workspaceId } });
-  },
-  updateBoard(boardId, workspaceId, payload) {
-    return apiClient.patch(`/boards/${boardId}`, payload, { params: { workspaceId } });
-  },
-  deleteBoard(boardId, workspaceId) {
-    return apiClient.delete(`/boards/${boardId}`, { params: { workspaceId } });
-  },
-};
-
-export const tasksApi = {
-  getTasks(workspaceId) {
-    return apiClient.get("/tasks", { params: { workspaceId } });
-  },
-  createTask(workspaceId, payload) {
-    return apiClient.post("/tasks", payload, { params: { workspaceId } });
-  },
-  updateTask(taskId, workspaceId, payload) {
-    return apiClient.patch(`/tasks/${taskId}`, payload, { params: { workspaceId } });
-  },
-  deleteTask(taskId, workspaceId) {
-    return apiClient.delete(`/tasks/${taskId}`, { params: { workspaceId } });
-  },
+  logoutUser(){
+    return apiClient.post("/users/logout");
+  }
 };
 
 export const workspaceApi = {
@@ -240,59 +210,58 @@ export const workspaceApi = {
     return apiClient.patch(`/workspaces/${workspaceId}/`, payload);
   },
   getBoards(workspaceId) {
-    return apiClient.get(`/workspaces/${workspaceId}/boards`, { params: { workspaceId } });
+    return apiClient.get(`/workspaces/${workspaceId}/boards`);
+  },
+  getBoard(workspaceId, boardId) {
+    return apiClient.get(`/workspaces/${workspaceId}/boards/${boardId}`);
   },
   createBoard(workspaceId, payload) {
-    return apiClient.post(`/workspaces/${workspaceId}/boards`, payload, { params: { workspaceId } });
+    return apiClient.post(`/workspaces/${workspaceId}/boards`, payload);
   },
   updateBoard(workspaceId, boardId, payload) {
-    return apiClient.patch(`/workspaces/${workspaceId}/boards/${boardId}`, payload, {
-      params: { workspaceId },
-    });
+    return apiClient.patch(`/workspaces/${workspaceId}/boards/${boardId}`, payload);
   },
   deleteBoard(workspaceId, boardId) {
-    return apiClient.delete(`/workspaces/${workspaceId}/boards/${boardId}`, {
-      params: { workspaceId },
-    });
+    return apiClient.delete(`/workspaces/${workspaceId}/boards/${boardId}`);
   },
-  getTasks(workspaceId) {
-    return apiClient.get(`/workspaces/${workspaceId}/tasks`, { params: { workspaceId } });
+  getTasks(workspaceId, boardId) {
+    return apiClient.get(`/workspaces/${workspaceId}/tasks/${boardId}`);
   },
   createTask(workspaceId, payload) {
-    return apiClient.post(`/workspaces/${workspaceId}/tasks`, payload, { params: { workspaceId } });
+    return apiClient.post(`/workspaces/${workspaceId}/tasks`, payload);
   },
   updateTask(workspaceId, taskId, payload) {
-    return apiClient.patch(`/workspaces/${workspaceId}/tasks/${taskId}`, payload, {
-      params: { workspaceId },
-    });
+    return apiClient.patch(`/workspaces/${workspaceId}/tasks/${taskId}`, payload);
   },
   deleteTask(workspaceId, taskId) {
-    return apiClient.delete(`/workspaces/${workspaceId}/tasks/${taskId}`, {
-      params: { workspaceId },
-    });
+    return apiClient.delete(`/workspaces/${workspaceId}/tasks/${taskId}`);
   },
   assignTask(workspaceId, payload) {
-    return apiClient.post(`/workspaces/${workspaceId}/assign`, payload, { params: { workspaceId } });
+    return apiClient.post(`/workspaces/${workspaceId}/assign`, payload);
   },
   getMembers(workspaceId) {
-    return apiClient.get(`/workspaces/${workspaceId}/members`, { params: { workspaceId } });
+    return apiClient.get(`/workspaces/${workspaceId}/members`);
   },
-  kickMember(workspaceId) {
+  kickMember(workspaceId, memberId) {
     return apiClient.delete(`/workspaces/${workspaceId}/kick`, {
-      params: { workspaceId },
+      data: { userId: memberId },
     });
   },
   getInvite(workspaceId) {
-    return apiClient.get(`/workspaces/${workspaceId}/new_invite`, { params: { workspaceId } });
+    return apiClient.get(`/workspaces/${workspaceId}/new_invite`);
+  },
+  getWorkspaceByInviteToken(joinToken) {
+    return apiClient.get(`/workspaces/invite/${joinToken}`);
   },
   promoteMember(workspaceId, userId, payload) {
-    return apiClient.patch(`/workspaces/${workspaceId}/promote/${userId}`, payload, {
-      params: { workspaceId, userId },
-    });
+    return apiClient.patch(`/workspaces/${workspaceId}/promote/${userId}`, payload);
   },
   acceptInvite(joinToken) {
-    return apiClient.post(`/workspaces/add/${joinToken}`);
+    return apiClient.post(`/workspaces/invite/accept/${joinToken}`);
   },
+  uploadAvatar(workspaceId,formData) {
+    return apiClient.post("/workspaces/${workspaceId}/upload_avatar", formData);
+  }
 };
 
 export const rawApiClient = apiClient;

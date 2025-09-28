@@ -16,8 +16,8 @@
       <h1>New board</h1>
       <div class="group" style="width: 100%">
         <label for="board-name">Name</label>
-        <input id="board-name" type="text" v-model="name" @keydown.enter.prevent="onCreate" />
-        <p v-if="error" class="error">{{ error }}</p>
+        <input id="board-name" type="text" v-model="name" @keydown.enter.prevent="onCreate" aria-describedby="board-name-error" />
+        <div v-if="error" class="error" id="board-name-error" role="tooltip">{{ error }}</div>
       </div>
     </div>
   </WindowComponent>

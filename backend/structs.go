@@ -58,9 +58,8 @@ type ErrorSwagger struct {
 }
 
 type Token struct {
-	Id        bson.ObjectID `json:"id" bson:"id"`
-	ExpiresAt int64         `json:"exp" bson:"exp"`
-	Type      string        `json:"type" bson:"type"`
+	Id   bson.ObjectID `json:"id" bson:"id"`
+	Type string        `json:"type" bson:"type"`
 	jwt.RegisteredClaims
 }
 

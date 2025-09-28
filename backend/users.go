@@ -73,41 +73,39 @@ func createUser(c *gin.Context) {
 				HashedPassword: base64.RawStdEncoding.EncodeToString(argon2.IDKey([]byte(input.Password+pepper), []byte(generatedSalt), uint32(1), uint32(32*1024), uint8(4), uint32(32))),
 				Email:          input.Email,
 			}
-			type dbResult struct {
-				result *mongo.InsertOneResult
-				err    error
-			}
-			dbChan := make(chan dbResult, 1)
-			go func() {
-				result, err := usersDb.InsertOne(context.TODO(), newUser)
-				dbChan <- dbResult{result, err}
-			}()
-			dbRes := <-dbChan
-			if dbRes.err != nil {
+			result, err := usersDb.InsertOne(context.TODO(), newUser)
+			if err != nil {
 				c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
 				return
 			}
-			claims := jwt.MapClaims{
-				"exp": time.Now().UTC().Unix() + 604800, // Current expire time is 7 days, this is subject to change
+
+			insertedID := result.InsertedID.(bson.ObjectID)
+
+			refreshClaims := Token{
+				Id:   insertedID,
+				Type: "refresh",
+				RegisteredClaims: jwt.RegisteredClaims{
+					ExpiresAt: jwt.NewNumericDate(time.Now().UTC().Add(7 * 24 * time.Hour)), // 7 days
+				},
 			}
-			claims["id"] = dbRes.result.InsertedID.(bson.ObjectID)
-			refreshToken := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+			refreshToken := jwt.NewWithClaims(jwt.SigningMethodHS256, refreshClaims)
 			signedRefreshToken, err := refreshToken.SignedString([]byte(pepper))
 			if err != nil {
 				fmt.Println(err)
 				c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
 				return
-			} else {
-				c.SetCookie("refreshToken", signedRefreshToken, 604800, "/", "", false, true)
-				bearerToken, err := generateAccessToken(signedRefreshToken, "access")
-				if err != nil {
-					fmt.Println(err)
-					c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
-					return
-				}
-				c.AbortWithStatusJSON(200, gin.H{"token": bearerToken})
+			}
+
+			c.SetCookie("refreshToken", signedRefreshToken, 604800, "/", "", false, true)
+			bearerToken, err := generateAccessToken(insertedID.Hex(), "access")
+			if err != nil {
+				fmt.Println(err)
+				c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
 				return
 			}
+			c.AbortWithStatusJSON(200, gin.H{"token": bearerToken})
+			return
+
 		}
 	} else {
 		c.AbortWithStatusJSON(409, gin.H{"error": "User with that email already exists"})
@@ -139,25 +137,42 @@ func loginUser(c *gin.Context) {
 		}
 	}
 	if base64.RawStdEncoding.EncodeToString(argon2.IDKey([]byte(input.Password+pepper), []byte(i.Salt), uint32(1), uint32(32*1024), uint8(4), uint32(32))) == i.HashedPassword {
-		refreshToken := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-			"id":  i.Id,
-			"exp": time.Now().UTC().Unix() + 604800, // Current expire time is 7 days, this is subject to change
-		})
+		refreshClaims := Token{
+			Id:   i.Id,
+			Type: "refresh",
+			RegisteredClaims: jwt.RegisteredClaims{
+				ExpiresAt: jwt.NewNumericDate(time.Now().UTC().Add(7 * 24 * time.Hour)), // 7 days
+			},
+		}
+		refreshToken := jwt.NewWithClaims(jwt.SigningMethodHS256, refreshClaims)
 		signedRefreshToken, err := refreshToken.SignedString([]byte(pepper))
 		if err != nil {
 			c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
 			return
-		} else {
-			c.SetCookie("refreshToken", signedRefreshToken, 604800, "/", "", false, true)
-			bearerToken, err := generateAccessToken(signedRefreshToken, "access")
-			if err != nil {
-				c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
-				return
-			}
-			c.JSON(200, gin.H{"token": bearerToken})
+		}
+
+		c.SetCookie("refreshToken", signedRefreshToken, 604800, "/", "", false, true)
+		bearerToken, err := generateAccessToken(i.Id.Hex(), "access")
+		if err != nil {
+			c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
 			return
 		}
+		c.JSON(200, gin.H{"token": bearerToken})
+		return
 	}
+
+	// Wrong password path: explicitly respond with an error
+	c.AbortWithStatusJSON(400, gin.H{"error": "Wrong email or password"})
+}
+
+// @Summary 		Logout user
+// @Description 	Logs out the current user by clearing the refresh token cookie.
+// @Router 			/users/logout [post]
+// @Tags 			Users
+// @Success 		200 "Successfully logged out"
+func logoutUser(c *gin.Context) {
+	c.SetCookie("refreshToken", "", -1, "/", "", false, true)
+	c.AbortWithStatus(200)
 }
 
 // @Summary 		Delete user
@@ -209,77 +224,92 @@ func deleteUser(c *gin.Context) {
 // @Produce 		json
 // @Param 			img formData file true "Avatar image file (jpg or png)"
 // @Param 			workspaceId path string false "Workspace ID (if uploading for a workspace)"
-// @Success 		200 "Avatar uploaded successfully"
+// @Success 		200 {object} gin.H "Avatar path"
 // @Failure 		400 {object} ErrorSwagger "Bad request - no file or wrong format"
 // @Failure 		404 {object} ErrorSwagger "Workspace not found"
 // @Failure 		500 {object} ErrorSwagger "Internal server error"
 func uploadAvatar(c *gin.Context) {
-	if _, err := os.Stat("./img/"); err != nil {
-		if os.IsNotExist(err) {
-			err = os.Mkdir("./img/", 0777)
-			if err != nil {
-				print("Failed to create img/")
-			}
-		} else {
-			print("Something went wrong when checking if img/ exists")
-		}
-	}
-	userId, _ := c.Get("id")
-	wId := c.Param("workspaceId")
-	workspaceId, _ := bson.ObjectIDFromHex(wId)
-	avatar, err := c.FormFile("img")
-	if err != nil {
-		fmt.Printf(fmt.Sprintf("%v", err))
-		c.AbortWithStatusJSON(400, gin.H{"error": "No file given"})
-		return
-	} else if filepath.Ext(avatar.Filename) != ".png" && filepath.Ext(avatar.Filename) != ".jpg" && filepath.Ext(avatar.Filename) != ".jpeg" {
-		c.AbortWithStatusJSON(400, gin.H{"error": "Wrong file format"})
-		return
-	}
-	filename := filepath.Join("img", "/"+fmt.Sprintf("%v", uuid.New()))
-	if err := c.SaveUploadedFile(avatar, filename); err != nil {
+	if err := os.MkdirAll("./img", 0755); err != nil {
+		fmt.Println("Failed to create img/ directory")
 		c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
 		return
 	}
-	if workspaceId.IsZero() {
-		user := User{}
-		if err := usersDb.FindOne(context.TODO(), bson.D{{"_id", userId}}).Decode(&user); err != nil {
-			c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
-			return
-		}
-		user.Avatar = filename
-		_, err = usersDb.ReplaceOne(context.TODO(), bson.D{{"_id", userId}}, user)
-		if err != nil {
-			c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
-			err = os.Remove("./img/" + filename)
-			if err != nil {
-				panic("Failed to remove avatar")
-			}
-		}
-		c.AbortWithStatus(200)
-	} else {
-		user := Workspace{}
-		if err := workspacesDb.FindOne(context.TODO(), bson.D{{"_id", workspaceId}}).Decode(&user); err != nil {
-			if errors.Is(err, mongo.ErrNoDocuments) {
-				c.AbortWithStatusJSON(404, gin.H{"error": "Workspace doesnt exist"})
-				return
-			} else {
-				c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
-				return
-			}
-		}
-		user.Avatar = filename
-		_, err = workspacesDb.ReplaceOne(context.TODO(), bson.D{{"_id", workspaceId}}, user)
-		if err != nil {
-			c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
-			err = os.Remove("./img/" + filename)
-			if err != nil {
-				panic("Failed to remove avatar")
-			}
-		}
-		c.AbortWithStatus(200)
+
+	avatar, err := c.FormFile("img")
+	if err != nil {
+		c.AbortWithStatusJSON(400, gin.H{"error": "No file given"})
+		return
 	}
 
+	ext := filepath.Ext(avatar.Filename)
+	if ext != ".png" && ext != ".jpg" && ext != ".jpeg" {
+		c.AbortWithStatusJSON(400, gin.H{"error": "Wrong file format"})
+		return
+	}
+
+	filename := fmt.Sprintf("%s%s", uuid.New().String(), ext)
+	fullPath := filepath.Join("img", filename)
+
+	if err := c.SaveUploadedFile(avatar, fullPath); err != nil {
+		c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
+		return
+	}
+
+	wId := c.Param("workspaceId")
+
+	if wId == "" { // User avatar
+		userId, _ := c.Get("id")
+		var user User
+		err := usersDb.FindOne(context.TODO(), bson.D{{"_id", userId}}).Decode(&user)
+		if err != nil {
+			c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
+			_ = os.Remove(fullPath) // Clean up uploaded file
+			return
+		}
+
+		_, err = usersDb.UpdateOne(
+			context.TODO(),
+			bson.D{{"_id", userId}},
+			bson.D{{"$set", bson.D{{"avatar", fullPath}}}},
+		)
+		if err != nil {
+			c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
+			_ = os.Remove(fullPath)
+			return
+		}
+	} else { // Workspace avatar
+		workspaceId, err := bson.ObjectIDFromHex(wId)
+		if err != nil {
+			c.AbortWithStatusJSON(400, gin.H{"error": "Invalid workspace ID"})
+			_ = os.Remove(fullPath) // Clean up uploaded file
+			return
+		}
+
+		var workspace Workspace
+		err = workspacesDb.FindOne(context.TODO(), bson.D{{"_id", workspaceId}}).Decode(&workspace)
+		if err != nil {
+			if errors.Is(err, mongo.ErrNoDocuments) {
+				c.AbortWithStatusJSON(404, gin.H{"error": "Workspace doesnt exist"})
+			} else {
+				c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
+			}
+			_ = os.Remove(fullPath)
+			return
+		}
+
+		_, err = workspacesDb.UpdateOne(
+			context.TODO(),
+			bson.D{{"_id", workspaceId}},
+			bson.D{{"$set", bson.D{{"avatar", fullPath}}}},
+		)
+		if err != nil {
+			c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
+			_ = os.Remove(fullPath)
+			return
+		}
+	}
+
+	c.JSON(200, gin.H{"avatar": fullPath})
 }
 
 // @Summary 		Refresh bearer token
@@ -299,18 +329,17 @@ func refreshAccessToken(c *gin.Context) {
 		}
 		return []byte(pepper), nil
 	})
-	if err != nil {
-		c.AbortWithStatusJSON(500, "Internal Server Error")
+	if err != nil || !token.Valid {
+		c.AbortWithStatusJSON(400, gin.H{"error": "Invalid or expired token"})
 		return
 	}
 	claims := token.Claims.(*Token)
-	if claims.ExpiresAt < time.Now().UTC().Unix() {
-		c.AbortWithStatusJSON(403, "Authorization Required")
+	if claims.Type != "refresh" {
+		c.AbortWithStatusJSON(400, gin.H{"error": "Invalid token type"})
 		return
-	} else if claims.Type == "access" {
-		c.AbortWithStatusJSON(400, "Invalid Token")
 	}
-	bearerToken, err := generateAccessToken(refreshToken, "access")
+
+	bearerToken, err := generateAccessToken(claims.Id.Hex(), "access")
 	if err != nil {
 		c.AbortWithStatusJSON(500, gin.H{"error": "Something went wrong when generating access token"})
 		return
