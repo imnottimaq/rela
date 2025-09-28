@@ -13,7 +13,7 @@
       <div v-if="error" class="error">{{ error }}</div>
 
       <section class="ws-info">
-        <p>ID: <code>{{ wsId }}</code></p>
+        <img v-if="avatarUrl" :src="avatarUrl" alt="Workspace Avatar" class="avatar" />
         <p>Name: <strong>{{ workspace?.name }}</strong></p>
       </section>
 
@@ -43,13 +43,8 @@
     <EditWorkspaceWindow
       :workspace="workspace"
       v-model:visible="editWorkspaceVisible"
-      @save="handleEditWorkspace"
-    />
-
-    <DeleteWorkspaceWindow
-      :workspace="workspace"
-      v-model:visible="deleteWorkspaceVisible"
-      @confirm="handleDeleteWorkspace"
+      @workspace-updated="handleWorkspaceUpdated"
+      @workspace-deleted="handleWorkspaceDeleted"
     />
   </WindowComponent>
 </template>
@@ -59,10 +54,8 @@ import { computed, onMounted, ref, watch } from 'vue';
 import WindowComponent from './WindowComponent.vue';
 import CreateBoardWindow from './CreateBoardWindow.vue';
 import EditWorkspaceWindow from './EditWorkspaceWindow.vue';
-import DeleteWorkspaceWindow from './DeleteWorkspaceWindow.vue';
-import { workspaceApi } from '../utils/http';
+import { API_BASE_URL, workspaceApi } from '../utils/http';
 import { openBoardWindow } from '../composables/useBoards';
-import { createWorkspaceInviteLink } from '../composables/useWorkspaces';
 
 const props = defineProps({
   workspace: { type: Object, required: true },
@@ -88,11 +81,17 @@ const loadingBoards = ref(false);
 const boardsError = ref('');
 const createBoardVisible = ref(false);
 const editWorkspaceVisible = ref(false);
-const deleteWorkspaceVisible = ref(false);
 const selectedBoardId = ref(null);
 
 const loading = ref(false);
 const error = ref('');
+
+const avatarUrl = computed(() => {
+  const avatar = props.workspace?.avatar;
+  if (!avatar) return null;
+  if (avatar.startsWith('http')) return avatar;
+  return `${API_BASE_URL || ''}/${avatar}`;
+});
 
 const loadBoards = async () => {
   if (!wsId.value) return;
@@ -140,37 +139,13 @@ const selectBoard = (board) => {
   openBoardWindow(props.workspace, board);
 };
 
-const handleEditWorkspace = async (newName) => {
-  loading.value = true;
-  error.value = '';
-  try {
-    await workspaceApi.updateWorkspace(wsId.value, { name: newName });
-    emit('workspace-updated', { id: wsId.value, name: newName });
-    editWorkspaceVisible.value = false;
-  } catch (e) {
-    console.error('Failed to update workspace', e);
-    error.value = 'Failed to update workspace name.';
-    window.alert(error.value); // Or use a more sophisticated notification
-  } finally {
-    loading.value = false;
-  }
+const handleWorkspaceUpdated = (updatedFields) => {
+  emit('workspace-updated', updatedFields);
 };
 
-const handleDeleteWorkspace = async () => {
-  loading.value = true;
-  error.value = '';
-  try {
-    await workspaceApi.deleteWorkspace(wsId.value);
-    deleteWorkspaceVisible.value = false;
-    emit('workspace-deleted', wsId.value);
-    close();
-  } catch (e) {
-    console.error('Failed to delete workspace', e);
-    error.value = 'Failed to delete workspace.';
-    window.alert(error.value); // Or use a more sophisticated notification
-  } finally {
-    loading.value = false;
-  }
+const handleWorkspaceDeleted = (deletedId) => {
+  emit('workspace-deleted', deletedId);
+  close();
 };
 
 const windowMenu = computed(() => {
@@ -194,27 +169,16 @@ const windowMenu = computed(() => {
     );
   }
 
-  const workspaceItems = [
+  const manageItems = [
     {
-      label: 'Edit Name',
+      label: 'Edit Workspace...',
+      type: 'button',
       onClick: () => (editWorkspaceVisible.value = true),
-      type: 'button',
-    },
-    { type: 'separator' },
-    {
-      label: 'Delete Workspace',
-      onClick: () => (deleteWorkspaceVisible.value = true),
-      type: 'button',
-    },
-    {
-      label: 'Create and Copy Invite Link',
-      onClick: () => createWorkspaceInviteLink(wsId.value),
-      type: 'button',
     },
   ];
 
   return [
-    { label: 'Workspace', items: workspaceItems },
+    { label: 'Manage', items: manageItems },
     { label: 'Boards', items: boardItems },
   ];
 });
@@ -222,7 +186,9 @@ const windowMenu = computed(() => {
 
 <style scoped>
 .content { text-align: left; padding: 0 12px 12px; }
-.ws-info { margin-bottom: 10px; }
+.ws-info { display: flex; align-items: center; margin-bottom: 10px; }
+.avatar { width: 50px; height: 50px; border-radius: 50%; margin-right: 10px; vertical-align: middle; }
+.ws-info > p { flex-grow: 1; }
 .boards { margin-top: 10px; }
 .boards-header { display: flex; align-items: center; justify-content: space-between; }
 .board-list { list-style: none; padding: 0; margin: 8px 0 0; }

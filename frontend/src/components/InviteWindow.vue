@@ -15,15 +15,15 @@
         <p class="error">{{ error }}</p>
       </template>
       <template v-else-if="!isAuthenticated">
-        <p>You need to be logged in to accept this invite.</p>
-        <p>Please log in or create an account.</p>
+        <p>You've been invited to join a workspace.</p>
+        <p>Please log in or create an account to see the details and join.</p>
       </template>
       <template v-else-if="workspace">
         <div class="workspace-info">
           <img v-if="workspace.avatar" :src="workspace.avatar" alt="Workspace Avatar" class="avatar-image" />
           <div v-else class="avatar-placeholder"></div>
           <div class="details">
-            <p>You have been invited to join:</p>
+            <p>You're about to join this workspace:</p>
             <h3>{{ workspace.name }}</h3>
           </div>
         </div>
@@ -113,9 +113,14 @@ watch(() => props.joinToken, (newToken) => {
   }
 });
 
+watch(internalVisible, (isVisible, wasVisible) => {
+  if (!isVisible && wasVisible) {
+    resetComponentState(true);
+  }
+});
+
 watch(() => [internalVisible.value, isAuthenticated.value, internalJoinToken.value], ([visible, isAuth, token]) => {
   if (!visible) {
-    resetComponentState(true);
     return;
   }
 
@@ -162,15 +167,16 @@ const footerButtons = computed(() => {
   if (!isAuthenticated.value) {
     return [
       { label: 'Cancel', onClick: handleCancel },
-      { label: 'Login', onClick: handleLogin, primary: true },
+      { label: 'Login to Join', onClick: handleLogin, primary: true },
     ];
   }
   if (workspace.value) {
     return [
-      { label: 'Decline', onClick: handleCancel },
-      { label: 'Join Workspace', onClick: handleJoin, primary: true, loading: loading.value, disabled: loading.value },
+      { label: 'Cancel', onClick: handleCancel },
+      { label: 'Join', onClick: handleJoin, primary: true, loading: loading.value, disabled: loading.value },
     ];
   }
+  if (loading.value) return [];
   return [{ label: 'Close', onClick: handleCancel }];
 });
 

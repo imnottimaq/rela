@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, "");
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, "");
 const ACCESS_TOKEN_KEY = "rela.access_token";
 const REFRESH_TOKEN_KEY = "rela.refresh_token";
 const DEFAULT_REFRESH_PATH = "/users/refresh";
@@ -259,6 +259,9 @@ export const workspaceApi = {
   acceptInvite(joinToken) {
     return apiClient.post(`/workspaces/invite/accept/${joinToken}`);
   },
+  uploadAvatar(workspaceId,formData) {
+    return apiClient.post("/workspaces/${workspaceId}/upload_avatar", formData);
+  }
 };
 
 export const rawApiClient = apiClient;
