@@ -136,7 +136,7 @@ const onDrop = async (ev) => {
   if (String(workspaceId) !== String(workspaceIdRef.value)) return;
   if (String(fromBoardId) === String(targetBoardId)) return;
   try {
-    await workspaceApi.updateTask(taskId, { board: targetBoardId });
+    await workspaceApi.updateTask(workspaceId, taskId, { board: targetBoardId });
     // Notify all BoardWindow instances to update their local task lists
     if (typeof window !== 'undefined') {
       try {
@@ -200,7 +200,7 @@ const windowMenu = computed(() => {
           onClick: fetchTasks,
           divider: tasks.value.length > 0,
         },
-        ...(tasks.value.length > 0 ? taskItems : [{ label: 'No tasks yet', disabled: true }]),
+        ...(tasks.value.length > 0 ? taskItems : []),
       ],
     },
   ];
