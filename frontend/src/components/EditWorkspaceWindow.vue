@@ -1,6 +1,7 @@
 <template>
   <WindowComponent
     title="Edit Workspace"
+    :buttons="[{ label: 'Close', onClick: handleCancel }]"
     v-model:visible="modelVisible"
     :initial-size="{ width: 400, height: 450 }"
     :footer-buttons="footerButtons"

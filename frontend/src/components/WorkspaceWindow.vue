@@ -13,8 +13,8 @@
       <div v-if="error" class="error">{{ error }}</div>
 
       <section class="ws-info">
-        <img v-if="avatarUrl" :src="avatarUrl" alt="Workspace Avatar" class="avatar" />
-        <p>Name: <strong>{{ workspace?.name }}</strong></p>
+        <img :src="avatarUrl" alt="Workspace Avatar" class="avatar" />
+        <p><strong>{{ workspace?.name }}</strong></p>
       </section>
 
       <section class="boards">
@@ -85,12 +85,13 @@ const selectedBoardId = ref(null);
 
 const loading = ref(false);
 const error = ref('');
+const detailedWorkspace = ref({});
 
 const avatarUrl = computed(() => {
-  const avatar = props.workspace?.avatar;
-  if (!avatar) return null;
-  if (avatar.startsWith('http')) return avatar;
-  return `${API_BASE_URL || ''}/${avatar}`;
+  if (detailedWorkspace.value?.avatar) {
+    return `${API_BASE_URL}/${detailedWorkspace.value.avatar}`;
+  }
+  return 'https://via.placeholder.com/128';
 });
 
 const loadBoards = async () => {
@@ -106,6 +107,22 @@ const loadBoards = async () => {
     boardsError.value = 'Failed to load boards';
   } finally {
     loadingBoards.value = false;
+  }
+};
+
+const loadWorkspaceDetails = async () => {
+  if (!wsId.value) return;
+  loading.value = true;
+  error.value = '';
+  try {
+    const { data } = await workspaceApi.getWorkspaceInfo(wsId.value);
+    detailedWorkspace.value = data;
+  } catch (e) {
+    console.error('Failed to fetch workspace info', e);
+    error.value = 'Failed to load workspace details.';
+    detailedWorkspace.value = {};
+  } finally {
+    loading.value = false;
   }
 };
 
@@ -129,9 +146,13 @@ const handleBoardCreated = async (board) => {
 
 onMounted(() => {
   loadBoards();
+  loadWorkspaceDetails();
 });
 
-watch(() => wsId.value, () => loadBoards());
+watch(() => wsId.value, () => {
+  loadBoards();
+  loadWorkspaceDetails();
+});
 
 const selectBoard = (board) => {
   const id = board?._id || board?.id || board?.name;
@@ -141,6 +162,7 @@ const selectBoard = (board) => {
 
 const handleWorkspaceUpdated = (updatedFields) => {
   emit('workspace-updated', updatedFields);
+  loadWorkspaceDetails();
 };
 
 const handleWorkspaceDeleted = (deletedId) => {
@@ -187,11 +209,18 @@ const windowMenu = computed(() => {
 <style scoped>
 .content { text-align: left; padding: 0 12px 12px; }
 .ws-info { display: flex; align-items: center; margin-bottom: 10px; }
-.avatar { width: 50px; height: 50px; border-radius: 50%; margin-right: 10px; vertical-align: middle; }
+.avatar { width: 50px; height: 50px; border-radius: 4px; margin-right: 10px; vertical-align: middle; }
 .ws-info > p { flex-grow: 1; }
 .boards { margin-top: 10px; }
 .boards-header { display: flex; align-items: center; justify-content: space-between; }
-.board-list { list-style: none; padding: 0; margin: 8px 0 0; }
+.board-list {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
 .board-name { font-weight: 500; }
 .error { color: #c00; }
 .hint { color: #555; font-style: italic; }

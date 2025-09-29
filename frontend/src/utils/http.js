@@ -207,10 +207,10 @@ export const workspaceApi = {
     return apiClient.post("/workspaces/create", payload);
   },
   deleteWorkspace(workspaceId) {
-    return apiClient.delete(`/workspaces/${workspaceId}`);
+    return apiClient.delete(`/workspaces/${workspaceId}/`);
   },
   updateWorkspace(workspaceId, payload) {
-    return apiClient.patch(`/workspaces/${workspaceId}`, payload);
+    return apiClient.patch(`/workspaces/${workspaceId}/`, payload);
   },
   getWorkspaceInfo(workspaceId) {
     return apiClient.get(`/workspaces/${workspaceId}/info`);

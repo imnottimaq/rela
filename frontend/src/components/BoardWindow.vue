@@ -34,6 +34,7 @@
                 <div class="task-title">{{ task.name || task.title || 'Unnamed Task' }}</div>
                 <div v-if="task.description" class="task-desc">{{ task.description }}</div>
               </td>
+              <td class="task-actions"></td>
             </tr>
           </tbody>
         </table>
@@ -54,11 +55,13 @@
       <div v-else class="no-tasks">No tasks found for this board.</div>
     </div>
 
-    <CreateTaskWindow
-      :workspace-id="workspaceId"
-      :board-id="boardId"
-      v-model:visible="createTaskVisible"
-      @created="handleTaskCreated"
+    <EditTaskWindow
+        :workspace-id="workspaceId"
+        :board-id="boardId"
+        v-model:visible="taskWindowVisible"
+        :task="taskToEdit"
+        @created="handleTaskCreated"
+        @updated="handleTaskUpdated"
     />
   </WindowComponent>
 </template>
@@ -66,7 +69,7 @@
 <script setup>
 import { computed, ref, reactive, onMounted, onUnmounted } from 'vue';
 import WindowComponent from './WindowComponent.vue';
-import CreateTaskWindow from './CreateTaskWindow.vue';
+import EditTaskWindow from './EditTaskWindow.vue';
 import { useBoardTasks } from '../composables/useBoards';
 import { workspaceApi } from '../utils/http';
 
@@ -85,7 +88,8 @@ const modelVisible = computed({
 });
 
 const localBoard = ref({ ...(props.board || {}) });
-const createTaskVisible = ref(false);
+const taskWindowVisible = ref(false);
+const taskToEdit = ref(null);
 
 const boardId = computed(() => localBoard.value?._id || localBoard.value?.id || localBoard.value?.Id || localBoard.value?.name);
 const boardName = computed(() => localBoard.value?.name || String(boardId.value));
@@ -117,9 +121,15 @@ const hideContextMenu = () => {
   contextMenu.visible = false;
 };
 
+const openCreateTaskWindow = () => {
+  taskToEdit.value = null;
+  taskWindowVisible.value = true;
+};
+
 const editTask = (task) => {
   if (!task) return;
-  alert(`Editing task: ${task.name || 'Unnamed Task'}`);
+  taskToEdit.value = task;
+  taskWindowVisible.value = true;
   hideContextMenu();
 };
 
@@ -142,10 +152,13 @@ const handleTaskCreated = (newTask) => {
   if (newTask) {
     tasks.value.unshift(newTask);
   }
-  // In case this was the first task
   if (isNotFound.value) {
     isNotFound.value = false;
   }
+};
+
+const handleTaskUpdated = () => {
+  fetchTasks();
 };
 
 const getTaskId = (task) => task?._id || task?.id || task?.Id;
@@ -158,7 +171,6 @@ const onDragStart = (task, ev) => {
       workspaceId: workspaceIdRef.value,
     };
     ev.dataTransfer?.setData('application/x-rela-task', JSON.stringify(payload));
-    // Fallback for some UAs
     ev.dataTransfer?.setData('text/plain', JSON.stringify(payload));
     if (ev.dataTransfer) ev.dataTransfer.effectAllowed = 'move';
   } catch (_) {}
@@ -189,13 +201,11 @@ const onDrop = async (ev) => {
   if (String(fromBoardId) === String(targetBoardId)) return;
   try {
     await workspaceApi.updateTask(workspaceId, taskId, { board: targetBoardId });
-    // Notify all BoardWindow instances to update their local task lists
     if (typeof window !== 'undefined') {
       try {
         window.dispatchEvent(new CustomEvent('rela:task-moved', { detail: { taskId, fromBoardId, toBoardId: targetBoardId, workspaceId } }));
       } catch (_) {}
     }
-    // Refresh our list as target window
     fetchTasks();
   } catch (err) {
     console.error('Failed to move task to another board', err);
@@ -206,11 +216,9 @@ const onTaskMoved = (e) => {
   try {
     const d = e?.detail || {};
     if (String(d.workspaceId) !== String(workspaceIdRef.value)) return;
-    // If this window is the source board, remove the task optimistically
     if (String(d.fromBoardId) === String(boardId.value)) {
       tasks.value = (tasks.value || []).filter((t) => String(getTaskId(t)) !== String(d.taskId));
     }
-    // If this window is the destination board, ensure list is in sync
     if (String(d.toBoardId) === String(boardId.value)) {
       fetchTasks();
     }
@@ -236,7 +244,6 @@ const windowMenu = computed(() => {
   const taskItems = (tasks.value || []).map(task => ({
     type: 'button',
     label: task.name || task.title || 'Unnamed Task',
-    // placeholder onClick
     onClick: () => alert(`Selected task: ${task.name || task.title || 'Unnamed Task'}`),
   }));
 
@@ -247,7 +254,7 @@ const windowMenu = computed(() => {
         {
           type: 'button',
           label: 'New Task',
-          onClick: () => { createTaskVisible.value = true; },
+          onClick: openCreateTaskWindow,
         },
         {
           type: 'button',
@@ -284,19 +291,6 @@ const windowMenu = computed(() => {
 .error {
   color: #d9534f;
 }
-/*
-.table-wrap { overflow: auto; }
-
-.task-table thead th {
-  text-align: left;
-  background: #f1f1f1;
-  border-bottom: 1px solid #ddd;
-  padding: 8px;
-  font-weight: 600;
-}
-.task-table tbody td { padding: 10px 8px; border-bottom: 1px solid #eee; }
-.task-row:hover td { background: #fafafa; }
-*/
 .task-table { width: 100%; border-collapse: collapse; }
 .task-title { font-weight: 600; color: #222; }
 .task-desc { font-size: 12px; color: #666; margin-top: 2px; }

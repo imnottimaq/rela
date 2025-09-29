@@ -79,6 +79,7 @@ const initialPosition = computed(() => {
 .user-info {
   display: flex;
   align-items: center;
+  justify-content: center;
   padding: 10px;
 }
 
