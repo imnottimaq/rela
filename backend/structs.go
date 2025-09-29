@@ -83,11 +83,17 @@ type CreateBoard struct {
 }
 
 type Workspace struct {
-	Id      bson.ObjectID   `bson:"_id,omitempty" json:"_id"`
-	Avatar  string          `json:"avatar" bson:"avatar"`
-	Name    string          `json:"name"`
-	OwnedBy bson.ObjectID   `bson:"owned_by" json:"owned_by"`
-	Members []bson.ObjectID `bson:"members" json:"members"`
+	Id      bson.ObjectID     `bson:"_id,omitempty" json:"_id"`
+	Avatar  string            `json:"avatar" bson:"avatar"`
+	Name    string            `json:"name"`
+	OwnedBy bson.ObjectID     `bson:"owned_by" json:"owned_by"`
+	Members []bson.ObjectID   `bson:"members" json:"members"`
+	Tokens  []WorkspaceTokens `json:"tokens" bson:"tokens"`
+}
+type WorkspaceTokens struct {
+	Sqid  string `json:"sqid" bson:"sqid"`
+	Token string `json:"token" bson:"token"`
+	Uses  uint8  `json:"uses" bson:"uses"`
 }
 
 type CreateWorkspace struct {

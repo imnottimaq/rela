@@ -66,7 +66,7 @@ const { copy } = useClipboard()
 export const createWorkspaceInviteLink = async (workspaceId) => {
   if (!workspaceId) return;
   const {data} = await workspaceApi.getInvite(workspaceId)
-  const token = data?.token;
+  const token = data?.sqid;
   const invite_url = import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, "") + "/workspaces/add/" + token;
   copy(invite_url)
 }

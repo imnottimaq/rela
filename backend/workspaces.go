@@ -4,14 +4,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"slices"
-	"time"
-
 	"github.com/gin-gonic/gin"
 	"github.com/goccy/go-json"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/sqids/sqids-go"
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
+	"math/rand"
+	"slices"
+	"time"
 )
 
 // @Summary 		Create a new workspace
@@ -248,6 +249,7 @@ func addMember(c *gin.Context) {
 // @Failure 		403 {object} ErrorSwagger "Forbidden - you are not the owner of this workspace"
 // @Failure 		404 {object} ErrorSwagger "Not Found - workspace not found"
 func createNewInvite(c *gin.Context) {
+	s, _ := sqids.New()
 	userId, _ := c.Get("id")
 	workspaceIdStr := c.Param("workspaceId")
 	if workspaceIdStr == "" {
@@ -273,7 +275,18 @@ func createNewInvite(c *gin.Context) {
 	}
 	newToken := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	inviteToken, _ := newToken.SignedString([]byte(pepper))
-	c.JSON(200, gin.H{"token": inviteToken})
+	noise := rand.Uint64()
+	sqid, _ := s.Encode([]uint64{noise})
+	workspace.Tokens = append(workspace.Tokens, WorkspaceTokens{
+		Sqid:  sqid,
+		Token: inviteToken,
+		Uses:  3,
+	})
+	if _, err := workspacesDb.ReplaceOne(context.TODO(), bson.D{{"_id", workspace.Id}}, workspace); err != nil {
+		c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
+		return
+	}
+	c.JSON(200, gin.H{"sqid": sqid})
 }
 
 // @Summary 		Get workspace details from invite token
@@ -287,8 +300,27 @@ func createNewInvite(c *gin.Context) {
 // @Failure 		404 {object} ErrorSwagger "Not Found - workspace not found"
 // @Failure 		500 {object} ErrorSwagger "Internal server error"
 func getWorkspaceByInviteToken(c *gin.Context) {
-	joinTokenStr := c.Param("joinToken")
-
+	sqid := c.Param("joinToken")
+	joinTokenStr := ""
+	workspace := Workspace{}
+	if err := workspacesDb.FindOne(context.TODO(), bson.D{{"tokens.sqid", sqid}}).Decode(&workspace); err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			c.AbortWithStatusJSON(404, gin.H{"error": "Not Found"})
+			return
+		} else if err != nil {
+			c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
+			return
+		}
+	}
+	for i := range workspace.Tokens {
+		if workspace.Tokens[i].Sqid == sqid {
+			joinTokenStr = workspace.Tokens[i].Token
+		}
+	}
+	if joinTokenStr == "" {
+		c.AbortWithStatusJSON(404, gin.H{"error": "Invite does not exist"})
+		return
+	}
 	// 1. Parse and validate the JWT
 	token, err := jwt.ParseWithClaims(joinTokenStr, &Token{}, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
@@ -316,17 +348,18 @@ func getWorkspaceByInviteToken(c *gin.Context) {
 	}
 
 	// 5. Fetch workspace from DB
-	var workspace Workspace
-	if err := workspacesDb.FindOne(context.TODO(), bson.D{{"_id", claims.Id}}).Decode(&workspace); err != nil {
-		if errors.Is(err, mongo.ErrNoDocuments) {
-			c.AbortWithStatusJSON(404, gin.H{"error": "Workspace does not exist"})
-		} else {
-			c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
-		}
-		return
-	}
+	//var workspace Workspace
+	//if err := workspacesDb.FindOne(context.TODO(), bson.D{{"_id", claims.Id}}).Decode(&workspace); err != nil {
+	//	if errors.Is(err, mongo.ErrNoDocuments) {
+	//		c.AbortWithStatusJSON(404, gin.H{"error": "Workspace does not exist"})
+	//	} else {
+	//		c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
+	//	}
+	//	return
+	//}
 
 	// 6. Return workspace details
+	workspace.Tokens = nil
 	c.JSON(200, workspace)
 }
 
@@ -597,8 +630,6 @@ func assignTask(c *gin.Context) {
 		return
 	}
 
-	// Allow assignment if the current user is the workspace owner or the user being assigned the task.
-	// A more robust implementation might check if the assigned user is a member of the workspace.
 	if input.UserId == currentUserId.(bson.ObjectID) || workspace.OwnedBy == currentUserId.(bson.ObjectID) {
 		var task Task
 		if err := tasksDb.FindOne(context.TODO(), bson.D{{"_id", input.TaskId}}).Decode(&task); err != nil {
