@@ -14,7 +14,7 @@
 
       <section class="ws-info">
         <img :src="avatarUrl" alt="Workspace Avatar" class="avatar" />
-        <p><strong>{{ workspace?.name }}</strong></p>
+        <p><strong>{{ detailedWorkspace.name || workspace?.name }}</strong></p>
       </section>
 
       <section class="boards">
@@ -33,36 +33,24 @@
         </ul>
       </section>
     </div>
-
-    <CreateBoardWindow
-      :workspace-id="wsId"
-      v-model:visible="createBoardVisible"
-      @created="handleBoardCreated"
-    />
-
-    <EditWorkspaceWindow
-      :workspace="workspace"
-      v-model:visible="editWorkspaceVisible"
-      @workspace-updated="handleWorkspaceUpdated"
-      @workspace-deleted="handleWorkspaceDeleted"
-    />
   </WindowComponent>
 </template>
 
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue';
-import WindowComponent from './WindowComponent.vue';
-import CreateBoardWindow from './CreateBoardWindow.vue';
-import EditWorkspaceWindow from './EditWorkspaceWindow.vue';
+import { computed, onMounted, onUnmounted, ref } from 'vue';
+import WindowComponent from './common/WindowComponent.vue';
 import { API_BASE_URL, workspaceApi } from '../utils/http';
 import { openBoardWindow } from '../composables/useBoards';
+import { showCreateBoardWindow } from '../composables/useCreateBoardWindow.js';
+import { showEditWorkspaceWindow } from '../composables/useEditWorkspaceWindow.js';
+import defaultAvatar from '/default-workspace.ico';
 
 const props = defineProps({
   workspace: { type: Object, required: true },
   visible: { type: Boolean, default: true },
 });
 
-const emit = defineEmits(['update:visible', 'close', 'workspace-updated', 'workspace-deleted']);
+const emit = defineEmits(['update:visible', 'close', 'workspace-deleted']);
 
 const modelVisible = computed({
   get: () => props.visible,
@@ -79,19 +67,16 @@ const wsId = computed(() => props.workspace?._id || props.workspace?.id || props
 const boards = ref([]);
 const loadingBoards = ref(false);
 const boardsError = ref('');
-const createBoardVisible = ref(false);
-const editWorkspaceVisible = ref(false);
-const selectedBoardId = ref(null);
 
 const loading = ref(false);
 const error = ref('');
 const detailedWorkspace = ref({});
 
 const avatarUrl = computed(() => {
-  if (detailedWorkspace.value?.avatar) {
-    return `${API_BASE_URL}/${detailedWorkspace.value.avatar}`;
-  }
-  return 'https://via.placeholder.com/128';
+  const avatar = detailedWorkspace.value?.avatar || props.workspace?.avatar;
+  if (!avatar) return defaultAvatar;
+  if (avatar.startsWith('http')) return avatar;
+  return `${API_BASE_URL || ''}/${avatar}`;
 });
 
 const loadBoards = async () => {
@@ -126,7 +111,8 @@ const loadWorkspaceDetails = async () => {
   }
 };
 
-const handleBoardCreated = async (board) => {
+const handleBoardCreated = async (event) => {
+  const board = event.detail.board;
   await loadBoards();
   if (!board) return;
 
@@ -144,30 +130,36 @@ const handleBoardCreated = async (board) => {
   }
 };
 
+const handleWorkspaceUpdated = (event) => {
+  const updatedWorkspace = event.detail.workspace;
+  const updatedId = updatedWorkspace.id || updatedWorkspace._id;
+  if (updatedId === wsId.value) {
+    detailedWorkspace.value = updatedWorkspace;
+  }
+};
+
+const handleWorkspaceDeleted = (event) => {
+  if (event.detail.workspaceId === wsId.value) {
+    close();
+  }
+};
+
 onMounted(() => {
   loadBoards();
   loadWorkspaceDetails();
+  window.addEventListener('rela:board-created', handleBoardCreated);
+  window.addEventListener('rela:workspace-updated', handleWorkspaceUpdated);
+  window.addEventListener('rela:workspace-deleted', handleWorkspaceDeleted);
 });
 
-watch(() => wsId.value, () => {
-  loadBoards();
-  loadWorkspaceDetails();
+onUnmounted(() => {
+  window.removeEventListener('rela:board-created', handleBoardCreated);
+  window.removeEventListener('rela:workspace-updated', handleWorkspaceUpdated);
+  window.removeEventListener('rela:workspace-deleted', handleWorkspaceDeleted);
 });
 
 const selectBoard = (board) => {
-  const id = board?._id || board?.id || board?.name;
-  selectedBoardId.value = id ?? null;
   openBoardWindow(props.workspace, board);
-};
-
-const handleWorkspaceUpdated = (updatedFields) => {
-  emit('workspace-updated', updatedFields);
-  loadWorkspaceDetails();
-};
-
-const handleWorkspaceDeleted = (deletedId) => {
-  emit('workspace-deleted', deletedId);
-  close();
 };
 
 const windowMenu = computed(() => {
@@ -176,7 +168,7 @@ const windowMenu = computed(() => {
     {
       type: 'button',
       label: 'Create board',
-      onClick: () => (createBoardVisible.value = true),
+      onClick: () => showCreateBoardWindow(wsId.value),
     },
   ];
 
@@ -195,7 +187,7 @@ const windowMenu = computed(() => {
     {
       label: 'Edit Workspace...',
       type: 'button',
-      onClick: () => (editWorkspaceVisible.value = true),
+      onClick: () => showEditWorkspaceWindow(detailedWorkspace.value),
     },
   ];
 

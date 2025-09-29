@@ -16,7 +16,7 @@
     </WindowComponent>
 </template>
 <script setup>
-import WindowComponent from './WindowComponent.vue';
+import WindowComponent from './common/WindowComponent.vue';
 import { showLoginWindow } from '../composables/useLoginWindow';
 import { showRegisterWindow } from '../composables/useRegisterWindow';
 import { showProfileWindow } from '../composables/useProfileWindow';

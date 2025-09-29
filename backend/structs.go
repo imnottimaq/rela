@@ -12,7 +12,6 @@ type Task struct {
 	CreatedAt   int64         `json:"created_at" bson:"created_at"`
 	CreatedBy   bson.ObjectID `json:"created_by" bson:"created_by"`
 	Board       bson.ObjectID `json:"board" bson:"board"`
-	AssignedTo  bson.ObjectID `json:"assigned_to" bson:"assigned_to,omitempty"`
 	Deadline    int64         `json:"deadline" bson:"deadline"`
 }
 

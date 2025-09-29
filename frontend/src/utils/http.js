@@ -242,9 +242,6 @@ export const workspaceApi = {
   deleteTask(workspaceId, taskId) {
     return apiClient.delete(`/workspaces/${workspaceId}/tasks/${taskId}`);
   },
-  assignTask(workspaceId, payload) {
-    return apiClient.post(`/workspaces/${workspaceId}/assign`, payload);
-  },
   kickMember(workspaceId, memberId) {
     return apiClient.delete(`/workspaces/${workspaceId}/kick`, {
       data: { userId: memberId },

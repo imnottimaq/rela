@@ -1,6 +1,6 @@
 <script setup lang="ts">
 
-import WindowComponent from "./WindowComponent.vue";
+import WindowComponent from "./common/WindowComponent.vue";
 import { useForgotPasswordWindow } from '../composables/useForgotPasswordWindow';
 
 const { forgotPasswordVisible, hideForgotPasswordWindow } = useForgotPasswordWindow();

@@ -8,6 +8,7 @@ import (
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
 	"slices"
+	"sync"
 )
 
 // @Summary 		Create a new board
@@ -88,8 +89,25 @@ func deleteBoard(c *gin.Context) {
 	workspaceId, _ := bson.ObjectIDFromHex(wId)
 
 	var board Board
-	if err := boardsDb.FindOne(context.TODO(), bson.M{"_id": boardId}).Decode(&board); err != nil {
-		if errors.Is(err, mongo.ErrNoDocuments) {
+	var workspace Workspace
+	var wg sync.WaitGroup
+	wg.Add(2)
+	var boardErr, workspaceErr error
+
+	go func() {
+		defer wg.Done()
+		boardErr = boardsDb.FindOne(context.TODO(), bson.M{"_id": boardId}).Decode(&board)
+	}()
+
+	go func() {
+		defer wg.Done()
+		workspaceErr = workspacesDb.FindOne(context.TODO(), bson.M{"_id": workspaceId}).Decode(&workspace)
+	}()
+
+	wg.Wait()
+
+	if boardErr != nil {
+		if errors.Is(boardErr, mongo.ErrNoDocuments) {
 			c.AbortWithStatusJSON(404, gin.H{"error": "Board does not exist"})
 		} else {
 			c.AbortWithStatusJSON(500, gin.H{"error": "Failed to retrieve board"})
@@ -97,10 +115,8 @@ func deleteBoard(c *gin.Context) {
 		return
 	}
 
-	// Authorization
-	var workspace Workspace
-	if err := workspacesDb.FindOne(context.TODO(), bson.M{"_id": workspaceId}).Decode(&workspace); err != nil {
-		if errors.Is(err, mongo.ErrNoDocuments) {
+	if workspaceErr != nil {
+		if errors.Is(workspaceErr, mongo.ErrNoDocuments) {
 			c.AbortWithStatusJSON(404, gin.H{"error": "Workspace not found"})
 		} else {
 			c.AbortWithStatusJSON(500, gin.H{"error": "Internal server error"})
@@ -118,12 +134,23 @@ func deleteBoard(c *gin.Context) {
 		return
 	}
 
-	if _, err := boardsDb.DeleteOne(context.TODO(), bson.D{{"_id", boardId}}); err != nil {
+	wg.Add(2)
+	var boardDeleteErr, tasksDeleteErr error
+	go func() {
+		defer wg.Done()
+		_, boardDeleteErr = boardsDb.DeleteOne(context.TODO(), bson.D{{"_id", boardId}})
+	}()
+	go func() {
+		defer wg.Done()
+		_, tasksDeleteErr = tasksDb.DeleteMany(context.TODO(), bson.D{{"board", boardId}})
+	}()
+	wg.Wait()
+
+	if boardDeleteErr != nil {
 		c.AbortWithStatusJSON(500, gin.H{"error": "Failed to remove board"})
 		return
 	}
-	// Also delete all tasks on this board
-	if _, err := tasksDb.DeleteMany(context.TODO(), bson.D{{"board", boardId}}); err != nil {
+	if tasksDeleteErr != nil {
 		c.AbortWithStatusJSON(500, gin.H{"error": "Failed to remove tasks on board"})
 		return
 	}

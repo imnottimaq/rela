@@ -1,8 +1,9 @@
 <script setup>
-import WindowComponent from "./WindowComponent.vue";
+import WindowComponent from "./common/WindowComponent.vue";
 import { useAuth } from "../composables/useAuth.js";
 import { authApi } from "../utils/http.js";
 import { computed, ref, watch } from "vue";
+import defaultAvatar from '/default-avatar.jpg';
 
 const { isAuthenticated } = useAuth();
 const profile = ref(null);
@@ -14,6 +15,9 @@ const getUserInfo = async () => {
     const userProfile = response?.data || null;
     if (userProfile && userProfile.avatar) {
       userProfile.avatar = `${API_BASE_URL}/${userProfile.avatar}`;
+    }
+    if (!userProfile.avatar){
+      userProfile.avatar = defaultAvatar;
     }
     profile.value = userProfile;
   } catch (error) {

@@ -2,9 +2,10 @@
   <WindowComponent
     title="Edit Workspace"
     :buttons="[{ label: 'Close', onClick: handleCancel }]"
-    v-model:visible="modelVisible"
+    v-model:visible="editWorkspaceVisible"
     :initial-size="{ width: 400, height: 450 }"
     :footer-buttons="footerButtons"
+    :storage-key="`rela-window-edit-workspace-${wsId}`"
   >
     <section class="tabs">
       <menu role="tablist" aria-label="Workspace Edit Tabs">
@@ -82,24 +83,16 @@
 
 <script setup>
 import { ref, computed, watch, nextTick } from 'vue';
-import WindowComponent from './WindowComponent.vue';
+import WindowComponent from './common/WindowComponent.vue';
 import { workspaceApi } from '../utils/http';
 import { createWorkspaceInviteLink } from '../composables/useWorkspaces';
+import { useEditWorkspaceWindow } from '../composables/useEditWorkspaceWindow.js';
+import defaultAvatar from '/default-workspace.ico';
 
-const props = defineProps({
-  workspace: { type: Object, required: true },
-  visible: { type: Boolean, default: false },
-});
-
-const emit = defineEmits(['update:visible', 'workspace-updated', 'workspace-deleted']);
-
-const modelVisible = computed({
-  get: () => props.visible,
-  set: (v) => emit('update:visible', v),
-});
+const { editWorkspaceVisible, editingWorkspace, hideEditWorkspaceWindow } = useEditWorkspaceWindow();
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, "");
-const wsId = computed(() => props.workspace?._id || props.workspace?.id);
+const wsId = computed(() => editingWorkspace.value?._id || editingWorkspace.value?.id);
 
 const detailedWorkspace = ref({});
 const activeTab = ref('general');
@@ -122,28 +115,17 @@ const avatarSrc = computed(() => {
   if (workspaceAvatar.value) {
     return `${API_BASE_URL}/${workspaceAvatar.value}`;
   }
-  return 'https://via.placeholder.com/128';
+  return defaultAvatar;
 });
 
-watch(() => props.visible, async (isVisible) => {
-  if (isVisible && wsId.value) {
+watch(editingWorkspace, (workspace) => {
+  if (workspace) {
     activeTab.value = 'general';
     newAvatarFile.value = null;
     avatarPreviewUrl.value = null;
     error.value = '';
-
-    loading.value = true;
-    try {
-      const { data } = await workspaceApi.getWorkspaceInfo(wsId.value);
-      detailedWorkspace.value = data;
-      newName.value = data.name;
-    } catch (e) {
-      console.error('Failed to fetch workspace info', e);
-      error.value = 'Failed to load workspace details.';
-      detailedWorkspace.value = {};
-    } finally {
-      loading.value = false;
-    }
+    detailedWorkspace.value = workspace;
+    newName.value = workspace.name;
 
     nextTick(() => {
       if (activeTab.value === 'general' && nameInput.value) {
@@ -175,26 +157,29 @@ const handleFileChange = (event) => {
 
 const getMemberAvatar = (member) => {
   if (member.avatar) {
-    console.log(`${API_BASE_URL}/${member.avatar}`);
     return `${API_BASE_URL}/${member.avatar}`;
   }
-  return 'https://via.placeholder.com/40';
+  return defaultAvatar;
 };
 
-const handlePromote = (memberId) => {
-  console.log('Promoting member:', memberId, 'in workspace', wsId.value);
-  try{
-    workspaceApi.promoteMember(wsId.value, memberId);
-  } catch (error){
+const handlePromote = async (memberId) => {
+  try {
+    await workspaceApi.promoteMember(wsId.value, memberId);
+    // Refresh members list
+    const { data } = await workspaceApi.getWorkspaceInfo(wsId.value);
+    detailedWorkspace.value = data;
+  } catch (error) {
     console.error('Failed to promote member', error);
   }
 };
 
-const handleKick = (memberId) => {
-  console.log('Kicking member:', memberId, 'in workspace', wsId.value);
-  try{
-    workspaceApi.kickMember(wsId.value, memberId)
-  }catch (error){
+const handleKick = async (memberId) => {
+  try {
+    await workspaceApi.kickMember(wsId.value, memberId);
+    // Refresh members list
+    const { data } = await workspaceApi.getWorkspaceInfo(wsId.value);
+    detailedWorkspace.value = data;
+  } catch (error) {
     console.error('Failed to kick member', error);
   }
 };
@@ -210,7 +195,7 @@ const handleSave = async () => {
   const hasAvatarChanged = !!newAvatarFile.value;
 
   if (!hasNameChanged && !hasAvatarChanged) {
-    modelVisible.value = false;
+    hideEditWorkspaceWindow();
     return;
   }
 
@@ -232,12 +217,11 @@ const handleSave = async () => {
 
     const { data: updatedWorkspace } = await workspaceApi.updateWorkspace(wsId.value, payload);
 
-    emit('workspace-updated', {
-      id: wsId.value,
-      name: updatedWorkspace.name,
-      avatar: updatedWorkspace.avatar,
-    });
-    modelVisible.value = false;
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('rela:workspace-updated', { detail: { workspace: updatedWorkspace } }));
+    }
+
+    hideEditWorkspaceWindow();
   } catch (e) {
     console.error('Failed to update workspace', e);
     error.value = 'Failed to update workspace.';
@@ -261,8 +245,10 @@ const handleDeleteWorkspace = async () => {
   error.value = '';
   try {
     await workspaceApi.deleteWorkspace(wsId.value);
-    emit('workspace-deleted', wsId.value);
-    modelVisible.value = false;
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('rela:workspace-deleted', { detail: { workspaceId: wsId.value } }));
+    }
+    hideEditWorkspaceWindow();
   } catch (e) {
     console.error('Failed to delete workspace', e);
     error.value = 'Failed to delete workspace.';
@@ -273,7 +259,7 @@ const handleDeleteWorkspace = async () => {
 };
 
 const handleCancel = () => {
-  modelVisible.value = false;
+  hideEditWorkspaceWindow();
 };
 
 const footerButtons = computed(() => {

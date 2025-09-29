@@ -1,11 +1,11 @@
 <template>
   <WindowComponent
-    :title="windowTitle"
-    v-model:visible="internalVisible"
-    :closable="true"
-    :initial-size="{ width: 400, height: 250 }"
-    :footer-buttons="footerButtons"
-    storage-key="rela-window-invite"
+      :title="windowTitle"
+      v-model:visible="internalVisible"
+      :closable="true"
+      :initial-size="{ width: 400, height: 250 }"
+      :footer-buttons="footerButtons"
+      storage-key="rela-window-invite"
   >
     <div class="content">
       <template v-if="loading">
@@ -13,6 +13,8 @@
       </template>
       <template v-else-if="error">
         <p class="error">{{ error }}</p>
+        <p class="debug-info">Token: {{ internalJoinToken }}</p>
+        <p class="debug-info">Authenticated: {{ isAuthenticated }}</p>
       </template>
       <template v-else-if="!isAuthenticated">
         <p>You've been invited to join a workspace.</p>
@@ -30,6 +32,8 @@
       </template>
       <template v-else>
         <p>This invite is invalid or has expired.</p>
+        <p class="debug-info">Token: {{ internalJoinToken }}</p>
+        <p class="debug-info">Authenticated: {{ isAuthenticated }}</p>
       </template>
     </div>
   </WindowComponent>
@@ -37,10 +41,11 @@
 
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue';
-import WindowComponent from './WindowComponent.vue';
+import WindowComponent from './common/WindowComponent.vue';
 import { useAuth } from '../composables/useAuth.js';
 import { workspaceApi } from '../utils/http.js';
 import { showLoginWindow } from "../composables/useLoginWindow";
+import defaultAvatar from '/default-workspace.ico';
 
 const props = defineProps({
   modelValue: Boolean,
@@ -63,24 +68,45 @@ const internalJoinToken = ref(null);
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, "");
 
 const fetchWorkspaceDetails = async () => {
-  if (!internalJoinToken.value) return;
+  if (!internalJoinToken.value) {
+    console.log('[InviteWindow] No join token available');
+    return;
+  }
 
+  console.log('[InviteWindow] Fetching workspace details for token:', internalJoinToken.value);
   loading.value = true;
   error.value = '';
+  workspace.value = null;
+
   try {
-    const { data } = await workspaceApi.getWorkspaceByInviteToken(internalJoinToken.value);
-    if (data && data.id) {
-      if (data.avatar) {
-        data.avatar = `${API_BASE_URL}/${data.avatar}`;
-      }
-      workspace.value = data;
+    const response = await workspaceApi.getWorkspaceByInviteToken(internalJoinToken.value);
+    console.log('[InviteWindow] Full response:', response);
+    console.log('[InviteWindow] Response data:', response.data);
+
+    const data = response.data;
+
+
+    // Проверяем наличие id в ответе
+    if (data && (data.id || data._id)) {
+      const workspaceData = {
+        id: data.id || data._id,
+        name: data.name,
+        avatar: data.avatar ? `${API_BASE_URL}/${data.avatar}` : defaultAvatar,
+        ownedBy: data.owned_by || data.ownedBy,
+        members: data.members
+      };
+
+      workspace.value = workspaceData;
+      console.log('[InviteWindow] Workspace loaded:', workspace.value);
     } else {
       error.value = 'Invalid or expired invite link.';
       workspace.value = null;
+      console.log('[InviteWindow] Invalid response structure:', data);
     }
   } catch (e) {
-    console.error('Failed to fetch workspace details', e);
-    error.value = e.response?.data?.error || 'Invalid or expired invite link.';
+    console.error('[InviteWindow] Failed to fetch workspace details', e);
+    console.error('[InviteWindow] Error response:', e.response);
+    error.value = e.response?.data?.error || e.response?.data?.message || 'Invalid or expired invite link.';
     workspace.value = null;
   } finally {
     loading.value = false;
@@ -99,13 +125,19 @@ const resetComponentState = (clearToken = false) => {
 
 onMounted(() => {
   const token = props.joinToken || localStorage.getItem('rela_join_token');
+  console.log('[InviteWindow] Mounted, token from props:', props.joinToken);
+  console.log('[InviteWindow] Mounted, token from localStorage:', localStorage.getItem('rela_join_token'));
+  console.log('[InviteWindow] Authenticated:', isAuthenticated.value);
+
   if (token) {
     internalJoinToken.value = token;
     localStorage.setItem('rela_join_token', token);
+    console.log('[InviteWindow] Token set:', token);
   }
 });
 
 watch(() => props.joinToken, (newToken) => {
+  console.log('[InviteWindow] joinToken prop changed:', newToken);
   if (newToken && newToken !== internalJoinToken.value) {
     internalJoinToken.value = newToken;
     localStorage.setItem('rela_join_token', newToken);
@@ -114,41 +146,55 @@ watch(() => props.joinToken, (newToken) => {
 });
 
 watch(internalVisible, (isVisible, wasVisible) => {
+  console.log('[InviteWindow] Visibility changed:', isVisible);
   if (!isVisible && wasVisible) {
     resetComponentState(true);
   }
 });
 
-watch(() => [internalVisible.value, isAuthenticated.value, internalJoinToken.value], ([visible, isAuth, token]) => {
-  if (!visible) {
-    return;
-  }
+watch(() => [internalVisible.value, isAuthenticated.value, internalJoinToken.value],
+    ([visible, isAuth, token]) => {
+      console.log('[InviteWindow] Watch triggered - visible:', visible, 'auth:', isAuth, 'token:', token);
 
-  if (token) {
-    if (isAuth) {
-      if (!workspace.value && !loading.value && !error.value) {
-        fetchWorkspaceDetails();
+      if (!visible) {
+        return;
       }
-    } else {
-      resetComponentState(false);
-    }
-  }
-}, { immediate: true });
 
+      if (token) {
+        if (isAuth) {
+          if (!workspace.value && !loading.value && !error.value) {
+            console.log('[InviteWindow] Conditions met, fetching workspace details');
+            fetchWorkspaceDetails();
+          }
+        } else {
+          console.log('[InviteWindow] User not authenticated, resetting state');
+          resetComponentState(false);
+        }
+      } else {
+        console.log('[InviteWindow] No token available');
+      }
+    },
+    { immediate: true }
+);
 
 const handleLogin = () => {
   showLoginWindow();
 };
 
 const handleJoin = async () => {
-  loading.value = true; error.value = '';
+  console.log('[InviteWindow] Attempting to join workspace');
+  loading.value = true;
+  error.value = '';
+
   try {
-    await workspaceApi.acceptInvite(internalJoinToken.value);
+    const response = await workspaceApi.acceptInvite(internalJoinToken.value);
+    console.log('[InviteWindow] Join successful:', response.data);
     emit('joined');
     internalVisible.value = false;
   } catch (e) {
-    console.error('Failed to join workspace', e);
-    error.value = e.response?.data?.error || 'Could not join the workspace.';
+    console.error('[InviteWindow] Failed to join workspace', e);
+    console.error('[InviteWindow] Error response:', e.response?.data);
+    error.value = e.response?.data?.error || e.response?.data?.message || 'Could not join the workspace.';
   } finally {
     loading.value = false;
   }
@@ -156,6 +202,7 @@ const handleJoin = async () => {
 
 const handleCancel = () => {
   internalVisible.value = false;
+  localStorage.removeItem("rela_join_token");
 };
 
 const windowTitle = computed(() => {
@@ -189,6 +236,11 @@ const footerButtons = computed(() => {
 }
 .error {
   color: #c00;
+}
+.debug-info {
+  font-size: 0.85em;
+  color: #666;
+  margin-top: 8px;
 }
 .workspace-info {
   display: flex;

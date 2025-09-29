@@ -25,7 +25,7 @@
 
 <script setup>
 import { ref } from 'vue';
-import WindowComponent from './WindowComponent.vue';
+import WindowComponent from './common/WindowComponent.vue';
 import { workspaceApi } from '../utils/http';
 import { useWorkspaces } from '../composables/useWorkspaces';
 import { openWorkspaceWindow } from '../composables/useWorkspaces';

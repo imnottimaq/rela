@@ -196,9 +196,28 @@ func deleteWorkspace(c *gin.Context) {
 // @Failure 		404 {object} ErrorSwagger "Not Found - workspace not found"
 // @Failure 		500 {object} ErrorSwagger "Internal server error"
 func addMember(c *gin.Context) {
+	sqid := c.Param("joinToken")
 	userId, _ := c.Get("id")
-	joinToken := c.Param("joinToken")
-	var workspace Workspace
+	joinToken := ""
+	workspace := Workspace{}
+	if err := workspacesDb.FindOne(context.TODO(), bson.D{{"tokens.sqid", sqid}}).Decode(&workspace); err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			c.AbortWithStatusJSON(404, gin.H{"error": "Not Found"})
+			return
+		} else if err != nil {
+			c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
+			return
+		}
+	}
+	for i := range workspace.Tokens {
+		if workspace.Tokens[i].Sqid == sqid {
+			joinToken = workspace.Tokens[i].Token
+		}
+	}
+	if joinToken == "" {
+		c.AbortWithStatusJSON(404, gin.H{"error": "Invite does not exist"})
+		return
+	}
 	token, err := jwt.ParseWithClaims(joinToken, &Token{}, func(token *jwt.Token) (any, error) {
 		if token.Method != jwt.SigningMethodHS256 {
 			return nil, fmt.Errorf("unknown signing method: %s", token.Method)
@@ -321,7 +340,6 @@ func getWorkspaceByInviteToken(c *gin.Context) {
 		c.AbortWithStatusJSON(404, gin.H{"error": "Invite does not exist"})
 		return
 	}
-	// 1. Parse and validate the JWT
 	token, err := jwt.ParseWithClaims(joinTokenStr, &Token{}, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
@@ -333,32 +351,16 @@ func getWorkspaceByInviteToken(c *gin.Context) {
 		c.AbortWithStatusJSON(400, gin.H{"error": "Invalid or expired token"})
 		return
 	}
-
-	// 2. Extract claims
 	claims, ok := token.Claims.(*Token)
 	if !ok {
 		c.AbortWithStatusJSON(500, gin.H{"error": "Failed to process token claims"})
 		return
 	}
 
-	// 3. Check token type
 	if claims.Type != "invite" {
 		c.AbortWithStatusJSON(400, gin.H{"error": "Invalid token type"})
 		return
 	}
-
-	// 5. Fetch workspace from DB
-	//var workspace Workspace
-	//if err := workspacesDb.FindOne(context.TODO(), bson.D{{"_id", claims.Id}}).Decode(&workspace); err != nil {
-	//	if errors.Is(err, mongo.ErrNoDocuments) {
-	//		c.AbortWithStatusJSON(404, gin.H{"error": "Workspace does not exist"})
-	//	} else {
-	//		c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
-	//	}
-	//	return
-	//}
-
-	// 6. Return workspace details
 	workspace.Tokens = nil
 	c.JSON(200, workspace)
 }
@@ -596,57 +598,4 @@ func getWorkspaceInfo(c *gin.Context) {
 	}
 
 	c.JSON(200, result)
-}
-
-// @Summary 		Assign a task to a user
-// @Description 	Assigns a task within a workspace to a specific user.
-// @Router 			/workspaces/{workspaceId}/assign [post]
-// @Tags 			Tasks
-// @Security 		BearerAuth
-// @Accept 			json
-// @Produce 		json
-// @Param 			workspaceId path string true "Workspace ID"
-// @Param 			data body AssignTask true "Task and User IDs"
-// @Success 		200 {object} Task "The updated task"
-// @Failure 		403 {object} ErrorSwagger "Forbidden - you are not the owner or the user to be assigned"
-// @Failure 		404 {object} ErrorSwagger "Not Found - workspace or task not found"
-// @Failure 		500 {object} ErrorSwagger "Internal server error"
-func assignTask(c *gin.Context) {
-	currentUserId, _ := c.Get("id")
-	wId := c.Param("workspaceId")
-	workspaceId, _ := bson.ObjectIDFromHex(wId)
-	var input AssignTask
-	if err := json.NewDecoder(c.Request.Body).Decode(&input); err != nil {
-		c.AbortWithStatusJSON(500, gin.H{"error": "Something went wrong when parsing request"})
-		return
-	}
-	var workspace Workspace
-	if err := workspacesDb.FindOne(context.TODO(), bson.D{{"_id", workspaceId}}).Decode(&workspace); err != nil {
-		if errors.Is(err, mongo.ErrNoDocuments) {
-			c.AbortWithStatusJSON(404, gin.H{"error": "Workspace does not exist"})
-		} else {
-			c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
-		}
-		return
-	}
-
-	if input.UserId == currentUserId.(bson.ObjectID) || workspace.OwnedBy == currentUserId.(bson.ObjectID) {
-		var task Task
-		if err := tasksDb.FindOne(context.TODO(), bson.D{{"_id", input.TaskId}}).Decode(&task); err != nil {
-			if errors.Is(err, mongo.ErrNoDocuments) {
-				c.AbortWithStatusJSON(404, gin.H{"error": "Task does not exist"})
-			} else {
-				c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
-			}
-			return
-		}
-		task.AssignedTo = input.UserId
-		if _, err := tasksDb.ReplaceOne(context.TODO(), bson.D{{"_id", input.TaskId}}, task); err != nil {
-			c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
-			return
-		}
-		c.JSON(200, task)
-	} else {
-		c.AbortWithStatusJSON(403, gin.H{"error": "You are not authorized to assign this task"})
-	}
 }

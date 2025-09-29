@@ -29,7 +29,7 @@
 </template>
 
 <script setup>
-import WindowComponent from './WindowComponent.vue';
+import WindowComponent from './common/WindowComponent.vue';
 import { useAboutRelaWindow } from '../composables/useAboutRelaWindow';
 
 const { aboutRelaVisible, hideAboutRelaWindow } = useAboutRelaWindow();

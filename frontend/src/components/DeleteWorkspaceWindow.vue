@@ -14,7 +14,7 @@
 
 <script setup>
 import { computed } from 'vue';
-import WindowComponent from './WindowComponent.vue';
+import WindowComponent from './common/WindowComponent.vue';
 
 const props = defineProps({
   workspace: { type: Object, required: true },

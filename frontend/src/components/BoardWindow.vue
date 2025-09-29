@@ -9,8 +9,20 @@
     :menu="windowMenu"
   >
     <div class="content" @dragover="onDragOver" @drop="onDrop">
-      <p>Workspace: <strong>{{ workspaceName }}</strong></p>
-      <p>Board Name: <strong>{{ boardName }}</strong></p>
+      <p>
+        Board Name:
+        <strong v-if="!isEditingBoard" @dblclick="editBoard" title="Double-click to edit">{{ boardName }}</strong>
+        <span v-else class="board-name-edit">
+          <input
+              ref="boardNameInput"
+              v-model="newBoardName"
+              placeholder="Enter new board name"
+              @blur="saveBoard"
+              @keydown.enter.prevent="saveBoard"
+              @keydown.esc.prevent="cancelEditBoard"
+          />
+        </span>
+      </p>
       <div v-if="isLoading" class="loading">Loading tasks...</div>
       <div v-else-if="error && !isNotFound" class="error">Failed to load tasks.</div>
       <div v-else-if="tasks.length" class="table-wrap">
@@ -33,6 +45,7 @@
               <td>
                 <div class="task-title">{{ task.name || task.title || 'Unnamed Task' }}</div>
                 <div v-if="task.description" class="task-desc">{{ task.description }}</div>
+                <div v-if="task.deadline" class="task-deadline">Deadline: {{ formatDeadline(task.deadline) }}</div>
               </td>
               <td class="task-actions"></td>
             </tr>
@@ -53,23 +66,16 @@
         </teleport>
       </div>
       <div v-else class="no-tasks">No tasks found for this board.</div>
+      <div class="status-bar" style="position:absolute;bottom:0;">
+        <p class="status-bar-field"><p>Workspace: <strong>{{ workspaceName }}</strong></p></p>
+      </div>
     </div>
-
-    <EditTaskWindow
-        :workspace-id="workspaceId"
-        :board-id="boardId"
-        v-model:visible="taskWindowVisible"
-        :task="taskToEdit"
-        @created="handleTaskCreated"
-        @updated="handleTaskUpdated"
-    />
   </WindowComponent>
 </template>
 
 <script setup>
-import { computed, ref, reactive, onMounted, onUnmounted } from 'vue';
-import WindowComponent from './WindowComponent.vue';
-import EditTaskWindow from './EditTaskWindow.vue';
+import { computed, ref, reactive, onMounted, onUnmounted, nextTick } from 'vue';
+import WindowComponent from './common/WindowComponent.vue';
 import { useBoardTasks } from '../composables/useBoards';
 import { workspaceApi } from '../utils/http';
 
@@ -88,8 +94,10 @@ const modelVisible = computed({
 });
 
 const localBoard = ref({ ...(props.board || {}) });
-const taskWindowVisible = ref(false);
-const taskToEdit = ref(null);
+
+const isEditingBoard = ref(false);
+const newBoardName = ref('');
+const boardNameInput = ref(null);
 
 const boardId = computed(() => localBoard.value?._id || localBoard.value?.id || localBoard.value?.Id || localBoard.value?.name);
 const boardName = computed(() => localBoard.value?.name || String(boardId.value));
@@ -122,14 +130,18 @@ const hideContextMenu = () => {
 };
 
 const openCreateTaskWindow = () => {
-  taskToEdit.value = null;
-  taskWindowVisible.value = true;
+  if (typeof window !== 'undefined') {
+    const detail = { workspaceId: workspaceIdRef.value, boardId: boardId.value };
+    window.dispatchEvent(new CustomEvent('rela:open-create-task-window', { detail }));
+  }
 };
 
 const editTask = (task) => {
   if (!task) return;
-  taskToEdit.value = task;
-  taskWindowVisible.value = true;
+  if (typeof window !== 'undefined') {
+    const detail = { workspaceId: workspaceIdRef.value, task };
+    window.dispatchEvent(new CustomEvent('rela:open-edit-task-window', { detail }));
+  }
   hideContextMenu();
 };
 
@@ -148,20 +160,16 @@ const close = () => {
   emit('close');
 };
 
-const handleTaskCreated = (newTask) => {
-  if (newTask) {
-    tasks.value.unshift(newTask);
-  }
-  if (isNotFound.value) {
-    isNotFound.value = false;
-  }
-};
-
-const handleTaskUpdated = () => {
-  fetchTasks();
-};
-
 const getTaskId = (task) => task?._id || task?.id || task?.Id;
+
+const formatDeadline = (timestamp) => {
+  if (!timestamp) return '';
+  const date = new Date(timestamp * 1000);
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(date.getUTCDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
 
 const onDragStart = (task, ev) => {
   try {
@@ -225,10 +233,75 @@ const onTaskMoved = (e) => {
   } catch (_) {}
 };
 
+const onTaskCreated = (e) => {
+  const detail = e.detail || {};
+  if (String(detail.workspaceId) === String(workspaceIdRef.value) && String(detail.boardId) === String(boardId.value)) {
+    fetchTasks();
+  }
+};
+
+const onTaskUpdated = (e) => {
+  const detail = e.detail || {};
+  if (String(detail.workspaceId) === String(workspaceIdRef.value) && String(detail.boardId) === String(boardId.value)) {
+    fetchTasks();
+  }
+};
+
+const editBoard = async () => {
+  isEditingBoard.value = true;
+  newBoardName.value = boardName.value;
+  await nextTick();
+  boardNameInput.value?.focus();
+};
+
+const cancelEditBoard = () => {
+  isEditingBoard.value = false;
+};
+
+const saveBoard = async () => {
+  if (!isEditingBoard.value) return;
+  isEditingBoard.value = false;
+  const oldName = boardName.value;
+  const newName = newBoardName.value.trim();
+  if (newName && newName !== oldName) {
+    try {
+      await workspaceApi.updateBoard(workspaceIdRef.value, boardId.value, { name: newName });
+      localBoard.value.name = newName;
+      if (typeof window !== 'undefined') {
+        try {
+          window.dispatchEvent(new CustomEvent('rela:board-updated', { detail: { boardId: boardId.value, workspaceId: workspaceIdRef.value, board: localBoard.value } }));
+        } catch (_) {}
+      }
+    } catch (err) {
+      console.error('Failed to update board name', err);
+      alert('Failed to update board name.');
+    }
+  }
+};
+
+const deleteBoard = async () => {
+  if (confirm(`Are you sure you want to delete board: ${boardName.value}?`)) {
+    try {
+      await workspaceApi.deleteBoard(workspaceIdRef.value, boardId.value);
+      if (typeof window !== 'undefined') {
+        try {
+          window.dispatchEvent(new CustomEvent('rela:board-deleted', { detail: { boardId: boardId.value, workspaceId: workspaceIdRef.value } }));
+        } catch (_) {}
+      }
+      close();
+    } catch (err) {
+      console.error('Failed to delete board', err);
+      alert('Failed to delete board.');
+    }
+  }
+};
+
 
 onMounted(() => {
   if (typeof window !== 'undefined') {
     window.addEventListener('rela:task-moved', onTaskMoved);
+    window.addEventListener('rela:task-created', onTaskCreated);
+    window.addEventListener('rela:task-updated', onTaskUpdated);
     document.addEventListener('click', hideContextMenu);
   }
 });
@@ -236,6 +309,8 @@ onMounted(() => {
 onUnmounted(() => {
   if (typeof window !== 'undefined') {
     window.removeEventListener('rela:task-moved', onTaskMoved);
+    window.removeEventListener('rela:task-created', onTaskCreated);
+    window.removeEventListener('rela:task-updated', onTaskUpdated);
     document.removeEventListener('click', hideContextMenu);
   }
 });
@@ -244,25 +319,17 @@ const windowMenu = computed(() => {
   const taskItems = (tasks.value || []).map(task => ({
     type: 'button',
     label: task.name || task.title || 'Unnamed Task',
-    onClick: () => alert(`Selected task: ${task.name || task.title || 'Unnamed Task'}`),
+    onClick: () => editTask(task),
   }));
 
   return [
     {
-      label: 'Tasks',
+      label: 'Board',
       items: [
-        {
-          type: 'button',
-          label: 'New Task',
-          onClick: openCreateTaskWindow,
-        },
-        {
-          type: 'button',
-          label: 'Refresh Tasks',
-          onClick: fetchTasks,
-          divider: tasks.value.length > 0,
-        },
-        ...(tasks.value.length > 0 ? taskItems : []),
+        { type: 'button', label: 'Edit Name', onClick: editBoard },
+        { type: 'button', label: 'Delete Board', onClick: deleteBoard, divider: true },
+        { type: 'button', label: 'New Task', onClick: openCreateTaskWindow },
+        { type: 'button', label: 'Refresh', onClick: fetchTasks },
       ],
     },
   ];
@@ -294,10 +361,24 @@ const windowMenu = computed(() => {
 .task-table { width: 100%; border-collapse: collapse; }
 .task-title { font-weight: 600; color: #222; }
 .task-desc { font-size: 12px; color: #666; margin-top: 2px; }
+.task-deadline { font-size: 12px; color: #c0392b; margin-top: 2px; font-weight: 500; }
 .task-actions-header { width: 40px; }
 .task-actions { text-align: left; vertical-align: middle; width: 50px; }
 .context-menu{
   border-radius: 0;
+}
+p .board-name-edit {
+  display: inline-block;
+}
+.board-name-edit input {
+  font-size: 1em;
+  font-weight: 600;
+  border: 1px solid #888;
+  padding: 1px 4px;
+  border-radius: 3px;
+  width: 200px;
+  background: #fefefe;
+  color: #222;
 }
 
 </style>

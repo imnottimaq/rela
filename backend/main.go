@@ -118,7 +118,6 @@ func main() {
 			workspaceByIdGroup.POST("/tasks", createNewTask)
 			workspaceByIdGroup.PATCH("/tasks/:taskId", taskMiddleware(), editExistingTask)
 			workspaceByIdGroup.DELETE("/delete/:taskId", taskMiddleware(), deleteExistingTask)
-			workspaceByIdGroup.POST("/assign", assignTask)
 
 			// Workspace Boards
 			workspaceByIdGroup.GET("/boards", getAllBoards)

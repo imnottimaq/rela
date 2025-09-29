@@ -21,7 +21,7 @@
 
 <script setup>
 import { computed, ref, watch } from 'vue';
-import WindowComponent from './WindowComponent.vue';
+import WindowComponent from './common/WindowComponent.vue';
 import { workspaceApi } from '../utils/http';
 
 const props = defineProps({

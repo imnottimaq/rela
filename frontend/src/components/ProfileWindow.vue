@@ -50,12 +50,18 @@
           <button @click="saveProfile" :disabled="saveLoading" class="action-button primary">
             {{ saveLoading ? 'Saving...' : 'Save Changes' }}
           </button>
-          <button @click="confirmDeleteAccount" :disabled="deleteLoading" class="action-button delete">
-            {{ deleteLoading ? 'Deleting...' : 'Delete Account' }}
-          </button>
-          <button @click="showConfirmLogoutWindow" class="action-button">Logout</button>
         </div>
-        <p v-if="deleteError" class="error">{{ deleteError }}</p>
+
+        <div class="danger-zone">
+          <h3 class="danger-zone-title">Danger Zone</h3>
+          <div class="danger-buttons">
+            <button @click="handleLogout" class="action-button">Logout</button>
+            <button @click="confirmDeleteAccount" :disabled="deleteLoading" class="action-button delete">
+              {{ deleteLoading ? 'Deleting...' : 'Delete Account' }}
+            </button>
+          </div>
+          <p v-if="deleteError" class="error">{{ deleteError }}</p>
+        </div>
       </template>
       <template v-else>
         <p>No profile data available.</p>
@@ -66,11 +72,12 @@
 
 <script setup>
 import { computed, ref, watch } from "vue";
-import WindowComponent from "./WindowComponent.vue";
+import WindowComponent from "./common/WindowComponent.vue";
 import { useProfileWindow } from "../composables/useProfileWindow";
 import { useAuth } from "../composables/useAuth";
 import { showConfirmLogoutWindow } from "../composables/useConfirmLogoutWindow";
 import { authApi, clearAuthTokens } from "../utils/http";
+import defaultAvatar from '/default-avatar.jpg';
 
 const { profileVisible, hideProfileWindow } = useProfileWindow();
 const { isAuthenticated, logout } = useAuth();
@@ -133,6 +140,8 @@ const loadProfile = async () => {
     const userProfile = response?.data || null;
     if (userProfile && userProfile.avatar) {
       userProfile.avatar = `${API_BASE_URL}/${userProfile.avatar}`;
+    } else if (!userProfile.avatar) {
+      userProfile.avatar = defaultAvatar;
     }
     profile.value = userProfile;
     if (userProfile) {
@@ -330,4 +339,32 @@ const footerButtons = computed(() => [
   text-align: center;
 }
 
+.danger-zone {
+  border: 1px solid #d00000;
+  border-radius: 4px;
+  padding: 12px;
+  margin-top: 24px;
+}
+
+.danger-zone-title {
+  color: #d00000;
+  margin: 0 0 12px;
+  text-align: center;
+  font-size: 1.2em;
+  font-weight: 600;
+}
+
+.danger-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.danger-buttons .action-button {
+  width: 100%;
+}
+
+.button-group {
+    margin-top: 16px;
+}
 </style>

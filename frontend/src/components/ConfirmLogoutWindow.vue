@@ -18,7 +18,7 @@
 
 <script setup>
 import { computed } from 'vue';
-import WindowComponent from './WindowComponent.vue';
+import WindowComponent from './common/WindowComponent.vue';
 import { useAuth } from '../composables/useAuth';
 import { useConfirmLogoutWindow } from '../composables/useConfirmLogoutWindow';
 

@@ -43,7 +43,7 @@
 </template>
 <script setup>
 import { ref, watch } from 'vue';
-import WindowComponent from './WindowComponent.vue';
+import WindowComponent from './common/WindowComponent.vue';
 import { useRegisterWindow } from '../composables/useRegisterWindow';
 import { hideLoginWindow, showLoginWindow } from '../composables/useLoginWindow';
 import { authApi } from '../utils/http';

@@ -196,7 +196,6 @@ func editExistingTask(c *gin.Context) {
 		}
 		task.Deadline = valuesToEdit.Deadline
 	}
-
 	if _, err := tasksDb.ReplaceOne(context.TODO(), bson.D{{Key: "_id", Value: task.Id}}, &task); err != nil {
 		c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
 		return

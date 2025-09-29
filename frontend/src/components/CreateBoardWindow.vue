@@ -1,12 +1,12 @@
 <template>
   <WindowComponent
     :title="`Create Board`"
-    :buttons="[{ label: 'Close', onClick: onCancel }]"
-    v-model:visible="modelVisible"
+    :buttons="[{ label: 'Close', onClick: hideCreateBoardWindow }]"
+    v-model:visible="createBoardVisible"
     :storage-key="`rela-window-create-board-${workspaceId}`"
     footer-buttons-align="right"
     :footer-buttons="[
-      { label: 'Cancel', onClick: onCancel },
+      { label: 'Cancel', onClick: hideCreateBoardWindow },
       { label: 'Create', onClick: onCreate, primary: true, loading: isSubmitting, disabled: isSubmitting }
     ]"
     :initial-size="{ width: 320, height: 200 }"
@@ -24,16 +24,18 @@
 </template>
 
 <script setup>
-import { computed, ref, watch } from 'vue';
-import WindowComponent from './WindowComponent.vue';
+import { ref, watch } from 'vue';
+import WindowComponent from './common/WindowComponent.vue';
 import { workspaceApi } from '../utils/http';
+import { useCreateBoardWindow } from '../composables/useCreateBoardWindow.js';
+
+const { createBoardVisible, hideCreateBoardWindow } = useCreateBoardWindow();
 
 const props = defineProps({
   workspaceId: { type: [String, Number], required: true },
-  visible: { type: Boolean, default: false },
 });
 
-const emit = defineEmits(['update:visible', 'created']);
+const emit = defineEmits(['created']);
 
 const name = ref('');
 const error = ref('');
@@ -44,20 +46,11 @@ const reset = () => {
   error.value = '';
 };
 
-const modelVisible = computed({
-  get: () => props.visible,
-  set: (v) => emit('update:visible', v),
-});
-
-watch(() => props.visible, (v) => {
-  if (!v) {
+watch(createBoardVisible, (isVisible) => {
+  if (!isVisible) {
     reset();
   }
 });
-
-const onCancel = () => {
-  emit('update:visible', false);
-};
 
 const onCreate = async () => {
   error.value = '';
@@ -72,8 +65,7 @@ const onCreate = async () => {
     const { data } = await workspaceApi.createBoard(props.workspaceId, { name: trimmed });
     // Always emit something usable; fallback to just the name
     emit('created', data && typeof data === 'object' ? data : { name: trimmed });
-    emit('update:visible', false);
-    reset();
+    hideCreateBoardWindow();
   } catch (e) {
     console.error('Create board failed', e);
     error.value = 'Failed to create board';

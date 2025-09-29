@@ -35,7 +35,7 @@
     </WindowComponent>
 </template>
 <script setup>
-import WindowComponent from './WindowComponent.vue';
+import WindowComponent from './common/WindowComponent.vue';
 import { useLoginWindow } from '../composables/useLoginWindow';
 import { showForgotPasswordWindow } from '../composables/useForgotPasswordWindow';
 import { hideRegisterWindow, showRegisterWindow } from '../composables/useRegisterWindow';
