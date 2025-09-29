@@ -5,15 +5,41 @@
     :initial-size="{ width: 400, height: 450 }"
     :footer-buttons="footerButtons"
   >
-    <div class="tabs">
-      <button @click="activeTab = 'general'" :class="{ active: activeTab === 'general' }">General</button>
-      <button @click="activeTab = 'members'" :class="{ active: activeTab === 'members' }">Members</button>
-      <button @click="activeTab = 'danger'" :class="{ active: activeTab === 'danger' }">Danger Zone</button>
-    </div>
+    <section class="tabs">
+      <menu role="tablist" aria-label="Workspace Edit Tabs">
+        <button
+          role="tab"
+          :aria-controls="'tab-general'"
+          :aria-selected="String(activeTab === 'general')"
+          :tabindex="activeTab === 'general' ? 0 : -1"
+          type="button"
+          @click="activeTab = 'general'"
+        >
+          General
+        </button>
+        <button
+          role="tab"
+          :aria-controls="'tab-members'"
+          :aria-selected="String(activeTab === 'members')"
+          :tabindex="activeTab === 'members' ? 0 : -1"
+          type="button"
+          @click="activeTab = 'members'"
+        >
+          Members
+        </button>
+        <button
+          role="tab"
+          :aria-controls="'tab-danger'"
+          :aria-selected="String(activeTab === 'danger')"
+          :tabindex="activeTab === 'danger' ? 0 : -1"
+          type="button"
+          @click="activeTab = 'danger'"
+        >
+          Danger Zone
+        </button>
+      </menu>
 
-    <div class="content">
-      <!-- General Tab -->
-      <div v-if="activeTab === 'general'">
+      <article role="tabpanel" id="tab-general" :hidden="activeTab !== 'general'">
         <div class="avatar-section">
           <img :src="avatarSrc" alt="Workspace Avatar" class="avatar-preview" />
           <input type="file" ref="fileInput" @change="handleFileChange" accept="image/png, image/jpeg" style="display: none" />
@@ -24,10 +50,9 @@
           <input v-model="newName" type="text" class="input-field" ref="nameInput" />
           <p v-if="error" class="error">{{ error }}</p>
         </div>
-      </div>
+      </article>
 
-      <!-- Members Tab -->
-      <div v-if="activeTab === 'members'">
+      <article role="tabpanel" id="tab-members" :hidden="activeTab !== 'members'">
         <div class="members-section">
           <div v-for="member in workspaceMembers" :key="member._id" class="member-item">
             <img :src="getMemberAvatar(member)" alt="Member Avatar" class="member-avatar" />
@@ -41,17 +66,16 @@
             <button @click="handleCreateInviteLink" class="action-btn">Create Invite Link</button>
           </div>
         </div>
-      </div>
+      </article>
 
-      <!-- Danger Zone Tab -->
-      <div v-if="activeTab === 'danger'">
-          <div class="danger-item">
-            <h4>Delete Workspace</h4>
-            <p>Once you delete a workspace, there is no going back. Please be certain.</p>
-            <button @click="confirmDelete" class="action-btn kick-btn">Delete this workspace</button>
-          </div>
-      </div>
-    </div>
+      <article role="tabpanel" id="tab-danger" :hidden="activeTab !== 'danger'">
+        <div class="danger-item">
+          <h4>Delete Workspace</h4>
+          <p>Once you delete a workspace, there is no going back. Please be certain.</p>
+          <button @click="confirmDelete" class="action-btn kick-btn">Delete this workspace</button>
+        </div>
+      </article>
+    </section>
   </WindowComponent>
 </template>
 
@@ -263,24 +287,6 @@ const footerButtons = computed(() => {
 </script>
 
 <style scoped>
-.tabs {
-  display: flex;
-  border-bottom: 1px solid #ccc;
-}
-.tabs button {
-  padding: 10px 20px;
-  border: none;
-  background-color: transparent;
-  cursor: pointer;
-}
-.tabs button.active {
-  border-bottom: 2px solid #007bff;
-  font-weight: bold;
-}
-.content {
-  padding: 12px;
-  text-align: center;
-}
 .avatar-section {
   margin-bottom: 20px;
   display: flex;
