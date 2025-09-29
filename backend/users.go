@@ -6,31 +6,35 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"golang.org/x/crypto/argon2"
+	"os"
+	"path/filepath"
+	"time"
+
 	"github.com/gin-gonic/gin"
 	"github.com/goccy/go-json"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
-	"golang.org/x/crypto/argon2"
-	"log"
-	"os"
-	"path/filepath"
-	"time"
 )
 
-// @Summary Create new user
-// @Router /api/v1/users/create [post]
-// @Accept json
-// @Success 200 {array} TokenSwagger
-// @Produce json
-// @Tags Users
-// @Param data body CreateUser true "Create user request"
+// @Summary 		Create new user
+// @Description 	Creates a new user and returns an access token.
+// @Router 			/users/create [post]
+// @Tags 			Users
+// @Accept 			json
+// @Produce 		json
+// @Param 			data body CreateUser true "User creation data"
+// @Success 		200 {object} TokenSwagger "Access token"
+// @Failure 		400 {object} ErrorSwagger "Bad request - check your input"
+// @Failure 		409 {object} ErrorSwagger "User with that email already exists"
+// @Failure 		500 {object} ErrorSwagger "Internal server error"
 func createUser(c *gin.Context) {
 	randomBytes := make([]byte, 32)
 	_, err := rand.Read(randomBytes)
 	if err != nil {
-		c.AbortWithStatusJSON(500, gin.H{"error": "Internal server error"})
+		c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
 		return
 	}
 	generatedSalt := base64.URLEncoding.EncodeToString(randomBytes)
@@ -50,6 +54,9 @@ func createUser(c *gin.Context) {
 	} else if input.Password == "" {
 		c.AbortWithStatusJSON(400, gin.H{"error": "Password is required"})
 		return
+	} else if len(input.Password) > 128 {
+		c.AbortWithStatusJSON(400, gin.H{"error": "Password too long"})
+		return
 	} else if !validatePassword(input.Password) {
 		c.AbortWithStatusJSON(400, gin.H{"error": "Password does not meet requirements"})
 		return
@@ -57,53 +64,65 @@ func createUser(c *gin.Context) {
 		c.AbortWithStatusJSON(400, gin.H{"error": "Name is required"})
 		return
 	}
-	newUser := User{
-		Salt:           generatedSalt,
-		Name:           input.Name,
-		HashedPassword: base64.RawStdEncoding.EncodeToString(argon2.IDKey([]byte(input.Password+pepper), []byte(generatedSalt), uint32(3), uint32(128*1024), uint8(2), uint32(32))),
-		Email:          input.Email,
-	}
 	err = usersDb.FindOne(context.TODO(), bson.D{{Key: "email", Value: input.Email}}).Decode(&i)
 	if err != nil {
 		if errors.Is(err, mongo.ErrNoDocuments) {
-			user, err := usersDb.InsertOne(context.TODO(), &newUser)
+			newUser := User{
+				Salt:           generatedSalt,
+				Name:           input.Name,
+				HashedPassword: base64.RawStdEncoding.EncodeToString(argon2.IDKey([]byte(input.Password+pepper), []byte(generatedSalt), uint32(1), uint32(32*1024), uint8(4), uint32(32))),
+				Email:          input.Email,
+			}
+			result, err := usersDb.InsertOne(context.TODO(), newUser)
 			if err != nil {
-				c.AbortWithStatusJSON(500, gin.H{"error": "Internal server error"})
+				c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
 				return
 			}
-			refreshToken := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-				"id":  user.InsertedID.(bson.ObjectID),
-				"exp": time.Now().UTC().Unix() + 604800, // Current expire time is 7 days, this is subject to change
-			})
+
+			insertedID := result.InsertedID.(bson.ObjectID)
+
+			refreshClaims := Token{
+				Id:   insertedID,
+				Type: "refresh",
+				RegisteredClaims: jwt.RegisteredClaims{
+					ExpiresAt: jwt.NewNumericDate(time.Now().UTC().Add(7 * 24 * time.Hour)), // 7 days
+				},
+			}
+			refreshToken := jwt.NewWithClaims(jwt.SigningMethodHS256, refreshClaims)
 			signedRefreshToken, err := refreshToken.SignedString([]byte(pepper))
 			if err != nil {
 				fmt.Println(err)
-				c.AbortWithStatusJSON(500, gin.H{"error": "Internal server error"})
-				return
-			} else {
-				c.SetCookie("refreshToken", signedRefreshToken, 604800, "/", "", true, true)
-				bearerToken, err := generateAccessToken(signedRefreshToken, "access")
-				if err != nil {
-					fmt.Println(err)
-					c.AbortWithStatusJSON(500, gin.H{"error": "Internal server error"})
-					return
-				}
-				c.AbortWithStatusJSON(200, gin.H{"token": bearerToken})
+				c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
 				return
 			}
+
+			c.SetCookie("refreshToken", signedRefreshToken, 604800, "/", "", false, true)
+			bearerToken, err := generateAccessToken(insertedID.Hex(), "access")
+			if err != nil {
+				fmt.Println(err)
+				c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
+				return
+			}
+			c.AbortWithStatusJSON(200, gin.H{"token": bearerToken})
+			return
+
 		}
+	} else {
+		c.AbortWithStatusJSON(409, gin.H{"error": "User with that email already exists"})
+		return
 	}
-	c.AbortWithStatusJSON(400, gin.H{"error": "Bad request"})
-	return
 }
 
-// @Summary Login user
-// @Router /api/v1/users/login [post]
-// @Accept json
-// @Success 200 {array} TokenSwagger
-// @Produce json
-// @Tags Users
-// @Param data body LoginUser true "Login user request"
+// @Summary 		Login user
+// @Description 	Logs in a user and returns an access token.
+// @Router 			/users/login [post]
+// @Tags 			Users
+// @Accept 			json
+// @Produce 		json
+// @Param 			data body LoginUser true "User login data"
+// @Success 		200 {object} TokenSwagger "Access token"
+// @Failure 		404 {object} ErrorSwagger "User not found"
+// @Failure 		500 {object} ErrorSwagger "Internal server error"
 func loginUser(c *gin.Context) {
 	middlewareInput, _ := c.Get("input")
 	input := middlewareInput.(LoginUser)
@@ -113,39 +132,60 @@ func loginUser(c *gin.Context) {
 			c.AbortWithStatusJSON(404, gin.H{"error": "User doesnt exist"})
 			return
 		} else {
-			c.AbortWithStatusJSON(500, gin.H{"error": "Internal server error"})
+			c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
 			return
 		}
 	}
-	if base64.RawStdEncoding.EncodeToString(argon2.IDKey([]byte(input.Password+pepper), []byte(i.Salt), uint32(3), uint32(128*1024), uint8(2), uint32(32))) == i.HashedPassword {
-		refreshToken := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-			"id":  i.Id,
-			"exp": time.Now().UTC().Unix() + 604800, // Current expire time is 7 days, this is subject to change
-		})
+	if base64.RawStdEncoding.EncodeToString(argon2.IDKey([]byte(input.Password+pepper), []byte(i.Salt), uint32(1), uint32(32*1024), uint8(4), uint32(32))) == i.HashedPassword {
+		refreshClaims := Token{
+			Id:   i.Id,
+			Type: "refresh",
+			RegisteredClaims: jwt.RegisteredClaims{
+				ExpiresAt: jwt.NewNumericDate(time.Now().UTC().Add(7 * 24 * time.Hour)), // 7 days
+			},
+		}
+		refreshToken := jwt.NewWithClaims(jwt.SigningMethodHS256, refreshClaims)
 		signedRefreshToken, err := refreshToken.SignedString([]byte(pepper))
 		if err != nil {
-			c.AbortWithStatusJSON(500, gin.H{"error": "Internal server error"})
-			return
-		} else {
-			c.SetCookie("refreshToken", signedRefreshToken, 604800, "/", "", true, true)
-			bearerToken, err := generateAccessToken(signedRefreshToken, "access")
-			if err != nil {
-				c.AbortWithStatusJSON(500, gin.H{"error": "Internal server error"})
-				return
-			}
-			c.JSON(200, gin.H{"token": bearerToken})
+			c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
 			return
 		}
+
+		c.SetCookie("refreshToken", signedRefreshToken, 604800, "/", "", false, true)
+		bearerToken, err := generateAccessToken(i.Id.Hex(), "access")
+		if err != nil {
+			c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
+			return
+		}
+		c.JSON(200, gin.H{"token": bearerToken})
+		return
 	}
+
+	// Wrong password path: explicitly respond with an error
+	c.AbortWithStatusJSON(400, gin.H{"error": "Wrong email or password"})
 }
 
-// @Summary Delete user
-// @Router /api/v1/users/delete [delete]
-// @Accept json
-// @Success 200
-// @Tags Users
-// @Param data body LoginUser true "Delete user request"
-// @Param X-Authorization header string true "Bearer Token"
+// @Summary 		Logout user
+// @Description 	Logs out the current user by clearing the refresh token cookie.
+// @Router 			/users/logout [post]
+// @Tags 			Users
+// @Success 		200 "Successfully logged out"
+func logoutUser(c *gin.Context) {
+	c.SetCookie("refreshToken", "", -1, "/", "", false, true)
+	c.AbortWithStatus(200)
+}
+
+// @Summary 		Delete user
+// @Description 	Deletes the currently authenticated user.
+// @Router 			/users/delete [delete]
+// @Tags 			Users
+// @Security 		BearerAuth
+// @Accept 			json
+// @Param 			data body LoginUser true "User password for confirmation"
+// @Success 		200 "User deleted successfully"
+// @Failure 		400 {object} ErrorSwagger "Bad request - password mismatch"
+// @Failure 		403 {object} ErrorSwagger "Forbidden"
+// @Failure 		500 {object} ErrorSwagger "Internal server error"
 func deleteUser(c *gin.Context) {
 	userId, _ := c.Get("id")
 	middlewareInput, _ := c.Get("input")
@@ -156,7 +196,7 @@ func deleteUser(c *gin.Context) {
 		c.AbortWithStatusJSON(500, gin.H{"error": "Failed to delete user"})
 		return
 	}
-	if user.Email == input.Email && base64.RawStdEncoding.EncodeToString(argon2.IDKey([]byte(input.Password+pepper), []byte(user.Salt), uint32(3), uint32(128*1024), uint8(2), uint32(32))) == user.HashedPassword && userId == user.Id {
+	if user.Email == input.Email && base64.RawStdEncoding.EncodeToString(argon2.IDKey([]byte(input.Password+pepper), []byte(user.Salt), uint32(1), uint32(32*1024), uint8(4), uint32(32))) == user.HashedPassword && userId == user.Id {
 		_, err = usersDb.DeleteOne(context.TODO(), bson.D{{Key: "_id", Value: userId}})
 		if err != nil {
 			c.AbortWithStatusJSON(500, gin.H{"error": "Failed to delete user"})
@@ -165,7 +205,7 @@ func deleteUser(c *gin.Context) {
 		c.SetCookie("refreshToken", "", -1, "/", "", true, true)
 		c.AbortWithStatus(200)
 		return
-	} else if user.Email != input.Email || base64.RawStdEncoding.EncodeToString(argon2.IDKey([]byte(input.Password+pepper), []byte(user.Salt), uint32(3), uint32(128*1024), uint8(2), uint32(32))) != user.HashedPassword {
+	} else if user.Email != input.Email || base64.RawStdEncoding.EncodeToString(argon2.IDKey([]byte(input.Password+pepper), []byte(user.Salt), uint32(1), uint32(32*1024), uint8(4), uint32(32))) != user.HashedPassword {
 		c.AbortWithStatus(400)
 		return
 	} else if userId != user.Id {
@@ -174,90 +214,113 @@ func deleteUser(c *gin.Context) {
 	}
 }
 
-// @Summary Upload avatar for user
-// @Router /api/v1/users/upload_avatar [post]
-// @Router /api/v1/workspaces/{workspaceId}/upload_avatar [post]
-// @Accept mpfd
-// @Success 200
-// @Tags Users
-// @Param image formData string true "Avatar"
-// @Param workspaceId query string true "Workspace ID"
-// @Param X-Authorization header string true "Bearer Token"
+// @Summary 		Upload avatar for user or workspace
+// @Description 	Uploads an avatar image for the current user or a specified workspace.
+// @Router 			/users/upload_avatar [post]
+// @Router 			/workspaces/{workspaceId}/upload_avatar [post]
+// @Tags 			Users
+// @Security 		BearerAuth
+// @Accept 			multipart/form-data
+// @Produce 		json
+// @Param 			img formData file true "Avatar image file (jpg or png)"
+// @Param 			workspaceId path string false "Workspace ID (if uploading for a workspace)"
+// @Success 		200 {object} gin.H "Avatar path"
+// @Failure 		400 {object} ErrorSwagger "Bad request - no file or wrong format"
+// @Failure 		404 {object} ErrorSwagger "Workspace not found"
+// @Failure 		500 {object} ErrorSwagger "Internal server error"
 func uploadAvatar(c *gin.Context) {
-	if _, err := os.Stat("./img/"); err != nil {
-		if os.IsNotExist(err) {
-			err = os.Mkdir("./img/", 0777)
-			if err != nil {
-				log.Fatal("Failed to create img/")
-			}
-		} else {
-			log.Fatal("Something went wrong when checking if img/ exists")
-		}
+	if err := os.MkdirAll("./img", 0755); err != nil {
+		fmt.Println("Failed to create img/ directory")
+		c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
+		return
 	}
-	userId, _ := c.Get("id")
-	workspaceId := c.Param("workspaceId")
+
 	avatar, err := c.FormFile("img")
 	if err != nil {
-		fmt.Printf(fmt.Sprintf("%v", err))
 		c.AbortWithStatusJSON(400, gin.H{"error": "No file given"})
 		return
-	} else if filepath.Ext(avatar.Filename) != ".png" && filepath.Ext(avatar.Filename) != ".jpg" && filepath.Ext(avatar.Filename) != ".jpeg" {
+	}
+
+	ext := filepath.Ext(avatar.Filename)
+	if ext != ".png" && ext != ".jpg" && ext != ".jpeg" {
 		c.AbortWithStatusJSON(400, gin.H{"error": "Wrong file format"})
 		return
 	}
-	filename := filepath.Join("img", "/"+fmt.Sprintf("%v", uuid.New()))
-	if err := c.SaveUploadedFile(avatar, filename); err != nil {
-		c.AbortWithStatusJSON(500, gin.H{"error": "Error while saving image"})
+
+	filename := fmt.Sprintf("%s%s", uuid.New().String(), ext)
+	fullPath := filepath.Join("img", filename)
+
+	if err := c.SaveUploadedFile(avatar, fullPath); err != nil {
+		c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
 		return
 	}
-	if workspaceId == "" {
-		user := User{}
-		if err := usersDb.FindOne(context.TODO(), bson.D{{"_id", userId}}).Decode(&user); err != nil {
-			c.AbortWithStatusJSON(500, gin.H{"error": "Failed to find user"})
+
+	wId := c.Param("workspaceId")
+
+	if wId == "" { // User avatar
+		userId, _ := c.Get("id")
+		var user User
+		err := usersDb.FindOne(context.TODO(), bson.D{{"_id", userId}}).Decode(&user)
+		if err != nil {
+			c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
+			_ = os.Remove(fullPath) // Clean up uploaded file
 			return
 		}
-		user.Avatar = filename
-		_, err = usersDb.ReplaceOne(context.TODO(), bson.D{{"_id", userId}}, user)
+
+		_, err = usersDb.UpdateOne(
+			context.TODO(),
+			bson.D{{"_id", userId}},
+			bson.D{{"$set", bson.D{{"avatar", fullPath}}}},
+		)
 		if err != nil {
-			c.AbortWithStatusJSON(500, gin.H{"error": "Failed to pin image to user"})
-			err = os.Remove("./img/" + filename)
-			if err != nil {
-				log.Fatal("Failed to remove avatar")
-			}
+			c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
+			_ = os.Remove(fullPath)
+			return
 		}
-		c.AbortWithStatus(200)
-	} else {
-		user := Workspace{}
-		if err := workspacesDb.FindOne(context.TODO(), bson.D{{"_id", workspaceId}}).Decode(&user); err != nil {
+	} else { // Workspace avatar
+		workspaceId, err := bson.ObjectIDFromHex(wId)
+		if err != nil {
+			c.AbortWithStatusJSON(400, gin.H{"error": "Invalid workspace ID"})
+			_ = os.Remove(fullPath) // Clean up uploaded file
+			return
+		}
+
+		var workspace Workspace
+		err = workspacesDb.FindOne(context.TODO(), bson.D{{"_id", workspaceId}}).Decode(&workspace)
+		if err != nil {
 			if errors.Is(err, mongo.ErrNoDocuments) {
-				c.AbortWithStatusJSON(404, gin.H{"error": "Not Found"})
-				return
+				c.AbortWithStatusJSON(404, gin.H{"error": "Workspace doesnt exist"})
 			} else {
-				c.AbortWithStatusJSON(500, gin.H{"error": "Failed to find workspace"})
-				return
+				c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
 			}
+			_ = os.Remove(fullPath)
+			return
 		}
-		user.Avatar = filename
-		_, err = workspacesDb.ReplaceOne(context.TODO(), bson.D{{"_id", workspaceId}}, user)
+
+		_, err = workspacesDb.UpdateOne(
+			context.TODO(),
+			bson.D{{"_id", workspaceId}},
+			bson.D{{"$set", bson.D{{"avatar", fullPath}}}},
+		)
 		if err != nil {
-			c.AbortWithStatusJSON(500, gin.H{"error": "Failed to pin image to user"})
-			err = os.Remove("./img/" + filename)
-			if err != nil {
-				log.Fatal("Failed to remove avatar")
-			}
+			c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
+			_ = os.Remove(fullPath)
+			return
 		}
-		c.AbortWithStatus(200)
 	}
 
+	c.JSON(200, gin.H{"avatar": fullPath})
 }
 
-// @Summary Refresh bearer token
-// @Description For this route, you must have refresh token, that is sent to your browser when you log into user account as an http-only cookie
-// @Router /api/v1/users/refresh [get]
-// @Success 200 {array} TokenSwagger
-// @Produce json
-// @Tags Users
-
+// @Summary 		Refresh bearer token
+// @Description 	Generates a new access token using the refresh token stored in an http-only cookie.
+// @Router 			/users/refresh [get]
+// @Tags 			Users
+// @Produce 		json
+// @Success 		200 {object} TokenSwagger "New access token"
+// @Failure 		400 {object} ErrorSwagger "Invalid token"
+// @Failure 		403 {object} ErrorSwagger "Authorization required"
+// @Failure 		500 {object} ErrorSwagger "Internal server error"
 func refreshAccessToken(c *gin.Context) {
 	refreshToken, _ := c.Cookie("refreshToken")
 	token, err := jwt.ParseWithClaims(refreshToken, &Token{}, func(token *jwt.Token) (any, error) {
@@ -266,18 +329,17 @@ func refreshAccessToken(c *gin.Context) {
 		}
 		return []byte(pepper), nil
 	})
-	if err != nil {
-		c.AbortWithStatusJSON(500, "Internal Server Error")
+	if err != nil || !token.Valid {
+		c.AbortWithStatusJSON(400, gin.H{"error": "Invalid or expired token"})
 		return
 	}
 	claims := token.Claims.(*Token)
-	if claims.ExpiresAt < time.Now().UTC().Unix() {
-		c.AbortWithStatusJSON(403, "Authorization Required")
+	if claims.Type != "refresh" {
+		c.AbortWithStatusJSON(400, gin.H{"error": "Invalid token type"})
 		return
-	} else if claims.Type == "access" {
-		c.AbortWithStatusJSON(400, "Invalid Token")
 	}
-	bearerToken, err := generateAccessToken(refreshToken, "access")
+
+	bearerToken, err := generateAccessToken(claims.Id.Hex(), "access")
 	if err != nil {
 		c.AbortWithStatusJSON(500, gin.H{"error": "Something went wrong when generating access token"})
 		return
@@ -285,13 +347,15 @@ func refreshAccessToken(c *gin.Context) {
 	c.AbortWithStatusJSON(200, gin.H{"token": bearerToken})
 }
 
-// @Summary Get user info
-// @Description For this route, you must have bearer token
-// @Router /api/v1/users/get_info [get]
-// @Success 200 {array} User
-// @Produce json
-// @Tags Users
-// @Param X-Authorization header string true "Bearer Token"
+// @Summary 		Get user info
+// @Description 	Retrieves details for the currently authenticated user.
+// @Router 			/users/get_info [get]
+// @Tags 			Users
+// @Security 		BearerAuth
+// @Produce 		json
+// @Success 		200 {object} User "User details"
+// @Failure 		403 {object} ErrorSwagger "Forbidden"
+// @Failure 		500 {object} ErrorSwagger "Internal server error"
 func getUserDetails(c *gin.Context) {
 	userId, _ := c.Get("id")
 	var user User

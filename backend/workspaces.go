@@ -7,287 +7,528 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/goccy/go-json"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/sqids/sqids-go"
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
+	"math/rand"
 	"slices"
 	"time"
 )
 
-// @Summary Create new workspace
-// @Router /api/v1/workspaces/create [post]
-// @Accept json
-// @Success 200
-// @Tags Workspaces
-// @Param data body CreateBoard true "Create new workspace"
-// @Param X-Authorization header string true "Bearer Token"
+// @Summary 		Create a new workspace
+// @Description 	Creates a new workspace for the current user.
+// @Router 			/workspaces/create [post]
+// @Tags 			Workspaces
+// @Security 		BearerAuth
+// @Accept 			json
+// @Produce 		json
+// @Param 			data body CreateWorkspace true "Workspace creation data"
+// @Success 		200 {object} Workspace "The created workspace"
+// @Failure 		400 {object} ErrorSwagger "Bad request - no name specified"
+// @Failure 		500 {object} ErrorSwagger "Internal server error"
 func createWorkspace(c *gin.Context) {
-	userId, _ := c.Get("id")
-	var input Workspace
-	var i Workspace
+	id, _ := c.Get("id")
+	userId := id.(bson.ObjectID)
+	var input CreateWorkspace
 	if err := json.NewDecoder(c.Request.Body).Decode(&input); err != nil {
-		c.AbortWithStatusJSON(500, gin.H{"error": "Failed to parse request"})
+		c.AbortWithStatusJSON(500, gin.H{"error": "Something went wrong when parsing request"})
 		return
-	}
-	if input.Name == "" {
+	} else if input.Name == "" {
 		c.AbortWithStatusJSON(400, gin.H{"error": "Field 'name' is not specified"})
-		return
-	} else if err := workspacesDb.FindOne(context.TODO(), bson.D{{"name", input.Name}}).Decode(&i); err == nil {
-		c.AbortWithStatusJSON(400, gin.H{"error": "Workspace with this name already exists"})
 		return
 	}
 	output := Workspace{
 		Name:    input.Name,
-		OwnedBy: userId.(bson.ObjectID),
+		OwnedBy: userId,
+		Members: []bson.ObjectID{userId},
 	}
-	output.Members = append(output.Members, userId.(bson.ObjectID))
-	if _, err := workspacesDb.InsertOne(context.TODO(), output); err != nil {
+	workspace, err := workspacesDb.InsertOne(context.TODO(), output)
+	if err != nil {
+		c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
+		return
+	}
+	output.Id = workspace.InsertedID.(bson.ObjectID)
+	c.JSON(200, output)
+}
+
+// @Summary 		Edit a workspace
+// @Description 	Edits the details of a specific workspace.
+// @Router 			/workspaces/{workspaceId} [patch]
+// @Tags 			Workspaces
+// @Security 		BearerAuth
+// @Accept 			json
+// @Produce 		json
+// @Param 			workspaceId path string true "Workspace ID"
+// @Param 			data body EditWorkspace true "Fields to edit in the workspace"
+// @Success 		200 {object} Workspace "The updated workspace"
+// @Failure 		400 {object} ErrorSwagger "Bad request - invalid input"
+// @Failure 		403 {object} ErrorSwagger "Forbidden - you are not the owner of this workspace"
+// @Failure 		404 {object} ErrorSwagger "Not Found - workspace not found"
+// @Failure 		500 {object} ErrorSwagger "Internal server error"
+func editWorkspace(c *gin.Context) {
+	userId, _ := c.Get("id")
+	wId := c.Param("workspaceId")
+	workspaceId, _ := bson.ObjectIDFromHex(wId)
+
+	var input map[string]interface{}
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.AbortWithStatusJSON(400, gin.H{"error": "Failed to parse request"})
+		return
+	}
+
+	var workspace Workspace
+	if err := workspacesDb.FindOne(context.TODO(), bson.M{"_id": workspaceId}).Decode(&workspace); err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			c.AbortWithStatusJSON(404, gin.H{"error": "Not Found"})
+		} else {
+			c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
+		}
+		return
+	}
+
+	if workspace.OwnedBy != userId.(bson.ObjectID) {
+		c.AbortWithStatusJSON(403, gin.H{"error": "You are not an owner of this workplace"})
+		return
+	}
+
+	updateFields := bson.M{}
+	if name, ok := input["name"].(string); ok {
+		if name == "" {
+			c.AbortWithStatusJSON(400, gin.H{"error": "Field 'name' can not be empty"})
+			return
+		}
+		updateFields["name"] = name
+		workspace.Name = name
+	}
+
+	if avatar, ok := input["avatar"]; ok {
+		updateFields["avatar"] = avatar
+		if av, ok := avatar.(string); ok {
+			workspace.Avatar = av
+		} else {
+			workspace.Avatar = "" // if avatar is null
+		}
+	}
+
+	if len(updateFields) > 0 {
+		_, err := workspacesDb.UpdateOne(
+			context.TODO(),
+			bson.M{"_id": workspaceId},
+			bson.M{"$set": updateFields},
+		)
+		if err != nil {
+			c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
+			return
+		}
+	}
+
+	c.JSON(200, workspace)
+}
+
+// @Summary 		Get all workspaces for the current user
+// @Description 	Returns a list of all workspaces the current user is a member of.
+// @Router 			/users/workspaces [get]
+// @Tags 			Workspaces
+// @Security 		BearerAuth
+// @Produce 		json
+// @Success 		200 {object} AllWorkspacesResponse "A list of workspaces"
+// @Failure 		500 {object} ErrorSwagger "Internal Server Error"
+func getAllWorkspaces(c *gin.Context) {
+	id, _ := c.Get("id")
+	userId := id.(bson.ObjectID)
+	cursor, _ := workspacesDb.Find(context.TODO(), bson.D{{"members", userId}})
+	workspaces := make([]Workspace, 0)
+	if err := cursor.All(context.TODO(), &workspaces); err != nil {
+		c.JSON(500, gin.H{"error": "failed to decode workspaces"})
+		return
+	}
+	if err := cursor.Close(context.TODO()); err != nil {
+		// Log the error but don't abort, as the response has already been sent.
+		println("Failed to close cursor: ", err.Error())
+	}
+	c.IndentedJSON(200, gin.H{"workspaces": workspaces})
+}
+
+// @Summary 		Delete a workspace
+// @Description 	Deletes a specific workspace.
+// @Router 			/workspaces/{workspaceId} [delete]
+// @Tags 			Workspaces
+// @Security 		BearerAuth
+// @Produce 		json
+// @Param 			workspaceId path string true "Workspace ID"
+// @Success 		200 "Workspace deleted successfully"
+// @Failure 		403 {object} ErrorSwagger "Forbidden - you are not the owner of this workspace"
+// @Failure 		404 {object} ErrorSwagger "Not Found - workspace not found"
+// @Failure 		500 {object} ErrorSwagger "Internal server error"
+func deleteWorkspace(c *gin.Context) {
+	id, _ := c.Get("id")
+	workspaceIdStr := c.Param("workspaceId")
+	workspaceId, _ := bson.ObjectIDFromHex(workspaceIdStr)
+	var previousVersion Workspace
+	if err := workspacesDb.FindOne(context.TODO(), bson.D{{"_id", workspaceId}}).Decode(&previousVersion); err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			c.AbortWithStatusJSON(404, gin.H{"error": "Not Found"})
+		} else {
+			c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
+		}
+		return
+	}
+	if previousVersion.OwnedBy != id.(bson.ObjectID) {
+		c.AbortWithStatusJSON(403, gin.H{"error": "You are not an owner of this workplace"})
+		return
+	}
+	if _, err := workspacesDb.DeleteOne(context.TODO(), bson.D{{"_id", workspaceId}}); err != nil {
 		c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
 		return
 	}
 	c.AbortWithStatus(200)
 }
 
-// @Summary Edit workspace
-// @Router /api/v1/workspaces/{workspaceId}/ [patch]
-// @Success 200
-// @Tags Workspaces
-// @Param X-Authorization header string true "Bearer Token"
-// @Param workspaceId query string true "Workspace ID"
-func editWorkspace(c *gin.Context) {
-	id, _ := c.Get("id")
-	workspaceId := c.Param("workspaceId")
-	previousVersion := Workspace{}
-	input := Workspace{}
-	if err := json.NewDecoder(c.Request.Body).Decode(&input); err != nil {
-		c.AbortWithStatusJSON(500, gin.H{"error": "Failed to parse request"})
-		return
-	} else if input.Name == "" {
-		c.AbortWithStatusJSON(400, gin.H{"error": "Name cant be null"})
-		return
-	}
-	if err := workspacesDb.FindOne(context.TODO(), bson.D{{"_id", bson.ObjectIDFromHex(workspaceId)}}).Decode(&previousVersion); err != nil {
-		if errors.Is(err, mongo.ErrNoDocuments) {
-			c.AbortWithStatusJSON(404, gin.H{"error": "Not Found"})
-			return
-		} else {
-			c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
-			return
-		}
-	}
-	if previousVersion.OwnedBy != id {
-		c.AbortWithStatusJSON(400, gin.H{"error": "You are not an owner of this workplace"})
-		return
-	}
-	previousVersion.Name = input.Name
-	previousVersion.Avatar = input.Avatar
-	if _, err := workspacesDb.ReplaceOne(context.TODO(), bson.D{{"_id", bson.ObjectIDFromHex(workspaceId)}}, previousVersion); err != nil {
-		c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
-		return
-	}
-}
-
-// @Summary Get all workspaces for the current user
-// @Router /api/v1/users/workspaces/ [get]
-// @Success 200
-// @Tags Workspaces
-// @Param X-Authorization header string true "Bearer Token"
-func getAllWorkspaces(c *gin.Context) {
-	id, _ := c.Get("id")
-	cursor, _ := workspacesDb.Find(context.TODO(), bson.D{{"members", id}})
-	defer cursor.Close(context.TODO())
-	var workspaces []Workspace
-	if err := cursor.All(context.TODO(), &workspaces); err != nil {
-		c.JSON(500, gin.H{"error": "failed to decode workspaces"})
-		return
-	}
-	c.IndentedJSON(200, workspaces)
-}
-
-// @Summary Delete workspace
-// @Router /api/v1/workspaces/{workspaceId}/ [delete]
-// @Success 200
-// @Tags Workspaces
-// @Param X-Authorization header string true "Bearer Token"
-// @Param workspaceId query string true "Workspace ID"
-func deleteWorkspace(c *gin.Context) {
-	id, _ := c.Get("id")
-	workspaceId := c.Param("workspaceId")
-	previousVersion := Workspace{}
-	if err := workspacesDb.FindOne(context.TODO(), bson.D{{"_id", bson.ObjectIDFromHex(workspaceId)}}).Decode(&previousVersion); err != nil {
-		if errors.Is(err, mongo.ErrNoDocuments) {
-			c.AbortWithStatusJSON(404, gin.H{"error": "Not Found"})
-			return
-		} else {
-			c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
-			return
-		}
-	}
-	if previousVersion.OwnedBy != id {
-		c.AbortWithStatusJSON(400, gin.H{"error": "You are not an owner of this workplace"})
-		return
-	}
-	if _, err := workspacesDb.DeleteOne(context.TODO(), bson.D{{"_id", bson.ObjectIDFromHex(workspaceId)}}); err != nil {
-		c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
-		return
-	}
-}
-
-// @Summary Accept invite
-// @Router /api/v1/workspaces/add/{joinToken} [post]
-// @Success 200
-// @Tags Workspaces
-// @Param X-Authorization header string true "Bearer Token"
-// @Param joinToken query string true "Join Token"
+// @Summary 		Join a workspace
+// @Description 	Adds the current user to a workspace using an invite token.
+// @Router 			/workspaces/add/{joinToken} [post]
+// @Tags 			Workspaces
+// @Security 		BearerAuth
+// @Produce 		json
+// @Param 			joinToken path string true "Join Token"
+// @Success 		200 "Successfully joined the workspace"
+// @Failure 		400 {object} ErrorSwagger "Bad request - invalid token"
+// @Failure 		404 {object} ErrorSwagger "Not Found - workspace not found"
+// @Failure 		500 {object} ErrorSwagger "Internal server error"
 func addMember(c *gin.Context) {
+	sqid := c.Param("joinToken")
 	userId, _ := c.Get("id")
-	joinToken := c.Param("joinToken")
-	var workspace Workspace
-	token, _ := jwt.ParseWithClaims(fmt.Sprintf("%v", joinToken), &Token{}, func(token *jwt.Token) (any, error) {
+	joinToken := ""
+	workspace := Workspace{}
+	if err := workspacesDb.FindOne(context.TODO(), bson.D{{"tokens.sqid", sqid}}).Decode(&workspace); err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			c.AbortWithStatusJSON(404, gin.H{"error": "Not Found"})
+			return
+		} else if err != nil {
+			c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
+			return
+		}
+	}
+	for i := range workspace.Tokens {
+		if workspace.Tokens[i].Sqid == sqid {
+			joinToken = workspace.Tokens[i].Token
+		}
+	}
+	if joinToken == "" {
+		c.AbortWithStatusJSON(404, gin.H{"error": "Invite does not exist"})
+		return
+	}
+	token, err := jwt.ParseWithClaims(joinToken, &Token{}, func(token *jwt.Token) (any, error) {
 		if token.Method != jwt.SigningMethodHS256 {
 			return nil, fmt.Errorf("unknown signing method: %s", token.Method)
 		}
 		return []byte(pepper), nil
 	})
-	claims := token.Claims.(*Token)
+	if err != nil || !token.Valid {
+		c.AbortWithStatusJSON(400, gin.H{"error": "Invalid or expired token"})
+		return
+	}
+	claims, ok := token.Claims.(*Token)
+	if !ok {
+		c.AbortWithStatusJSON(400, gin.H{"error": "Invalid token claims"})
+		return
+	}
+	if claims.Type != "invite" {
+		c.AbortWithStatusJSON(400, gin.H{"error": "Invalid token type"})
+		return
+	}
 	if err := workspacesDb.FindOne(context.TODO(), bson.D{{"_id", claims.Id}}).Decode(&workspace); err != nil {
 		if errors.Is(err, mongo.ErrNoDocuments) {
 			c.AbortWithStatusJSON(404, gin.H{"error": "Workspace does not exist"})
-			return
 		} else {
+			c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
+		}
+		return
+	}
+	// Add user to members if not already present
+	if slices.Index(workspace.Members, userId.(bson.ObjectID)) == -1 {
+		workspace.Members = append(workspace.Members, userId.(bson.ObjectID))
+		if _, err := workspacesDb.ReplaceOne(context.TODO(), bson.D{{"_id", claims.Id}}, workspace); err != nil {
 			c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
 			return
 		}
 	}
-	_ = append(workspace.Members, userId.(bson.ObjectID))
-	if _, err := workspacesDb.ReplaceOne(context.TODO(), bson.D{{"_id", claims.Id}}, workspace); err != nil {
+	c.AbortWithStatus(200)
+}
+
+// @Summary 		Create a workspace invite
+// @Description 	Generates a new invite token for a workspace.
+// @Router 			/workspaces/{workspaceId}/new_invite [get]
+// @Tags 			Workspaces
+// @Security 		BearerAuth
+// @Produce 		json
+// @Param 			workspaceId path string true "Workspace ID"
+// @Success 		200 {object} TokenSwagger "The invite token"
+// @Failure 		400 {object} ErrorSwagger "Bad request - workspace ID not specified"
+// @Failure 		403 {object} ErrorSwagger "Forbidden - you are not the owner of this workspace"
+// @Failure 		404 {object} ErrorSwagger "Not Found - workspace not found"
+func createNewInvite(c *gin.Context) {
+	s, _ := sqids.New()
+	userId, _ := c.Get("id")
+	workspaceIdStr := c.Param("workspaceId")
+	if workspaceIdStr == "" {
+		c.AbortWithStatusJSON(400, gin.H{"error": "You must specify workspace id"})
+		return
+	}
+	var workspace Workspace
+	workspaceId, _ := bson.ObjectIDFromHex(workspaceIdStr)
+	if err := workspacesDb.FindOne(context.TODO(), bson.D{{"_id", workspaceId}}).Decode(&workspace); err != nil {
+		c.AbortWithStatusJSON(404, gin.H{"error": "Not Found"})
+		return
+	}
+	if workspace.OwnedBy != userId.(bson.ObjectID) {
+		c.AbortWithStatusJSON(403, gin.H{"error": "You are not an owner of this workplace"})
+		return
+	}
+	claims := Token{
+		Id:   workspaceId,
+		Type: "invite",
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().UTC().Add(2 * 7 * 24 * time.Hour)), // 2 weeks
+		},
+	}
+	newToken := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	inviteToken, _ := newToken.SignedString([]byte(pepper))
+	noise := rand.Uint64()
+	sqid, _ := s.Encode([]uint64{noise})
+	workspace.Tokens = append(workspace.Tokens, WorkspaceTokens{
+		Sqid:  sqid,
+		Token: inviteToken,
+		Uses:  3,
+	})
+	if _, err := workspacesDb.ReplaceOne(context.TODO(), bson.D{{"_id", workspace.Id}}, workspace); err != nil {
 		c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
+		return
+	}
+	c.JSON(200, gin.H{"sqid": sqid})
+}
+
+// @Summary 		Get workspace details from invite token
+// @Description 	Retrieves workspace details using an invite token.
+// @Router 			/workspaces/invite/{joinToken} [get]
+// @Tags 			Workspaces
+// @Produce 		json
+// @Param 			joinToken path string true "Join Token"
+// @Success 		200 {object} Workspace "The workspace details"
+// @Failure 		400 {object} ErrorSwagger "Bad request - invalid token"
+// @Failure 		404 {object} ErrorSwagger "Not Found - workspace not found"
+// @Failure 		500 {object} ErrorSwagger "Internal server error"
+func getWorkspaceByInviteToken(c *gin.Context) {
+	sqid := c.Param("joinToken")
+	joinTokenStr := ""
+	workspace := Workspace{}
+	if err := workspacesDb.FindOne(context.TODO(), bson.D{{"tokens.sqid", sqid}}).Decode(&workspace); err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			c.AbortWithStatusJSON(404, gin.H{"error": "Not Found"})
+			return
+		} else if err != nil {
+			c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
+			return
+		}
+	}
+	for i := range workspace.Tokens {
+		if workspace.Tokens[i].Sqid == sqid {
+			joinTokenStr = workspace.Tokens[i].Token
+		}
+	}
+	if joinTokenStr == "" {
+		c.AbortWithStatusJSON(404, gin.H{"error": "Invite does not exist"})
+		return
+	}
+	token, err := jwt.ParseWithClaims(joinTokenStr, &Token{}, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+		}
+		return []byte(pepper), nil
+	})
+
+	if err != nil || !token.Valid {
+		c.AbortWithStatusJSON(400, gin.H{"error": "Invalid or expired token"})
+		return
+	}
+	claims, ok := token.Claims.(*Token)
+	if !ok {
+		c.AbortWithStatusJSON(500, gin.H{"error": "Failed to process token claims"})
+		return
+	}
+
+	if claims.Type != "invite" {
+		c.AbortWithStatusJSON(400, gin.H{"error": "Invalid token type"})
+		return
+	}
+	workspace.Tokens = nil
+	c.JSON(200, workspace)
+}
+
+// @Summary 		Kick a member from a workspace
+// @Description 	Removes a member from a specific workspace.
+// @Router 			/workspaces/{workspaceId}/kick [delete]
+// @Tags 			Workspaces
+// @Security 		BearerAuth
+// @Accept 			json
+// @Param 			workspaceId path string true "Workspace ID"
+// @Param 			data body KickUser true "User ID to kick"
+// @Success 		200 "Member kicked successfully"
+// @Failure 		400 {object} ErrorSwagger "Bad request - workspace ID not specified"
+// @Failure 		403 {object} ErrorSwagger "Forbidden - you are not the owner of this workspace"
+// @Failure 		404 {object} ErrorSwagger "Not Found - workspace or user not found"
+// @Failure 		500 {object} ErrorSwagger "Internal server error"
+func kickMember(c *gin.Context) {
+	currentUserId, _ := c.Get("id")
+	workspaceIdStr := c.Param("workspaceId")
+	if workspaceIdStr == "" {
+		c.AbortWithStatusJSON(400, gin.H{"error": "You must specify workspace id"})
+		return
+	}
+	var input KickUser
+	if err := json.NewDecoder(c.Request.Body).Decode(&input); err != nil {
+		c.AbortWithStatusJSON(500, gin.H{"error": "Something went wrong when parsing request"})
+		return
+	}
+	workspaceId, _ := bson.ObjectIDFromHex(workspaceIdStr)
+	var workspace Workspace
+	if err := workspacesDb.FindOne(context.TODO(), bson.D{{"_id", workspaceId}}).Decode(&workspace); err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			c.AbortWithStatusJSON(404, gin.H{"error": "Not Found"})
+		} else {
+			c.AbortWithStatusJSON(500, gin.H{"error": "Internal server error"})
+		}
+		return
+	}
+	if workspace.OwnedBy != currentUserId.(bson.ObjectID) {
+		c.AbortWithStatusJSON(403, gin.H{"error": "You are not owner of this workspace"})
+		return
+	}
+	// Prevent owner from being kicked
+	if input.Id == workspace.OwnedBy {
+		c.AbortWithStatusJSON(400, gin.H{"error": "Cannot kick the owner"})
+		return
+	}
+	// Remove member
+	newMembers := make([]bson.ObjectID, 0)
+	found := false
+	for _, memberId := range workspace.Members {
+		if memberId == input.Id {
+			found = true
+			continue
+		}
+		newMembers = append(newMembers, memberId)
+	}
+	if !found {
+		c.AbortWithStatusJSON(404, gin.H{"error": "User not found in workspace"})
+		return
+	}
+	workspace.Members = newMembers
+	if _, err := workspacesDb.ReplaceOne(context.TODO(), bson.D{{"_id", workspace.Id}}, workspace); err != nil {
+		c.AbortWithStatusJSON(500, gin.H{"error": "Internal server error"})
 		return
 	}
 	c.AbortWithStatus(200)
 }
 
-// @Summary Create invite to the workspace
-// @Router /api/v1/workspaces/{workspaceId}/new_invite [get]
-// @Success 200
-// @Tags Workspaces
-// @Param X-Authorization header string true "Bearer Token"
-// @Param workspaceId query string true "Workspace ID"
-func createNewInvite(c *gin.Context) {
-	if workspaceId, exists := c.Get("workspaceId"); exists == true {
-		var i Workspace
-		if err := workspacesDb.FindOne(context.TODO(), bson.D{{"_id", workspaceId}}).Decode(&i); err != nil {
-			c.AbortWithStatusJSON(404, gin.H{"error": "Not Found"})
-			return
-		} else {
-			newToken := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-				"id":   workspaceId,
-				"exp":  time.Now().UTC().Unix() + 1209600, //2 weeks
-				"type": "invite",
-			})
-			inviteToken, _ := newToken.SignedString([]byte(pepper))
-			c.AbortWithStatusJSON(200, gin.H{"token": inviteToken})
-			return
-		}
-	} else {
-		c.AbortWithStatusJSON(400, gin.H{"error": "You must specify workspace id"})
-		return
-	}
-}
-
-// @Summary Kick member
-// @Router /api/v1/workspaces/{workspaceId}/kick [delete]
-// @Success 200
-// @Tags Workspaces
-// @Param X-Authorization header string true "Bearer Token"
-// @Param workspaceId query string true "Workspace ID"
-func kickMember(c *gin.Context) {
-	id, _ := c.Get("id")
-	workspaceId := c.Param("workspaceId")
-	var input KickUser
-	if err := json.NewDecoder(c.Request.Body).Decode(&input); err != nil {
-		c.AbortWithStatusJSON(500, gin.H{"error": "Something went wrong when parsing request"})
-		return
-	}
-	if workspaceId != "" {
-		i, _ := bson.ObjectIDFromHex(workspaceId)
-		workspace := Workspace{}
-		if err := workspacesDb.FindOne(context.TODO(), bson.D{{"_id", i}}).Decode(&workspace); err != nil {
-			if errors.Is(err, mongo.ErrNoDocuments) {
-				c.AbortWithStatusJSON(404, gin.H{"error": "Not Found"})
-				return
-			} else {
-				c.AbortWithStatusJSON(500, gin.H{"error": "Internal server error"})
-				return
-			}
-		} else if workspace.OwnedBy != id {
-			c.AbortWithStatusJSON(500, gin.H{"error": "You are not owner of this workspace"})
-			return
-		}
-		workspace.Members = slices.Delete(workspace.Members, slices.Index(workspace.Members, input.Id), slices.Index(workspace.Members, input.Id)+1)
-		if _, err := workspacesDb.ReplaceOne(context.TODO(), bson.D{{"_id", workspace.Id}}, workspace); err != nil {
-			c.AbortWithStatusJSON(500, gin.H{"error": "Internal server error"})
-			return
-		}
-		c.AbortWithStatus(200)
-		return
-	} else {
-		c.AbortWithStatusJSON(400, gin.H{"error": "You must specify workspace id"})
-		return
-	}
-}
-
-// @Summary Promote member
-// @Router /api/v1/workspaces/{workspaceId}/promote/{userId} [patch]
-// @Success 200
-// @Tags Workspaces
-// @Param X-Authorization header string true "Bearer Token"
-// @Param workspaceId query string true "Workspace ID"
-// @Param userId query string true "User ID"
+// @Summary 		Promote a member to owner
+// @Description 	Promotes a member of a workspace to be the new owner.
+// @Router 			/workspaces/{workspaceId}/promote/{userId} [patch]
+// @Tags 			Workspaces
+// @Security 		BearerAuth
+// @Param 			workspaceId path string true "Workspace ID"
+// @Param 			userId path string true "User ID to promote"
+// @Success 		200 "Member promoted successfully"
+// @Failure 		400 {object} ErrorSwagger "Bad request - user is not part of this workspace"
+// @Failure 		403 {object} ErrorSwagger "Forbidden - you are not the owner of this workspace"
+// @Failure 		404 {object} ErrorSwagger "Not Found - workspace or user not found"
+// @Failure 		500 {object} ErrorSwagger "Internal server error"
 func promoteMember(c *gin.Context) {
-	id, _ := c.Get("id")
-	workspaceId := c.Param("workspaceId")
-	var input KickUser
-	if err := json.NewDecoder(c.Request.Body).Decode(&input); err != nil {
-		c.AbortWithStatusJSON(500, gin.H{"error": "Something went wrong when parsing request"})
-		return
-	}
-	if workspaceId != "" {
-		i, _ := bson.ObjectIDFromHex(workspaceId)
-		workspace := Workspace{}
-		if err := workspacesDb.FindOne(context.TODO(), bson.D{{"_id", i}}).Decode(&workspace); err != nil {
-			if errors.Is(err, mongo.ErrNoDocuments) {
-				c.AbortWithStatusJSON(404, gin.H{"error": "Not Found"})
-				return
-			} else {
-				c.AbortWithStatusJSON(500, gin.H{"error": "Internal server error"})
-				return
-			}
-		} else if workspace.OwnedBy != id {
-			c.AbortWithStatusJSON(500, gin.H{"error": "You are not owner of this workspace"})
-			return
-		} else if slices.Index(workspace.Members, input.Id) == -1 {
-			c.AbortWithStatusJSON(400, gin.H{"error": "User is not part of this workspace"})
-			return
-		}
-		workspace.OwnedBy = input.Id
-		if _, err := workspacesDb.ReplaceOne(context.TODO(), bson.D{{"_id", workspace.Id}}, workspace); err != nil {
-			c.AbortWithStatusJSON(500, gin.H{"error": "Internal server error"})
-			return
-		}
-		c.AbortWithStatus(200)
-		return
-	} else {
+	currentUserId, _ := c.Get("id")
+	workspaceIdStr := c.Param("workspaceId")
+	userIdToPromoteStr := c.Param("userId")
+	workspaceId, _ := bson.ObjectIDFromHex(workspaceIdStr)
+	userIdToPromote, _ := bson.ObjectIDFromHex(userIdToPromoteStr)
 
+	var workspace Workspace
+	if err := workspacesDb.FindOne(context.TODO(), bson.D{{"_id", workspaceId}}).Decode(&workspace); err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			c.AbortWithStatusJSON(404, gin.H{"error": "Not Found"})
+		} else {
+			c.AbortWithStatusJSON(500, gin.H{"error": "Internal server error"})
+		}
+		return
 	}
+	if workspace.OwnedBy != currentUserId.(bson.ObjectID) {
+		c.AbortWithStatusJSON(403, gin.H{"error": "You are not owner of this workspace"})
+		return
+	}
+	if slices.Index(workspace.Members, userIdToPromote) == -1 {
+		c.AbortWithStatusJSON(400, gin.H{"error": "User is not part of this workspace"})
+		return
+	}
+	workspace.OwnedBy = userIdToPromote
+	if _, err := workspacesDb.ReplaceOne(context.TODO(), bson.D{{"_id", workspace.Id}}, workspace); err != nil {
+		c.AbortWithStatusJSON(500, gin.H{"error": "Internal server error"})
+		return
+	}
+	c.AbortWithStatus(200)
 }
 
-// @Summary Get all members info
-// @Router /api/v1/workspaces/{workspaceId}/members [get]
-// @Success 200
-// @Tags Workspaces
-// @Param X-Authorization header string true "Bearer Token"
-// @Param workspaceId query string true "Workspace ID"
-func getAllMembers(c *gin.Context) {
+// @Summary 		Get a workspace by ID
+// @Description 	Retrieves a specific workspace by its ID.
+// @Router 			/workspaces/{workspaceId} [get]
+// @Tags 			Workspaces
+// @Security 		BearerAuth
+// @Produce 		json
+// @Param 			workspaceId path string true "Workspace ID"
+// @Success 		200 {object} Workspace "The requested workspace"
+// @Failure 		400 {object} ErrorSwagger "Bad request - invalid workspace ID"
+// @Failure 		403 {object} ErrorSwagger "Forbidden - you are not a member of this workspace"
+// @Failure 		404 {object} ErrorSwagger "Not Found - workspace not found"
+// @Failure 		500 {object} ErrorSwagger "Internal server error"
+func getWorkspace(c *gin.Context) {
+	id, _ := c.Get("id")
+	userId := id.(bson.ObjectID)
+	workspaceIdStr := c.Param("workspaceId")
+	workspaceId, err := bson.ObjectIDFromHex(workspaceIdStr)
+	if err != nil {
+		c.JSON(400, gin.H{"error": "invalid workspaceId"})
+		return
+	}
+
+	var workspace Workspace
+	if err := workspacesDb.FindOne(context.TODO(), bson.M{"_id": workspaceId}).Decode(&workspace); err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			c.JSON(404, gin.H{"error": "workspace not found"})
+		} else {
+			c.JSON(500, gin.H{"error": err.Error()})
+		}
+		return
+	}
+
+	// Ensure requester is a member or owner
+	if slices.Index(workspace.Members, userId) == -1 && workspace.OwnedBy != userId {
+		c.JSON(403, gin.H{"error": "forbidden"})
+		return
+	}
+
+	c.IndentedJSON(200, workspace)
+}
+
+// @Summary 		Get workspace info
+// @Description 	Retrieves detailed information about a workspace, including members and boards.
+// @Router 			/workspaces/{workspaceId}/info [get]
+// @Tags 			Workspaces
+// @Security 		BearerAuth
+// @Produce 		json
+// @Param 			workspaceId path string true "Workspace ID"
+// @Success 		200 {object} WorkspaceInfo "Detailed workspace information"
+// @Failure 		400 {object} ErrorSwagger "Bad request - invalid workspace ID"
+// @Failure 		403 {object} ErrorSwagger "Forbidden - you are not a member of this workspace"
+// @Failure 		404 {object} ErrorSwagger "Not Found - workspace not found"
+// @Failure 		500 {object} ErrorSwagger "Internal server error"
+func getWorkspaceInfo(c *gin.Context) {
 	id, _ := c.Get("id")
 	userId := id.(bson.ObjectID)
 
@@ -298,81 +539,63 @@ func getAllMembers(c *gin.Context) {
 		return
 	}
 
-	workspace := Workspace{}
-	if err := workspacesDb.FindOne(context.TODO(), bson.M{"_id": workspaceId}).Decode(&workspace); err != nil {
-		if errors.Is(err, mongo.ErrNoDocuments) {
-			c.JSON(404, gin.H{"error": "workspace not found"})
-			return
-		}
-		c.JSON(500, gin.H{"error": err.Error()})
-		return
+	pipeline := mongo.Pipeline{
+		{{"$match", bson.D{{"_id", workspaceId}}}},
+		{{"$lookup", bson.D{
+			{"from", "users"},
+			{"localField", "members"},
+			{"foreignField", "_id"},
+			{"as", "memberDetails"},
+			{"pipeline", bson.A{
+				bson.D{{"$project", bson.D{
+					{"_id", 1},
+					{"name", 1},
+					{"avatar", 1},
+				}}},
+			}},
+		}}},
+		{{"$lookup", bson.D{
+			{"from", "boards"},
+			{"localField", "_id"},
+			{"foreignField", "owned_by"},
+			{"as", "boards"},
+		}}},
 	}
 
-	if slices.Index(workspace.Members, userId) == -1 {
-		c.JSON(403, gin.H{"error": "not a member of this workspace"})
-		return
-	}
-	cursor, err := usersDb.Find(context.TODO(), bson.M{
-		"_id": bson.M{"$in": workspace.Members},
-	})
+	cursor, err := workspacesDb.Aggregate(context.TODO(), pipeline)
 	if err != nil {
-		c.JSON(500, gin.H{"error": "failed to fetch users"})
+		c.JSON(500, gin.H{"error": "failed to fetch workspace info"})
 		return
 	}
 	defer cursor.Close(context.TODO())
 
-	var members []Member
-	if err := cursor.All(context.TODO(), &members); err != nil {
-		c.JSON(500, gin.H{"error": "failed to decode users"})
+	var results []WorkspaceInfo
+	if err := cursor.All(context.TODO(), &results); err != nil {
+		c.JSON(500, gin.H{"error": "failed to decode results"})
 		return
 	}
 
-	c.IndentedJSON(200, members)
-}
-
-// @Summary Assign task to someone
-// @Router /api/v1/workspaces/{workspaceId}/assign [post]
-// @Accept json
-// @Success 200
-// @Tags Tasks
-// @Param data body AssignTask true "Assign Task"
-// @Param X-Authorization header string true "Bearer Token"
-// @Param workspaceId query string true "Workspace ID"
-func assignTask(c *gin.Context) {
-	id, _ := c.Get("id")
-	workspaceId := c.Param("workspaceId")
-	var input AssignTask
-	if err := json.NewDecoder(c.Request.Body).Decode(&input); err != nil {
-		c.AbortWithStatusJSON(500, gin.H{"error": "Something went wrong when parsing request"})
+	if len(results) == 0 {
+		c.JSON(404, gin.H{"error": "workspace not found"})
 		return
 	}
-	workspace := Workspace{}
-	if err := workspacesDb.FindOne(context.TODO(), bson.D{{"_id", workspaceId}}).Decode(&workspace); err != nil {
-		if errors.Is(err, mongo.ErrNoDocuments) {
-			c.AbortWithStatusJSON(404, gin.H{"error": "Workspace does not exist"})
-			return
-		} else {
-			c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
-			return
-		}
-	}
-	if input.UserId == id || workspace.OwnedBy == id {
-		task := Task{}
-		if err := tasksDb.FindOne(context.TODO(), bson.D{{"_id", input.TaskId}}).Decode(&task); err != nil {
-			if errors.Is(err, mongo.ErrNoDocuments) {
-				c.AbortWithStatusJSON(404, gin.H{"error": "Task does not exist"})
-				return
-			} else {
-				c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
-				return
+
+	result := results[0]
+
+	authorized := result.OwnedBy == userId
+	if !authorized {
+		for _, member := range result.Members {
+			if member == userId {
+				authorized = true
+				break
 			}
 		}
-		task.AssignedTo = id.(bson.ObjectID)
-		if _, err := tasksDb.ReplaceOne(context.TODO(), bson.D{{"_id", input.TaskId}}, task); err != nil {
-			c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
-			return
-		}
-		c.AbortWithStatus(200)
+	}
+
+	if !authorized {
+		c.JSON(403, gin.H{"error": "forbidden"})
 		return
 	}
+
+	c.JSON(200, result)
 }

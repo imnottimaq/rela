@@ -2,17 +2,18 @@ package main
 
 import (
 	_ "Rela/docs"
-	"go.mongodb.org/mongo-driver/v2/mongo"
-	"go.mongodb.org/mongo-driver/v2/mongo/options"
-	"log"
-	_ "net/http/pprof"
 	"os"
 	"regexp"
+	"strings"
 	"time"
 
-	ratelimit "github.com/JGLTechnologies/gin-rate-limit"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
+
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
+	ratelimit "github.com/khaaleoo/gin-rate-limiter/core"
 	swaggerfiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
 )
@@ -21,7 +22,8 @@ var _ = godotenv.Load(".env_local")
 var port = os.Getenv("PORT")
 var pepper = os.Getenv("PEPPER")
 var mongodbCredentials = os.Getenv("MONGO_CREDS")
-var dbClient, _ = mongo.Connect(options.Client().ApplyURI(mongodbCredentials).SetServerAPIOptions(options.ServerAPI(options.ServerAPIVersion1)))
+var frontendOriginEnv = os.Getenv("FRONTEND_ORIGINS")
+var dbClient, _ = mongo.Connect(options.Client().ApplyURI(mongodbCredentials).SetServerAPIOptions(options.ServerAPI(options.ServerAPIVersion1)).SetMaxPoolSize(100).SetMinPoolSize(10).SetMaxConnIdleTime(30 * time.Second))
 
 var tasksDb = dbClient.Database("rela").Collection("tasks")
 var usersDb = dbClient.Database("rela").Collection("users")
@@ -30,103 +32,119 @@ var workspacesDb = dbClient.Database("rela").Collection("workspaces")
 
 var emailRegex = regexp.MustCompile(`^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$`)
 
-func keyFunc(c *gin.Context) string {
-	return c.ClientIP()
-}
-func rateLimitHandler(c *gin.Context, info ratelimit.Info) {
-	c.AbortWithStatusJSON(429, gin.H{"error": "too many requests"})
+func getAllowedOrigins() []string {
+	if frontendOriginEnv == "" {
+		return []string{"http://localhost:5173", "http://localhost:8000", "http://localhost:5174"}
+	}
+	origins := strings.Split(frontendOriginEnv, ",")
+	for i := range origins {
+		origins[i] = strings.TrimSpace(origins[i])
+	}
+	return origins
 }
 
+// @Title			Rela API Docs
+// @Description	Simple WIP task tracker that can be self-hosted
+// @Version		1.0
+// @BasePath		/api/v1
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
 func main() {
 	r := gin.Default()
+	r.RedirectTrailingSlash = false // Explicitly disable automatic redirects
+	corsConfig := cors.DefaultConfig()
+	corsConfig.AllowOrigins = getAllowedOrigins()
+	corsConfig.AllowMethods = []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"}
+	corsConfig.AllowHeaders = []string{"Origin", "Content-Type", "Accept", "Authorization", "X-Requested-With", "X-Authorization"}
+	corsConfig.AllowCredentials = true
+	r.Use(cors.New(corsConfig))
 	r.MaxMultipartMemory = 8 << 20
-	store := ratelimit.InMemoryStore(&ratelimit.InMemoryOptions{
-		Rate:  time.Second,
-		Limit: 5,
+	// Rate Limiter
+	rateLimiter := ratelimit.RequireRateLimiter(ratelimit.RateLimiter{
+		RateLimiterType: ratelimit.IPRateLimiter,
+		Key:             "rela",
+		Option:          ratelimit.RateLimiterOption{Limit: 5, Burst: 100, Len: 1 * time.Minute},
 	})
-	rateLimiter := ratelimit.RateLimiter(store, &ratelimit.Options{
-		ErrorHandler: rateLimitHandler,
-		KeyFunc:      keyFunc,
-	})
-
 	// Groups
-	protected := r.Group("/api/v1")
-	workspaces := protected.Group("/workspaces/:workspaceId")
-	tasks := protected.Group("/tasks")
-	users := r.Group("/api/v1/users")
-	boards := protected.Group("/boards")
-
-	//Middleware
+	v1 := r.Group("/api/v1")
+	protected := v1.Group("/")
 	protected.Use(authMiddleware())
-	boards.Use(authMiddleware())
-	tasks.Use(authMiddleware())
-	tasks.Use(taskMiddleware())
-	users.Use(userMiddleware())
-	workspaces.Use(authMiddleware())
+
+	// Middleware
+	r.Use(rateLimiter)
+
 	{
-		//Tasks
-		r.Static("/app", "../frontend/dist/")
-		r.Static("/assets", "../frontend/dist/assets")
-		r.Static("/img", "./img")
-		tasks.GET("/", rateLimiter, getAllTasks)
-		tasks.POST("/", rateLimiter, createNewTask)
-		tasks.PATCH("/:taskId", rateLimiter, editExistingTask)
-		tasks.DELETE("/:taskId", rateLimiter, deleteExistingTask)
+		v1.Static("/img", "./img")
 
-		//Boards
-		boards.GET("/", rateLimiter, getAllBoards)
-		boards.POST("/", rateLimiter, addBoard)
-		boards.DELETE("/:boardId", rateLimiter, deleteBoard)
-		boards.PATCH("/:boardId", rateLimiter, editBoard)
+		// Users
+		usersGroup := v1.Group("/users")
+		usersGroup.Use(userMiddleware())
+		{
+			usersGroup.POST("/create", createUser)
+			usersGroup.POST("/login", loginUser)
+			usersGroup.GET("/refresh", refreshAccessToken)
+			usersGroup.POST("/logout", logoutUser)
+		}
 
-		//Users
-		users.POST("/create", rateLimiter, createUser)
-		users.POST("/login", rateLimiter, loginUser)
-		users.GET("/refresh", rateLimiter, refreshAccessToken)
+		// Protected User Routes
+		protectedUsersGroup := protected.Group("/users")
+		{
+			protectedUsersGroup.GET("/workspaces", getAllWorkspaces)
+			protectedUsersGroup.DELETE("/delete", deleteUser)
+			protectedUsersGroup.POST("/upload_avatar", uploadAvatar)
+			protectedUsersGroup.GET("/get_info", getUserDetails)
+		}
 
-		protected.GET("/users/workspaces", rateLimiter, getAllWorkspaces)
-		protected.DELETE("/users/delete", rateLimiter, deleteUser)
-		protected.POST("/users/upload_avatar", rateLimiter, uploadAvatar)
-		protected.GET("/users/get_info", rateLimiter, getUserDetails)
+		// Workspaces
+		workspacesGroup := protected.Group("/workspaces")
+		workspaceByIdGroup := workspacesGroup.Group("/:workspaceId")
+		{
+			workspacesGroup.POST("/create", createWorkspace)
+			workspacesGroup.POST("/invite/accept/:joinToken", addMember)
+			r.GET("/workspaces/invite/:joinToken", getWorkspaceByInviteToken)
 
-		//Workspace management
-		protected.POST("/workspaces/create", rateLimiter, createWorkspace)
-		workspaces.POST("/add/:joinToken", rateLimiter, addMember)
-		workspaces.GET("/new_invite", rateLimiter, createNewInvite)
-		workspaces.DELETE("/kick", rateLimiter, kickMember)
-		workspaces.PATCH("/promote/:userId", rateLimiter, promoteMember)
-		workspaces.GET("/members", rateLimiter, getAllMembers)
-		workspaces.PATCH("/", rateLimiter, editWorkspace)
-		workspaces.DELETE("/", rateLimiter, deleteWorkspace)
-		workspaces.POST("/upload_avatar", rateLimiter, uploadAvatar)
+			workspaceByIdGroup.GET("/new_invite", createNewInvite)
+			workspaceByIdGroup.DELETE("/kick", kickMember)
+			workspaceByIdGroup.PATCH("/promote/:userId", promoteMember)
+			workspaceByIdGroup.GET("/", getWorkspace)
+			workspaceByIdGroup.GET("/info", getWorkspaceInfo)
+			workspaceByIdGroup.PATCH("/", editWorkspace)
+			workspaceByIdGroup.DELETE("/", deleteWorkspace)
+			workspaceByIdGroup.POST("/upload_avatar", uploadAvatar)
 
-		//Workspace tasks
-		workspaces.GET("/tasks/", rateLimiter, getAllTasks)
-		workspaces.POST("/tasks/", rateLimiter, createNewTask)
-		workspaces.PATCH("/tasks/:taskId", rateLimiter, editExistingTask)
-		workspaces.DELETE("/delete/:taskId", rateLimiter, deleteExistingTask)
-		workspaces.POST("/assign", rateLimiter, assignTask)
+			// Workspace Tasks
+			workspaceByIdGroup.GET("/tasks/:boardId", getAllTasks)
+			workspaceByIdGroup.POST("/tasks", createNewTask)
+			workspaceByIdGroup.PATCH("/tasks/:taskId", taskMiddleware(), editExistingTask)
+			workspaceByIdGroup.DELETE("/delete/:taskId", taskMiddleware(), deleteExistingTask)
 
-		//Workspace boards
-		workspaces.GET("/boards", rateLimiter, getAllBoards)
-		workspaces.POST("/boards", rateLimiter, addBoard)
-		workspaces.DELETE("/boards/:boardId", rateLimiter, deleteBoard)
-		workspaces.PATCH("/boards/:boardId", rateLimiter, editBoard)
+			// Workspace Boards
+			workspaceByIdGroup.GET("/boards", getAllBoards)
+			workspaceByIdGroup.POST("/boards", addBoard)
+			workspaceByIdGroup.DELETE("/boards/:boardId", deleteBoard)
+			workspaceByIdGroup.PATCH("/boards/:boardId", editBoard)
+		}
 
-		//Docs
-		r.GET("/api/v1/docs/*any", ginSwagger.WrapHandler(swaggerfiles.Handler))
+		// Public invite route
+		v1.GET("/workspaces/invite/:joinToken", getWorkspaceByInviteToken)
+
+		// Docs
+		v1.GET("/docs/*any", ginSwagger.WrapHandler(swaggerfiles.Handler))
 	}
+
 	if pepper == "" {
-		log.Print("WARNING Server-side secret is not present, this is big security flaw")
+		print("WARNING Server-side secret is not present, this is a big security flaw")
 	} else if mongodbCredentials == "" {
-		log.Fatal("FATAL MongoDB credentials is not present")
+		panic("FATAL MongoDB credentials are not present")
 	} else if port == "" {
-		log.Print("WARNING Port is not present, falling back to default")
+		print("WARNING Port is not present, falling back to default")
 		if err := r.Run(":8080"); err != nil {
-			log.Fatal("Failed to start server")
+			panic("Failed to start server")
 		}
 	}
+
 	if err := r.Run(port); err != nil {
-		log.Fatal("Failed to start server")
+		panic("Failed to start server")
 	}
 }

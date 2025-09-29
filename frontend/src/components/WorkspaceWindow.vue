@@ -1,0 +1,230 @@
+<template>
+  <WindowComponent
+    :title="`Workspace: ${workspace?.name || 'Unnamed'}`"
+    :buttons="[{ label: 'Close', onClick: close }]"
+    v-model:visible="modelVisible"
+    :initial-size="{ width: 520, height: 420 }"
+    :min-size="{ width: 420, height: 320 }"
+    :storage-key="`rela-window-workspace-${workspace?.id || workspace?._id || workspace?.name}`"
+    :menu="windowMenu"
+  >
+    <div class="content">
+      <div v-if="loading" class="hint">Working...</div>
+      <div v-if="error" class="error">{{ error }}</div>
+
+      <section class="ws-info">
+        <img :src="avatarUrl" alt="Workspace Avatar" class="avatar" />
+        <p><strong>{{ detailedWorkspace.name || workspace?.name }}</strong></p>
+      </section>
+
+      <section class="boards">
+        <div class="boards-header">
+          <h3>Boards</h3>
+        </div>
+        <div v-if="boardsError" class="error">{{ boardsError }}</div>
+        <div v-if="loadingBoards" class="hint">Loading boards…</div>
+        <ul v-else class="board-list">
+          <li v-if="boards.length === 0" class="hint">No boards yet</li>
+          <li v-for="b in boards" :key="b._id || b.id">
+            <button class="inline-link" type="button" @click="selectBoard(b)">
+              <span class="board-name">{{ b.name || (b._id || b.id) }}</span>
+            </button>
+          </li>
+        </ul>
+      </section>
+    </div>
+  </WindowComponent>
+</template>
+
+<script setup>
+import { computed, onMounted, onUnmounted, ref } from 'vue';
+import WindowComponent from './common/WindowComponent.vue';
+import { API_BASE_URL, workspaceApi } from '../utils/http';
+import { openBoardWindow } from '../composables/useBoards';
+import { showCreateBoardWindow } from '../composables/useCreateBoardWindow.js';
+import { showEditWorkspaceWindow } from '../composables/useEditWorkspaceWindow.js';
+import defaultAvatar from '/default-workspace.ico';
+
+const props = defineProps({
+  workspace: { type: Object, required: true },
+  visible: { type: Boolean, default: true },
+});
+
+const emit = defineEmits(['update:visible', 'close', 'workspace-deleted']);
+
+const modelVisible = computed({
+  get: () => props.visible,
+  set: (v) => emit('update:visible', v),
+});
+
+const close = () => {
+  emit('update:visible', false);
+  emit('close');
+};
+
+const wsId = computed(() => props.workspace?._id || props.workspace?.id || props.workspace?.Id || props.workspace?.name);
+
+const boards = ref([]);
+const loadingBoards = ref(false);
+const boardsError = ref('');
+
+const loading = ref(false);
+const error = ref('');
+const detailedWorkspace = ref({});
+
+const avatarUrl = computed(() => {
+  const avatar = detailedWorkspace.value?.avatar || props.workspace?.avatar;
+  if (!avatar) return defaultAvatar;
+  if (avatar.startsWith('http')) return avatar;
+  return `${API_BASE_URL || ''}/${avatar}`;
+});
+
+const loadBoards = async () => {
+  if (!wsId.value) return;
+  loadingBoards.value = true;
+  boardsError.value = '';
+  try {
+    const { data } = await workspaceApi.getBoards(wsId.value);
+    boards.value = Array.isArray(data) ? data : (Array.isArray(data?.boards) ? data.boards : []);
+  } catch (e) {
+    console.error('Failed to load boards', e);
+    boards.value = [];
+    boardsError.value = 'Failed to load boards';
+  } finally {
+    loadingBoards.value = false;
+  }
+};
+
+const loadWorkspaceDetails = async () => {
+  if (!wsId.value) return;
+  loading.value = true;
+  error.value = '';
+  try {
+    const { data } = await workspaceApi.getWorkspaceInfo(wsId.value);
+    detailedWorkspace.value = data;
+  } catch (e) {
+    console.error('Failed to fetch workspace info', e);
+    error.value = 'Failed to load workspace details.';
+    detailedWorkspace.value = {};
+  } finally {
+    loading.value = false;
+  }
+};
+
+const handleBoardCreated = async (event) => {
+  const board = event.detail.board;
+  await loadBoards();
+  if (!board) return;
+
+  const boardId = board._id || board.id;
+  let boardToOpen = null;
+
+  if (boardId) {
+    boardToOpen = boards.value.find(b => (b._id || b.id) === boardId);
+  } else if (board.name) {
+    boardToOpen = boards.value.find(b => b.name === board.name);
+  }
+
+  if (boardToOpen) {
+    openBoardWindow(props.workspace, boardToOpen);
+  }
+};
+
+const handleWorkspaceUpdated = (event) => {
+  const updatedWorkspace = event.detail.workspace;
+  const updatedId = updatedWorkspace.id || updatedWorkspace._id;
+  if (updatedId === wsId.value) {
+    detailedWorkspace.value = updatedWorkspace;
+  }
+};
+
+const handleWorkspaceDeleted = (event) => {
+  if (event.detail.workspaceId === wsId.value) {
+    close();
+  }
+};
+
+onMounted(() => {
+  loadBoards();
+  loadWorkspaceDetails();
+  window.addEventListener('rela:board-created', handleBoardCreated);
+  window.addEventListener('rela:workspace-updated', handleWorkspaceUpdated);
+  window.addEventListener('rela:workspace-deleted', handleWorkspaceDeleted);
+});
+
+onUnmounted(() => {
+  window.removeEventListener('rela:board-created', handleBoardCreated);
+  window.removeEventListener('rela:workspace-updated', handleWorkspaceUpdated);
+  window.removeEventListener('rela:workspace-deleted', handleWorkspaceDeleted);
+});
+
+const selectBoard = (board) => {
+  openBoardWindow(props.workspace, board);
+};
+
+const windowMenu = computed(() => {
+  const list = Array.isArray(boards.value) ? boards.value : [];
+  const boardItems = [
+    {
+      type: 'button',
+      label: 'Create board',
+      onClick: () => showCreateBoardWindow(wsId.value),
+    },
+  ];
+
+  if (list.length > 0) {
+    boardItems.push({ type: 'separator' });
+    boardItems.push(
+      ...list.map((b) => ({
+        type: 'button',
+        label: b.name || String(b._id || b.id),
+        onClick: () => selectBoard(b),
+      }))
+    );
+  }
+
+  const manageItems = [
+    {
+      label: 'Edit Workspace...',
+      type: 'button',
+      onClick: () => showEditWorkspaceWindow(detailedWorkspace.value),
+    },
+  ];
+
+  return [
+    { label: 'Manage', items: manageItems },
+    { label: 'Boards', items: boardItems },
+  ];
+});
+</script>
+
+<style scoped>
+.content { text-align: left; padding: 0 12px 12px; }
+.ws-info { display: flex; align-items: center; margin-bottom: 10px; }
+.avatar { width: 50px; height: 50px; border-radius: 4px; margin-right: 10px; vertical-align: middle; }
+.ws-info > p { flex-grow: 1; }
+.boards { margin-top: 10px; }
+.boards-header { display: flex; align-items: center; justify-content: space-between; }
+.board-list {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.board-name { font-weight: 500; }
+.error { color: #c00; }
+.hint { color: #555; font-style: italic; }
+.btn { font-size: 12px; padding: 4px 8px; }
+.inline-link {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: #0066cc;
+  cursor: pointer;
+  text-decoration: underline;
+}
+.inline-link:hover { color: #004b99; }
+</style>

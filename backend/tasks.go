@@ -3,62 +3,56 @@ package main
 import (
 	"context"
 	"errors"
+	"slices"
+	"time"
+
 	"github.com/gin-gonic/gin"
 	"github.com/goccy/go-json"
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
-	"log"
-	"time"
 )
 
-// @Title			Rela API Docs
-// @Description	Simple WIP task tracker that can be self-hosted
-// @Version		1.0
-// @BasePath		/api/v1
-
-// @Summary Get all tasks
-// @Description Return all tasks that current user owns
-// @Router /api/v1/tasks [get]
-// @Router /api/v1/workspaces/{workspaceId}/tasks [get]
-// @Success 200 {array} Task
-// @Produce json
-// @Tags Tasks
-// @Param workspaceId query string true "Workspace ID"
-// @Param X-Authorization header string true "Bearer Token"
+// @Summary 		Get all tasks
+// @Description 	Returns all tasks for a given workspace.
+// @Router 			/workspaces/{workspaceId}/tasks/{boardId} [get]
+// @Tags 			Tasks
+// @Security 		BearerAuth
+// @Produce 		json
+// @Param 			workspaceId path string true "Workspace ID"
+// @Param 			boardId path string true "Board ID"
+// @Success 		200 {object} AllTasksResponse "A list of tasks"
+// @Failure 		500 {object} ErrorSwagger "Internal Server Error"
 func getAllTasks(c *gin.Context) {
-	id, _ := c.Get("id")
-	var tasks []Task
-	if workspaceId := c.Param("workspaceId"); workspaceId == "" {
-		cursor, _ := tasksDb.Find(context.TODO(), bson.D{{"created_by", id}})
-
-		_ = cursor.All(context.TODO(), &tasks)
-		c.IndentedJSON(200, tasks)
-		if err := cursor.Close(context.TODO()); err != nil {
-			log.Print("Failed to close cursor")
-		}
+	bId := c.Param("boardId")
+	boardId, _ := bson.ObjectIDFromHex(bId)
+	tasks := make([]Task, 0)
+	wId := c.Param("workspaceId")
+	workspaceId, _ := bson.ObjectIDFromHex(wId)
+	cursor, _ := tasksDb.Find(context.TODO(), bson.D{
+		{"created_by", workspaceId},
+		{"board", boardId},
+	})
+	_ = cursor.All(context.TODO(), &tasks)
+	c.IndentedJSON(200, gin.H{"tasks": tasks})
+	if err := cursor.Close(context.TODO()); err != nil {
+		c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
 		return
-	} else {
-		cursor, _ := tasksDb.Find(context.TODO(), bson.D{{"created_by", workspaceId}})
-		_ = cursor.All(context.TODO(), &tasks)
-		c.IndentedJSON(200, tasks)
-		if err := cursor.Close(context.TODO()); err != nil {
-			log.Print("Failed to close cursor")
-		}
 	}
 }
 
-// @Summary Create new task
-// @Router /api/v1/tasks [post]
-// @Router /api/v1/workspaces/{workspaceId}/tasks [post]
-// @Accept json
-// @Success 200 {array} Task
-// @Produce json
-// @Tags Tasks
-// @Param data body CreateTask true "Create task request"
-// @Param workspaceId query string true "Workspace ID"
-// @Param X-Authorization header string true "Bearer Token"
+// @Summary 		Create a new task
+// @Description 	Creates a new task for a workspace.
+// @Router 			/workspaces/{workspaceId}/tasks [post]
+// @Tags 			Tasks
+// @Security 		BearerAuth
+// @Accept 			json
+// @Produce 		json
+// @Param 			workspaceId path string true "Workspace ID"
+// @Param 			data body CreateTask true "Task creation data"
+// @Success 		200 {object} Task "The created task"
+// @Failure 		400 {object} ErrorSwagger "Bad request - check your input"
+// @Failure 		500 {object} ErrorSwagger "Internal server error"
 func createNewTask(c *gin.Context) {
-	id, _ := c.Get("id")
 	var input CreateTask
 	var board Board
 	err := json.NewDecoder(c.Request.Body).Decode(&input)
@@ -76,23 +70,22 @@ func createNewTask(c *gin.Context) {
 	if errors.Is(err, mongo.ErrNoDocuments) {
 		c.AbortWithStatusJSON(400, gin.H{"error": "Board does not exist"})
 		return
-	} else {
-		c.AbortWithStatusJSON(500, gin.H{"error": "Internal server error"})
+	} else if err != nil {
+		c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
+		return
 	}
+	workspaceId := c.Param("workspaceId")
+	transformedId, _ := bson.ObjectIDFromHex(workspaceId)
 	newTask := Task{
 		Name:        input.Name,
 		Description: input.Description,
 		CreatedAt:   time.Now().UTC().Unix(),
-		CreatedBy:   id.(bson.ObjectID),
+		CreatedBy:   transformedId,
 		Board:       input.Board,
-	}
-	if workspaceId := c.Param("workspaceId"); workspaceId != "" {
-		transformedId, _ := bson.ObjectIDFromHex(workspaceId)
-		newTask.CreatedBy = transformedId
 	}
 	task, err := tasksDb.InsertOne(context.TODO(), newTask)
 	if err != nil {
-		c.AbortWithStatusJSON(500, gin.H{"error": "Failed to push task to database"})
+		c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
 		return
 	}
 	newTask.Id = task.InsertedID.(bson.ObjectID)
@@ -100,60 +93,142 @@ func createNewTask(c *gin.Context) {
 	return
 }
 
-// @Summary Edit existing task
-// @Router /api/v1/tasks/{taskId} [patch]
-// @Router /api/v1/workspaces/{workspaceId}/tasks/{taskId} [patch]
-// @Accept json
-// @Success 200
-// @Tags Tasks
-// @Param taskId path bson.ObjectID true "Task ID"
-// @Param workspaceId query string true "Workspace ID"
-// @Param data body EditTask true "Edit task request"
-// @Param X-Authorization header string true "Bearer Token"
-func editExistingTask(c *gin.Context) {
-	input, _ := c.Get("output")
-	previousVersion := input.(Task)
-	var valuesToEdit EditTask
-	taskId := c.Param("taskId")
-	err := json.NewDecoder(c.Request.Body).Decode(&valuesToEdit)
+func authorizeTaskAccess(c *gin.Context, task Task) bool {
+	userId, _ := c.Get("id")
+	wId := c.Param("workspaceId")
+	workspaceId, err := bson.ObjectIDFromHex(wId)
 	if err != nil {
-		c.AbortWithStatusJSON(400, gin.H{"error": "Something went wrong when parsing request"})
+		c.AbortWithStatusJSON(400, gin.H{"error": "Invalid workspaceId"})
+		return false
+	}
+
+	var workspace Workspace
+	if err := workspacesDb.FindOne(context.TODO(), bson.D{{"_id", workspaceId}}).Decode(&workspace); err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			c.AbortWithStatusJSON(404, gin.H{"error": "Workspace not found"})
+		} else {
+			c.AbortWithStatusJSON(500, gin.H{"error": "Internal server error"})
+		}
+		return false
+	}
+
+	if slices.Index(workspace.Members, userId.(bson.ObjectID)) == -1 {
+		c.AbortWithStatusJSON(403, gin.H{"error": "You are not a member of this workspace"})
+		return false
+	}
+
+	if task.CreatedBy != workspaceId {
+		c.AbortWithStatusJSON(400, gin.H{"error": "This task does not belong to this workspace"})
+		return false
+	}
+	return true
+}
+
+// @Summary 		Edit an existing task
+// @Description 	Edits the details of a specific task.
+// @Router 			/workspaces/{workspaceId}/tasks/{taskId} [patch]
+// @Tags 			Tasks
+// @Security 		BearerAuth
+// @Accept 			json
+// @Param 			taskId path string true "Task ID"
+// @Param 			workspaceId path string true "Workspace ID"
+// @Param 			data body EditTask true "Fields to edit in the task"
+// @Success 		200 "Task updated successfully"
+// @Failure 		400 {object} ErrorSwagger "Bad request - invalid input or deadline in the past"
+// @Failure 		403 {object} ErrorSwagger "Forbidden - you do not have access to this task"
+// @Failure 		404 {object} ErrorSwagger "Not Found - task or workspace not found"
+// @Failure 		500 {object} ErrorSwagger "Internal server error"
+func editExistingTask(c *gin.Context) {
+	taskInput, exists := c.Get("taskObj")
+	if !exists {
+		c.AbortWithStatusJSON(500, gin.H{"error": "Task object not found in context"})
 		return
 	}
-	if valuesToEdit.Name != nil {
-		previousVersion.Name = *valuesToEdit.Name
-		if previousVersion.Name == "" {
-			c.AbortWithStatusJSON(400, gin.H{"error": "Name cannot be empty"})
+	task := taskInput.(Task)
+
+	if !authorizeTaskAccess(c, task) {
+		return
+	}
+
+	var valuesToEdit EditTask
+	if err := json.NewDecoder(c.Request.Body).Decode(&valuesToEdit); err != nil {
+		c.AbortWithStatusJSON(500, gin.H{"error": "Something went wrong when parsing request"})
+		return
+	}
+
+	if valuesToEdit.Name != "" {
+		task.Name = valuesToEdit.Name
+	}
+	if valuesToEdit.Description != "" {
+		task.Description = valuesToEdit.Description
+	}
+	// Handle moving task between boards
+	if valuesToEdit.Board != "" {
+		newBoardId, err := bson.ObjectIDFromHex(valuesToEdit.Board)
+		if err != nil {
+			c.AbortWithStatusJSON(400, gin.H{"error": "Invalid board id"})
 			return
 		}
+
+		// Ensure the target board exists and belongs to the same owner (user or workspace)
+		var targetBoard Board
+		if err := boardsDb.FindOne(context.TODO(), bson.D{{"_id", newBoardId}}).Decode(&targetBoard); err != nil {
+			if errors.Is(err, mongo.ErrNoDocuments) {
+				c.AbortWithStatusJSON(404, gin.H{"error": "Board does not exist"})
+				return
+			}
+			c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
+			return
+		}
+
+		// The board must be owned by the same entity as the task (user or workspace)
+		if targetBoard.OwnedBy != task.CreatedBy {
+			c.AbortWithStatusJSON(400, gin.H{"error": "Cannot move task to a board with different owner"})
+			return
+		}
+
+		task.Board = newBoardId
 	}
-	if valuesToEdit.Description != nil {
-		previousVersion.Description = valuesToEdit.Description
+	if valuesToEdit.Deadline != 0 {
+		if valuesToEdit.Deadline <= time.Now().UTC().Unix() {
+			c.AbortWithStatusJSON(400, gin.H{"error": "Deadline cant be past current time"})
+			return
+		}
+		task.Deadline = valuesToEdit.Deadline
 	}
-	_, err = tasksDb.ReplaceOne(context.TODO(), bson.D{{Key: "_id", Value: taskId}}, &previousVersion)
-	if err != nil {
-		c.AbortWithStatusJSON(500, gin.H{"error": "Failed to change task"})
+	if _, err := tasksDb.ReplaceOne(context.TODO(), bson.D{{Key: "_id", Value: task.Id}}, &task); err != nil {
+		c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
 		return
 	}
 	c.AbortWithStatus(200)
-	return
 }
 
-// @Summary Delete existing task
-// @Router /api/v1/tasks/{taskId} [delete]
-// @Router /api/v1/workspaces/{workspaceId}/tasks/{taskId} [delete]
-// @Success 200
-// @Produce json
-// @Tags Tasks
-// @Param taskId path bson.ObjectID true "Task ID"
-// @Param workspaceId query string true "Workspace ID"
-// @Param X-Authorization header string true "Bearer Token"
+// @Summary 		Delete an existing task
+// @Description 	Deletes a specific task.
+// @Router 			/workspaces/{workspaceId}/tasks/{taskId} [delete]
+// @Tags 			Tasks
+// @Security 		BearerAuth
+// @Param 			taskId path string true "Task ID"
+// @Param 			workspaceId path string true "Workspace ID"
+// @Success 		200 "Task deleted successfully"
+// @Failure 		403 {object} ErrorSwagger "Forbidden - you do not have access to this task"
+// @Failure 		404 {object} ErrorSwagger "Not Found - task or workspace not found"
+// @Failure 		500 {object} ErrorSwagger "Internal server error"
 func deleteExistingTask(c *gin.Context) {
-	input, _ := c.Get("output")
-	result := input.(Task)
-	_, err := tasksDb.DeleteOne(context.TODO(), bson.D{{Key: "_id", Value: result.Id}})
-	if err != nil {
+	taskInput, exists := c.Get("taskObj")
+	if !exists {
+		c.AbortWithStatusJSON(500, gin.H{"error": "Task object not found in context"})
+		return
+	}
+	task := taskInput.(Task)
+
+	if !authorizeTaskAccess(c, task) {
+		return
+	}
+
+	if _, err := tasksDb.DeleteOne(context.TODO(), bson.D{{Key: "_id", Value: task.Id}}); err != nil {
 		c.AbortWithStatusJSON(500, gin.H{"error": "Failed to delete task"})
 		return
 	}
+	c.AbortWithStatus(200)
 }
