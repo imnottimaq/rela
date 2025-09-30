@@ -13,12 +13,14 @@
           <a>Name: </a>
           <input id="task-title-input" type="text" v-model="taskName" @keydown.enter="submit"  placeholder="Name" aria-describedby="task-title-error"/>
           <div v-if="error" class="error-message" id="task-title-error" role="tooltip">{{ error }}</div>
+          <br>
         </div>
         <a>Description: </a>
         <input id="task-desc-input" type="text" v-model="taskDesc" @keydown.enter="submit"  placeholder="Description"/>
         <br>
         <a>Deadline: </a>
         <input id="task-deadline-input" type="date" v-model="taskDeadline" placeholder="Deadline" />
+        <br>
       </div>
     </div>
   </WindowComponent>
@@ -28,7 +30,6 @@
 import { computed, ref, onMounted, onUnmounted } from 'vue';
 import WindowComponent from './common/WindowComponent.vue';
 import { authApi, workspaceApi } from '../utils/http';
-import defaultAvatar from '/default-avatar.jpg';
 
 const visible = ref(false);
 const isEditing = ref(false);
@@ -44,8 +45,6 @@ const error = ref('');
 const workspaceId = ref(null);
 const boardId = ref(null);
 const task = ref(null);
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, "");
 
 const windowTitle = computed(() => isEditing.value ? 'Edit Task' : 'Create New Task');
 
@@ -64,7 +63,6 @@ const fetchWorkspaceMembers = async (wId) => {
     console.error('Failed to fetch workspace members:', err);
   }
 };
-
 const fetchCurrentUser = async () => {
   try {
     const { data } = await authApi.getUserInfo();
