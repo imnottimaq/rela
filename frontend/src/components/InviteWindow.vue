@@ -5,6 +5,7 @@
       :closable="true"
       :initial-size="{ width: 400, height: 250 }"
       :footer-buttons="footerButtons"
+      :buttons="[{ label: 'Close', onClick: handleCancel }]"
       storage-key="rela-window-invite"
   >
     <div class="content">

@@ -8,6 +8,7 @@
     <ForgotPasswordWindow/>
     <ProfileWindow />
     <ConfirmLogoutWindow />
+    <ConfirmDeleteAccountWindow />
     <CreateWorkspaceWindow />
     <AboutRelaWindow />
     <EditWorkspaceWindow />
@@ -53,6 +54,7 @@ import LoginWindow from './components/LoginWindow.vue';
 import RegisterWindow from './components/RegisterWindow.vue';
 import ProfileWindow from './components/ProfileWindow.vue';
 import ConfirmLogoutWindow from './components/ConfirmLogoutWindow.vue';
+import ConfirmDeleteAccountWindow from './components/ConfirmDeleteAccountWindow.vue';
 import CreateWorkspaceWindow from './components/CreateWorkspaceWindow.vue';
 import BoardWindow from './components/BoardWindow.vue';
 import YouWindow from "./components/YouWindow.vue";

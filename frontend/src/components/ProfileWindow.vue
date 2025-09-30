@@ -56,11 +56,10 @@
           <h3 class="danger-zone-title">Danger Zone</h3>
           <div class="danger-buttons">
             <button @click="handleLogout" class="action-button">Logout</button>
-            <button @click="confirmDeleteAccount" :disabled="deleteLoading" class="action-button delete">
-              {{ deleteLoading ? 'Deleting...' : 'Delete Account' }}
+            <button @click="handleDeleteAccount" class="action-button delete">
+              Delete Account
             </button>
           </div>
-          <p v-if="deleteError" class="error">{{ deleteError }}</p>
         </div>
       </template>
       <template v-else>
@@ -76,11 +75,12 @@ import WindowComponent from "./common/WindowComponent.vue";
 import { useProfileWindow } from "../composables/useProfileWindow";
 import { useAuth } from "../composables/useAuth";
 import { showConfirmLogoutWindow } from "../composables/useConfirmLogoutWindow";
-import { authApi, clearAuthTokens } from "../utils/http";
+import { showConfirmDeleteAccountWindow } from "../composables/useConfirmDeleteAccountWindow";
+import { authApi } from "../utils/http";
 import defaultAvatar from '/default-avatar.jpg';
 
 const { profileVisible, hideProfileWindow } = useProfileWindow();
-const { isAuthenticated, logout } = useAuth();
+const { isAuthenticated } = useAuth();
 
 const profile = ref(null);
 const editableProfile = ref({ name: '', email: '' });
@@ -88,10 +88,8 @@ const newPassword = ref('');
 const confirmPassword = ref('');
 const loading = ref(false);
 const saveLoading = ref(false);
-const deleteLoading = ref(false);
 const error = ref("");
 const saveError = ref("");
-const deleteError = ref("");
 const saveSuccess = ref(false);
 const fileInput = ref(null);
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, "");
@@ -129,7 +127,6 @@ const loadProfile = async () => {
   loading.value = true;
   error.value = "";
   saveError.value = "";
-  deleteError.value = "";
   saveSuccess.value = false;
 
   try {
@@ -196,39 +193,8 @@ const saveProfile = async () => {
   }
 };
 
-const confirmDeleteAccount = () => {
-  showConfirmDialog({
-    title: "Delete Account",
-    message: "Are you sure you want to delete your account? This action cannot be undone. Please enter your password to confirm.",
-    confirmText: "Delete",
-    confirmButtonClass: "delete",
-    showInput: true,
-    inputType: "password",
-    onConfirm: (password) => deleteAccount(password),
-  });
-};
-
-const deleteAccount = async (password) => {
-  deleteLoading.value = true;
-  deleteError.value = "";
-
-  if (!password) {
-    deleteError.value = "Password is required to delete your account.";
-    deleteLoading.value = false;
-    return;
-  }
-
-  try {
-    await authApi.deleteUser({ password });
-    clearAuthTokens();
-    logout();
-    hideProfileWindow();
-  } catch (err) {
-    console.error("Failed to delete account", err);
-    deleteError.value = err.response?.data?.message || "Failed to delete account.";
-  } finally {
-    deleteLoading.value = false;
-  }
+const handleDeleteAccount = () => {
+  showConfirmDeleteAccountWindow(() => hideProfileWindow(), editableProfile.value.email);
 };
 
 watch(
@@ -240,7 +206,6 @@ watch(
       profile.value = null;
       error.value = "";
       saveError.value = "";
-      deleteError.value = "";
       saveSuccess.value = false;
       newPassword.value = '';
       confirmPassword.value = '';

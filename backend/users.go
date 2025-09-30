@@ -188,8 +188,11 @@ func logoutUser(c *gin.Context) {
 // @Failure 		500 {object} ErrorSwagger "Internal server error"
 func deleteUser(c *gin.Context) {
 	userId, _ := c.Get("id")
-	middlewareInput, _ := c.Get("input")
-	input := middlewareInput.(LoginUser)
+	var input LoginUser
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.AbortWithStatusJSON(400, gin.H{"error": "Invalid request body"})
+		return
+	}
 	var user User
 	err := usersDb.FindOne(context.TODO(), bson.D{{Key: "_id", Value: userId}}).Decode(&user)
 	if err != nil {
