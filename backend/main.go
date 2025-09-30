@@ -86,7 +86,7 @@ func main() {
 			usersGroup.GET("/refresh", refreshAccessToken)
 			usersGroup.POST("/logout", logoutUser)
 		}
-
+		protected.PATCH("/users/update_info", updateUserInfo)
 		// Protected User Routes
 		protectedUsersGroup := protected.Group("/users")
 		{

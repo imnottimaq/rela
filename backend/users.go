@@ -365,3 +365,43 @@ func getUserDetails(c *gin.Context) {
 	}
 	c.AbortWithStatusJSON(200, user)
 }
+
+func updateUserInfo(c *gin.Context) {
+	userId, _ := c.Get("id")
+	valuesToEdit := CreateUser{}
+	user := User{}
+	if err := json.NewDecoder(c.Request.Body).Decode(&valuesToEdit); err != nil {
+		c.AbortWithStatusJSON(500, gin.H{"error": "Failed to decode request"})
+		return
+	}
+	if err := usersDb.FindOne(context.TODO(), bson.D{{"_id", userId}}).Decode(&user); err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			c.AbortWithStatusJSON(404, gin.H{"error": "User Not Found"})
+			return
+		} else if err != nil {
+			c.AbortWithStatusJSON(500, gin.H{"error": "Internal Server Error"})
+			return
+		}
+	}
+	if valuesToEdit.Name != "" {
+		user.Name = valuesToEdit.Name
+	}
+	if valuesToEdit.Email != "" {
+		user.Name = valuesToEdit.Name
+	}
+	if valuesToEdit.Password != "" {
+		if !validatePassword(valuesToEdit.Password) {
+			c.AbortWithStatusJSON(400, gin.H{"error": "Password does not meet requirements"})
+			return
+		} else {
+			user.HashedPassword = base64.RawStdEncoding.EncodeToString(argon2.IDKey([]byte(valuesToEdit.Password+pepper), []byte(user.Salt), uint32(1), uint32(32*1024), uint8(4), uint32(32)))
+		}
+	}
+	if _, err := usersDb.ReplaceOne(context.TODO(), bson.D{{"_id", userId}}, user); err != nil {
+		c.AbortWithStatusJSON(500, gin.H{"error": "Failed to change user data"})
+		return
+	} else {
+		c.AbortWithStatus(200)
+		return
+	}
+}
